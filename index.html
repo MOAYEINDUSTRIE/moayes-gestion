@@ -210,7 +210,7 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-b
    charges, ajustements). Aucun solde saisi à la main.
    Format de données identique aux sauvegardes V30.
    ========================================================= */
-const VERSION = 'V2.8.1';
+const VERSION = 'V2.8.2';
 const LS_DATA = 'moayes_v2_data', LS_CFG = 'moayes_v2_cfg', LS_PIN = 'moayes_v2_pins', LS_TS = 'moayes_v2_ts';
 const FIREBASE_CONFIG = {
   apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
@@ -274,6 +274,9 @@ function sanitize(d){
   for (const k of Object.keys(b)) if (d[k] === undefined || d[k] === null) d[k] = b[k];
   ['ventes','reglements','clients','production','achats','charges','fournisseurs','rh','rhHistorique','stockAjust','archives','audit','commandes','controlesCaisse','paiementsFourn','annulations']
     .forEach(k => { if (!Array.isArray(d[k])) d[k] = d[k] && typeof d[k]==='object' ? Object.values(d[k]) : []; });
+  // date de création des fiches clients : reprise du journal pour les fiches qui n'en ont pas
+  const creeLe = {}; d.audit.forEach(x => { if (x && x.module === 'clients' && /cr[ée]ation/i.test(x.action || '') && x.id && !creeLe[x.id]) creeLe[x.id] = x.date; });
+  d.clients.forEach(c => { if (c && !c.cree && creeLe[c.id]) c.cree = creeLe[c.id]; });
   if (!d.soldeInit && d.soldeInitial) d.soldeInit = d.soldeInitial;
   d.soldeInitial = d.soldeInit;
   return d;
@@ -587,13 +590,15 @@ function initTour(){
   const K = calc(), t = today(), from = addDays(t, -30);
   const freq = {};
   DATA.ventes.forEach(v => { if (v.date >= from){ const k = K.keyOf(v); freq[k] = (freq[k]||0) + 1; } });
-  const ids = DATA.clients.filter(c => freq[c.id]).sort((a,b) => freq[b.id] - freq[a.id]).map(c => c.id);
+  const ids = [...DATA.clients.filter(c => !freq[c.id] && (c.cree || '') >= from).map(c => c.id), ...DATA.clients.filter(c => freq[c.id]).sort((a,b) => freq[b.id] - freq[a.id]).map(c => c.id)];
   const lastQ = {};
   [...DATA.ventes].sort((a,b) => a.date < b.date ? -1 : 1).forEach(v => { const k = K.keyOf(v); lastQ[k] = num(v.qty); });
   TOUR = { date: t, mode:'Espèces', rows: ids.map(id => ({id, qty:0, paid:0, reg:0, lastQ: lastQ[id]||0, touched:false})) };
 }
 VIEWS.tournee = () => {
   if (!TOUR) initTour();
+  else { const have = new Set(TOUR.rows.map(r => r.id)), from = addDays(today(), -30);
+    DATA.clients.filter(c => !have.has(c.id) && (c.cree || '') >= from).forEach(c => TOUR.rows.unshift({id:c.id, qty:0, paid:0, reg:0, lastQ:0, touched:false})); }
   return header('Tournée du jour', 'Saisissez toutes les livraisons en une fois. Une ligne = un client.', `<button class="btn" onclick="bonLivraison(TOUR.date)">🧾 Bon de livraison</button>`) + `
   <div class="card" style="margin-bottom:12px"><div class="row">
     <div><label class="f">Date</label><input class="inp" type="date" id="tDate" value="${TOUR.date}" onchange="TOUR.date=this.value"></div>
@@ -644,7 +649,7 @@ function newClient(o){
   const ex = new Set(DATA.clients.map(c=>c.id));
   let id; do { id = 'CL' + String(seq).padStart(4,'0'); seq++; } while (ex.has(id));
   DATA._idClientSeq = seq;
-  const c = {id, nom: norm(o.nom), type:o.type||'Restaurant', tel:o.tel||'', zone:norm(o.zone||''), freq:o.freq||'Quotidien', mode:'Espèces', credit:0, obs:o.obs||''};
+  const c = {id, nom: norm(o.nom), type:o.type||'Restaurant', tel:o.tel||'', zone:norm(o.zone||''), freq:o.freq||'Quotidien', mode:o.mode||'Espèces', credit:0, obs:o.obs||'', cree:today()};
   DATA.clients.push(c); audit('clients','création','',c,id);
   return c;
 }
@@ -676,22 +681,24 @@ function saveTour(){
 }
 
 /* ---------- CLIENTS ---------- */
-let CF = {q:'', f:'dette'};
+let CF = {q:'', f:'tous'};
 VIEWS.clients = () => {
   const K = calc();
   let L = DATA.clients.map(c => ({c, cr:creditOf(c.id), last:K.last[c.id]||'', tot:K.tot[c.id]||0}));
-  if (CF.q) L = L.filter(x => norm(x.c.nom).includes(norm(CF.q)) || norm(x.c.zone).includes(norm(CF.q)));
-  if (CF.f === 'dette') L = L.filter(x => x.cr > 0).sort((a,b) => b.cr - a.cr);
-  else if (CF.f === 'actifs') L = L.filter(x => x.last >= addDays(today(), -14)).sort((a,b) => b.tot - a.tot);
-  else L.sort((a,b) => a.c.nom < b.c.nom ? -1 : 1);
+  const neuf = x => !x.last && (x.c.cree || '') >= addDays(today(), -30);
+  if (CF.q) L = L.filter(x => norm(x.c.nom).includes(norm(CF.q)) || norm(x.c.zone).includes(norm(CF.q)) || (x.c.tel||'').includes(CF.q));
+  if (CF.q) L.sort((a,b) => a.c.nom < b.c.nom ? -1 : 1);
+  else if (CF.f === 'dette') L = L.filter(x => x.cr > 0).sort((a,b) => b.cr - a.cr);
+  else if (CF.f === 'actifs') L = L.filter(x => x.last >= addDays(today(), -14) || neuf(x)).sort((a,b) => (neuf(b) - neuf(a)) || (b.tot - a.tot));
+  else L.sort((a,b) => (neuf(b) - neuf(a)) || (b.last > a.last ? 1 : b.last < a.last ? -1 : (a.c.nom < b.c.nom ? -1 : 1)));
   const totCr = L.reduce((s,x)=>s+Math.max(0,x.cr),0);
   return header('Clients & crédits', `${DATA.clients.length} fiches · crédit total ${FC(K.creditTotal)}`, `${isMgr()?`<button class="btn" onclick="exportTousClients()">📊 Exporter les historiques</button>`:''}<button class="btn p" onclick="editClient()">+ Nouveau client</button>`) + `
   <div class="card"><div class="row" style="margin-bottom:10px">
     <input class="inp" style="max-width:280px" placeholder="Rechercher un client ou une zone…" value="${esc(CF.q)}" oninput="CF.q=this.value;clearTimeout(window._cq);window._cq=setTimeout(()=>{render();const i=document.querySelector('.card .inp');i.focus();i.setSelectionRange(i.value.length,i.value.length)},250)">
-    <div class="seg">${[['dette','Doivent'],['actifs','Actifs 14 j'],['tous','Tous']].map(([k,l]) => `<button class="${CF.f===k?'on':''}" onclick="CF.f='${k}';render()">${l}</button>`).join('')}</div>
+    <div class="seg">${[['tous','Tous'],['dette','Doivent'],['actifs','Actifs 14 j']].map(([k,l]) => `<button class="${CF.f===k?'on':''}" onclick="CF.f='${k}';render()">${l}</button>`).join('')}</div>
     <div class="sp"></div><span class="small muted">${L.length} client(s) · ${FC(totCr)}</span></div>
   <div class="tw"><table><tr><th>Client</th><th>Zone</th><th class="n">Crédit</th><th class="n">Total acheté</th><th class="n">Dernier achat</th></tr>
-  ${L.map(x => `<tr class="click" onclick="go('client','${x.c.id}')"><td><b>${esc(x.c.nom)}</b>${x.c.tel?` <span class="small muted">${esc(x.c.tel)}</span>`:''}</td><td class="small">${esc(x.c.zone)}</td>
+  ${L.map(x => `<tr class="click" onclick="go('client','${x.c.id}')"><td><b>${esc(x.c.nom)}</b>${neuf(x)?' <span class="tag oc">nouveau</span>':''}${x.c.tel?` <span class="small muted">${esc(x.c.tel)}</span>`:''}</td><td class="small">${esc(x.c.zone)}</td>
     <td class="n">${x.cr>0?`<span class="tag cr">${FC(x.cr)}</span>`:x.cr<0?`<span class="tag oc">avance ${FC(-x.cr)}</span>`:'<span class="tag">0</span>'}</td>
     <td class="n">${FC(x.tot)}</td><td class="n">${fmtD(x.last)||'—'}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Aucun client</td></tr>'}</table></div></div>`;
 };
@@ -783,7 +790,7 @@ function editClient(id){
     {k:'obs', label:'Observation', value:c.obs, full:true}
   ], v => {
     if (!v.nom) { toast('Nom obligatoire'); return false; }
-    if (!id){ if (DATA.clients.find(x => norm(x.nom)===norm(v.nom))) { toast('Ce client existe déjà'); return false; } newClient(v); return; }
+    if (!id){ if (DATA.clients.find(x => norm(x.nom)===norm(v.nom))) { toast('Ce client existe déjà'); return false; } const nc = newClient(v); toast('✅ Client ' + nc.nom + ' créé (' + nc.id + ')'); setTimeout(() => go('client', nc.id), 60); return; }
     const old = JSON.stringify(c), oldNom = c.nom;
     Object.assign(c, {nom:norm(v.nom), tel:v.tel, zone:norm(v.zone), type:v.type, freq:v.freq, mode:v.mode, obs:v.obs});
     if (oldNom !== c.nom){ ['ventes','reglements'].forEach(k => DATA[k].forEach(o => { if (o.idClient === c.id) o.client = c.nom; })); }
