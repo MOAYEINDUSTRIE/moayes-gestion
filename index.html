@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#173f2f">
 <title>MOAYÉ'S INDUSTRIE — Gestion Pro V2</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#173f2f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="MOAYÉ'S">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -204,7 +211,7 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-b
    charges, ajustements). Aucun solde saisi à la main.
    Format de données identique aux sauvegardes V30.
    ========================================================= */
-const VERSION = 'V2.4';
+const VERSION = 'V2.5';
 const LS_DATA = 'moayes_v2_data', LS_CFG = 'moayes_v2_cfg', LS_PIN = 'moayes_v2_pins', LS_TS = 'moayes_v2_ts';
 const FIREBASE_CONFIG = {
   apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
@@ -705,7 +712,7 @@ VIEWS.client = () => {
     <div class="card kpi"><div class="l">30 derniers jours</div><div class="v">${pots30} <small>pots</small></div><div class="d">${m30.length} livraisons · ${FC(pots30*CFG.prix)}</div></div>
     <div class="card kpi"><div class="l">Total depuis le début</div><div class="v">${F(K.tot[c.id]||0)} <small>F</small></div><div class="d">Client depuis le ${fmtD(mv[0]?.d)||'—'}</div></div>
   </div>
-  <div class="card" style="margin-top:14px"><h3>Relevé de compte <button class="btn sm" onclick="window.print()">Imprimer</button></h3>
+  <div class="card" style="margin-top:14px"><h3>Relevé de compte <button class="btn sm" onclick="printPage()">Imprimer</button></h3>
   <div class="tw"><table><tr><th>Date</th><th>Opération</th><th class="n">Montant</th><th class="n">Payé</th><th class="n">Solde dû</th><th></th></tr>
   ${rows.map(m => m.t==='v'
     ? `<tr><td>${fmtD(m.d)}</td><td>${num(m.o.qty)} pots${num(m.o.remiseMontant)?` <span class="tag oc">remise ${F(m.o.remiseMontant)}</span>`:''}</td><td class="n">${FC(m.o.montant)}</td><td class="n">${enc(m.o)?FC(enc(m.o)):'<span class="tag cr">crédit</span>'}</td><td class="n"><b>${FC(m.bal)}</b></td><td class="n">${isMgr()?`<button class="btn sm" onclick="editVente(${m.i})">✎</button>`:''}</td></tr>`
@@ -1127,8 +1134,8 @@ VIEWS.rapports = () => {
   const top = Object.values(pc).sort((a,b)=>b.ca-a.ca);
   const prixRevient = m.pots ? m.couts/m.pots : 0;
   const tabs = `<div class="seg" style="margin-bottom:12px">${[['m','Mensuel'],['j','Journalier']].map(([k,l]) => `<button class="${(window.RT||'m')===k?'on':''}" onclick="window.RT='${k}';render()">${l}</button>`).join('')}</div>`;
-  if (window.RT === 'j') return header('Rapports', 'Rapport journalier complet', `<button class="btn" onclick="waBilan(window.RJD||today())">📲 WhatsApp</button><button class="btn" onclick="window.print()">Imprimer / PDF</button>`) + tabs + rapportJour(window.RJD || today());
-  return header('Rapports', 'Compte de résultat mensuel et indicateurs', `<button class="btn" onclick="exportXLSX()">📊 Excel</button><button class="btn" onclick="window.print()">Imprimer / PDF</button>`) + tabs + `
+  if (window.RT === 'j') return header('Rapports', 'Rapport journalier complet', `<button class="btn" onclick="waBilan(window.RJD||today())">📲 WhatsApp</button><button class="btn" onclick="printPage()">Imprimer / PDF</button>`) + tabs + rapportJour(window.RJD || today());
+  return header('Rapports', 'Compte de résultat mensuel et indicateurs', `<button class="btn" onclick="exportXLSX()">📊 Excel</button><button class="btn" onclick="printPage()">Imprimer / PDF</button>`) + tabs + `
   <div class="card"><h3>Compte de résultat par mois</h3><div class="tw"><table>
     <tr><th>Mois</th><th class="n">Pots</th><th class="n">CA</th><th class="n">Achats manioc</th><th class="n">Autres charges</th><th class="n">Résultat</th><th class="n">Marge</th><th class="n">Coût / pot</th><th class="n">Cash net</th><th class="n">Pertes</th></tr>
     ${ms.map(x => `<tr class="click" onclick="RM='${x.m}';render()" ${x.m===RM?'style="background:#f6fbf8"':''}><td><b>${fmtM(x.m)}</b></td><td class="n">${F(x.pots)}</td><td class="n">${F(x.ca)}</td><td class="n">${F(x.achats)}</td><td class="n">${F(x.chHM)}</td><td class="n ${x.res>=0?'up':'dn'}"><b>${F(x.res)}</b></td><td class="n">${x.ca?Math.round(x.res/x.ca*100):0} %</td><td class="n">${F(x.coutPot)}</td><td class="n ${x.cash>=0?'up':'dn'}">${F(x.cash)}</td><td class="n ${x.pertesVal?'dn':''}">${x.pertesVal?F(x.pertesVal):''}</td></tr>`).join('')}
@@ -1167,9 +1174,7 @@ function flux(d1, d2){
 const finMois = m => { const [y,mo] = m.split('-').map(Number); return m + '-' + String(new Date(y, mo, 0).getDate()).padStart(2,'0'); };
 function printDoc(title, body){
   const E = DATA.entreprise || {};
-  const w = window.open('', '_blank');
-  if (!w){ toast('Autorisez les fenêtres pop-up pour imprimer'); return; }
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>
+  const html = (`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>
     body{font-family:Arial,Helvetica,sans-serif;color:#111;padding:24px;font-size:13px;max-width:800px;margin:auto}
     .h{display:flex;justify-content:space-between;gap:20px;border-bottom:3px solid #173f2f;padding-bottom:12px;margin-bottom:16px}
     .t{font-size:20px;font-weight:700;color:#173f2f;text-align:right}
@@ -1178,8 +1183,11 @@ function printDoc(title, body){
     @media print{.np{display:none}}</style></head><body>
     <div class="h"><div>${E.logo?`<img src="${E.logo}" style="max-height:60px;margin-bottom:6px"><br>`:''}<b style="font-size:18px">${esc(E.nom||"MOAYÉ'S INDUSTRIE")}</b><br><span class="small">${esc(E.slogan||'')}</span><br>${esc(E.ville||'')}${E.tel?' · '+esc(E.tel):''}<br><span class="small">${E.rccm?'RCCM : '+esc(E.rccm):''}${E.cc?' · CC : '+esc(E.cc):''}</span></div><div class="t">${title}</div></div>
     ${body}<p class="np" style="margin-top:24px"><button onclick="print()" style="padding:10px 18px;font-size:15px">Imprimer / Enregistrer en PDF</button></p>
-    <script>setTimeout(function(){print()},400)<\/script></body></html>`);
-  w.document.close();
+    ${AB ? '' : '<script>setTimeout(function(){print()},400)<\/script>'}</body></html>`);
+  if (AB){ AB.printHtml(html, title); return; }
+  const w = window.open('', '_blank');
+  if (!w){ toast('Autorisez les fenêtres pop-up pour imprimer'); return; }
+  w.document.write(html); w.document.close();
 }
 function facture(id){
   const c = clientById(id);
@@ -1253,7 +1261,8 @@ function exportXLSX(){
   add('Pertes et ajustements', DATA.stockAjust.map(a => ({Date:a.date, Article:a.key==='manioc'?'Manioc (sacs)':'Attiéké (kg)', Type:a.type||'ajustement', Cause:a.cause||'', Quantité:num(a.delta), Valeur:num(a.valeur), Motif:a.motif||''})));
   add('Paiements fournisseurs', DATA.paiementsFourn.map(x => ({Date:x.date, Fournisseur:x.fourn, Montant:num(x.montant), Mode:x.mode||''})));
   add('Fournisseurs', DATA.fournisseurs.map(f => ({Nom:f.nom, 'Dette':Math.round(detteFourn(f.nom)), 'Téléphone':f.tel||'', Zone:f.zone||'', Type:f.type||'', 'Prix habituel':num(f.prix), Observation:f.obs||''})));
-  XLSX.writeFile(wb, `MOAYES_${today()}.xlsx`);
+  if (AB) AB.saveFile(`MOAYES_${today()}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', XLSX.write(wb, {bookType:'xlsx', type:'base64'}));
+  else XLSX.writeFile(wb, `MOAYES_${today()}.xlsx`);
   audit('système','export Excel','','','');
 }
 
@@ -1338,7 +1347,7 @@ VIEWS.etats = () => {
   const lastPrix = num((DATA.achats.slice().sort((a,b)=>a.date<b.date?-1:1).pop()||{}).prix);
   const cp = K.months.slice(-3).reduce((t,m) => ({c:t.c+m.couts, p:t.p+m.pots}), {c:0,p:0}), coutPot = cp.p ? cp.c/cp.p : 0;
   const row = (l, v, b, cls) => `<tr ${b?'style="border-top:2px solid var(--ink)"':''}><td>${b?'<b>'+l+'</b>':l}</td><td class="n ${cls||''}">${b?'<b>'+F(v)+'</b>':F(v)}</td></tr>`;
-  return header('États financiers', `Du ${fmtD(d1)} au ${fmtD(d2)}`, `<button class="btn" onclick="window.print()">Imprimer / PDF</button>`) + `
+  return header('États financiers', `Du ${fmtD(d1)} au ${fmtD(d2)}`, `<button class="btn" onclick="printPage()">Imprimer / PDF</button>`) + `
   <div class="row" style="margin-bottom:12px"><select class="inp" style="max-width:200px" onchange="EFP=this.value;render()">${opts.map(([v,l])=>`<option value="${v}" ${v===EFP?'selected':''}>${l}</option>`).join('')}</select></div>
   <div class="grid k2">
   <div class="card"><h3>Compte de résultat</h3><table>
@@ -1597,12 +1606,31 @@ function setLogo(file){
   rd.onload = () => { img.onload = () => { const r = Math.min(1, 240/Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = img.width*r; c.height = img.height*r; c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); DATA.entreprise = DATA.entreprise || {}; DATA.entreprise.logo = c.toDataURL('image/png'); save(); render(); toast('✅ Logo enregistré'); }; img.src = rd.result; };
   rd.readAsDataURL(file);
 }
+/* ---------- application Android (APK) : le pont « AndroidBridge » remplace ce qu'un navigateur fait seul ---------- */
+const AB = window.AndroidBridge || null;
+const b64utf8 = t => { const b = new TextEncoder().encode(t); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); };
+function saveFile(name, mime, text){
+  if (AB){ AB.saveFile(name, mime, b64utf8(text)); return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type:mime})); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function openExt(url){ if (AB) AB.openExternal(url); else window.open(url, '_blank'); }
+function printPage(){
+  if (!AB) return window.print();
+  const c = document.documentElement.cloneNode(true);
+  c.querySelectorAll('script,#layer,.bnav,.side').forEach(e => e.remove());
+  AB.printHtml('<!doctype html>' + c.outerHTML, document.title);
+}
+window.__back = () => {
+  if (document.querySelector('#layer .md')){ closeModal(); return true; }
+  if (USER && PAGE !== homeOf()){ go(PAGE === 'client' ? 'clients' : homeOf()); return true; }
+  return false;
+};
+if ('serviceWorker' in navigator && location.protocol === 'https:') window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 function exportJSON(){
   syncLegacy();
-  const blob = new Blob([JSON.stringify(DATA, null, 2)], {type:'application/json'});
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `MOAYES_sauvegarde_${today()}.json`; a.click();
-  localStorage.setItem('moayes_v2_lastExport', today()); toast('✅ Sauvegarde téléchargée');
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  saveFile(`MOAYES_sauvegarde_${today()}.json`, 'application/json', JSON.stringify(DATA, null, 2));
+  localStorage.setItem('moayes_v2_lastExport', today()); toast('✅ Sauvegarde enregistrée dans Téléchargements');
 }
 function importJSON(file){
   if (!file) return;
@@ -1622,7 +1650,7 @@ function exportCSV(){
   const rows = [['date','heure','client','idClient','pots','prix','remise','montant','encaisse','reste','mode']];
   DATA.ventes.filter(v => v.date >= VF.d1 && v.date <= VF.d2).forEach(v => rows.push([v.date, v.heure||'', v.client, v.idClient||'', v.qty, v.prix, num(v.remiseMontant), v.montant, enc(v), num(v.montant)-enc(v), v.mode||'']));
   const csv = '﻿' + rows.map(r => r.map(x => `"${String(x).replace(/"/g,'""')}"`).join(';')).join('\n');
-  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'})); a.download = `ventes_${VF.d1}_${VF.d2}.csv`; a.click();
+  saveFile(`ventes_${VF.d1}_${VF.d2}.csv`, 'text/csv', csv);
 }
 
 /* ---------- WhatsApp ---------- */
@@ -1630,7 +1658,7 @@ function waNum(t){ let d = String(t||'').replace(/\D/g,''); if (d.startsWith('00
 function waRelance(id){
   const c = clientById(id), cr = creditOf(id);
   const msg = `Bonjour ${c.nom}, c'est MOAYÉ'S INDUSTRIE. Merci pour votre fidélité. Votre solde à régler est de ${FC(cr)}. Merci de prévoir le règlement. Bonne journée !`;
-  window.open(`https://wa.me/${waNum(c.tel)}?text=${encodeURIComponent(msg)}`, '_blank');
+  openExt(`https://wa.me/${waNum(c.tel)}?text=${encodeURIComponent(msg)}`);
 }
 function waBilan(d){
   const t = d || today(), K = calc();
@@ -1640,7 +1668,7 @@ function waBilan(d){
   const ch = DATA.charges.filter(c=>c.date===t&&c.cat!=='Manioc').reduce((s,c)=>s+num(c.montant),0) + DATA.achats.filter(a=>a.date===t).reduce((s,a)=>s+num(a.montant),0);
   const pr = DATA.production.filter(x=>x.date===t), pe = DATA.stockAjust.filter(x=>x.date===t&&x.type==='perte');
   const msg = `*${(DATA.entreprise||{}).nom||"MOAYÉ'S INDUSTRIE"} — Bilan du ${fmtD(t)}*\n\n🏭 Production : ${F(pr.reduce((s,x)=>s+num(x.sacs),0))} sac(s) · ${F(pr.reduce((s,x)=>s+num(x.kg),0))} kg${pe.length?`\n⚠️ Pertes : ${FC(pe.reduce((s,x)=>s+num(x.valeur),0))}`:''}\n🥣 Pots vendus : ${p}\n💰 Ventes : ${FC(ca)}\n✅ Encaissé : ${FC(e)}\n💳 Dettes réglées : ${FC(r)}\n⏳ Parti à crédit : ${FC(ca-e)}\n💸 Dépenses : ${FC(ch)}\n\n🏦 Trésorerie : ${FC(K.treso)}\n📋 Crédit clients total : ${FC(K.creditTotal)}\n📦 Stock : ${F(Math.max(0,K.stockKg/CFG.poids))} pots`;
-  window.open(`https://wa.me/${CFG.waPhone?waNum(CFG.waPhone):''}?text=${encodeURIComponent(msg)}`, '_blank');
+  openExt(`https://wa.me/${CFG.waPhone?waNum(CFG.waPhone):''}?text=${encodeURIComponent(msg)}`);
 }
 
 /* ---------- Firebase ---------- */
