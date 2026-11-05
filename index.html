@@ -210,7 +210,7 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-b
    charges, ajustements). Aucun solde saisi à la main.
    Format de données identique aux sauvegardes V30.
    ========================================================= */
-const VERSION = 'V2.7';
+const VERSION = 'V2.8';
 const LS_DATA = 'moayes_v2_data', LS_CFG = 'moayes_v2_cfg', LS_PIN = 'moayes_v2_pins', LS_TS = 'moayes_v2_ts';
 const FIREBASE_CONFIG = {
   apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
@@ -1146,7 +1146,7 @@ VIEWS.guide = () => {
   <div class="card"><h3>☁️ Synchronisation entre téléphones</h3>
     <p class="small">Avec la synchronisation automatique (activée par défaut), chaque saisie part sur le cloud en 1 à 2 secondes et apparaît sur les autres téléphones. Sans réseau, tout est gardé sur le téléphone et part au retour de la connexion.</p>
     <p class="small" style="margin-top:8px">L'indicateur en haut à droite : <b>☁ En ligne</b> = tout va bien · <b>Hors ligne</b> = pas de réseau · <b>Accès refusé</b> ou <b>Connexion anonyme désactivée</b> = réglage à faire une fois dans la console Firebase. <b>Touchez l'indicateur</b> : la marche à suivre, les règles à copier et un bouton <b>Lancer le diagnostic</b> s'affichent. <a style="text-decoration:underline;cursor:pointer" onclick="fbHelp()">Ouvrir maintenant</a></p>
-    <p class="small" style="margin-top:8px">La V2 travaille dans son propre espace (<b>moayes_v2</b>). La V30 n'est jamais modifiée.</p>
+    <p class="small" style="margin-top:8px">Les données de l'application sont dans <b>moayes/v2_data</b>. L'ancienne V30 est retirée ; ses données restent archivées dans <b>moayes/data</b>.</p>
     <p class="small" style="margin-top:8px"><b>Supabase</b> (facultatif) : Paramètres → Synchronisation Supabase. Collez l'adresse du projet et la clé « anon public », exécutez une fois le script SQL affiché, puis « Tester la connexion ». Firebase et Supabase peuvent tourner ensemble : chacun sert de copie de secours à l'autre.</p>
     <p class="small" style="margin-top:8px"><b>Codes d'accès</b> : un code changé sur un téléphone est appliqué sur tous les autres.</p></div>
   </div>`;
@@ -1688,7 +1688,7 @@ VIEWS.params = () => {
     <div class="row"><button class="btn p" onclick="exportJSON()">⬇ Télécharger une sauvegarde</button>
     <label class="btn">⬆ Importer une sauvegarde (V30 ou V2)<input type="file" accept=".json,application/json" class="hide" onchange="importJSON(this.files[0])"></label>
     <button class="btn" onclick="exportXLSX()">📊 Export Excel complet</button></div>
-    <label class="row small" style="margin-top:10px"><input type="checkbox" ${CFG.autoBk?'checked':''} onchange="CFG.autoBk=this.checked;saveCfg()"> Télécharger automatiquement une sauvegarde chaque jour (comme la V30)</label>
+    <label class="row small" style="margin-top:10px"><input type="checkbox" ${CFG.autoBk?'checked':''} onchange="CFG.autoBk=this.checked;saveCfg()"> Télécharger automatiquement une sauvegarde chaque jour</label>
     <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
     <h3>Entreprise (en-tête des impressions)</h3>
     <div class="fg">
@@ -1709,18 +1709,17 @@ VIEWS.params = () => {
     </div>
   </div>
   <div class="card"><h3>Synchronisation Firebase</h3>
-    <div class="alert">Par sécurité, V2 écrit dans un emplacement séparé (<b>moayes_v2/data</b>). L'ancienne application V30 n'est pas touchée tant que vous ne changez pas l'emplacement.</div>
+    <div class="alert">Les données de l'application sont dans <b>moayes/v2_data</b>. L'ancien espace de la V30 (<b>moayes/data</b>) est conservé en archive et n'est plus utilisé.</div>
     <label class="f">Emplacement</label>
     <select class="inp" onchange="CFG.fbPath=this.value;saveCfg();REMOTE_SEEN=false;fbListen();render()" style="margin-bottom:10px">
       <option value="moayes_v2/data" ${CFG.fbPath==='moayes_v2/data'?'selected':''}>moayes_v2/data — V2 séparée (recommandé)</option>
-      <option value="moayes/v2_data" ${CFG.fbPath==='moayes/v2_data'?'selected':''}>moayes/v2_data — V2 séparée, autorisée par les règles V30</option>
-      <option value="moayes/data" ${CFG.fbPath==='moayes/data'?'selected':''}>moayes/data — partagé avec V30</option>
+      <option value="moayes/v2_data" ${CFG.fbPath==='moayes/v2_data'?'selected':''}>moayes/v2_data — emplacement de l'application</option>
     </select>
     <label class="row small" style="margin-bottom:12px"><input type="checkbox" ${CFG.fbAuto?'checked':''} onchange="CFG.fbAuto=this.checked;saveCfg();if(this.checked)fbListen()"> Synchronisation automatique en temps réel (recommandé : tous les téléphones voient les mêmes chiffres)</label>
-    <div class="row"><button class="btn p" onclick="fbHelp();setTimeout(fbDiag,100)">🩺 Diagnostic Firebase</button><button class="btn" onclick="fbPush()">☁ Envoyer maintenant</button><button class="btn" onclick="fbPull(CFG.fbPath)">Récupérer depuis l'emplacement</button><button class="btn" onclick="fbPull('moayes/data')">Importer les données V30</button></div>
+    <div class="row"><button class="btn p" onclick="fbHelp();setTimeout(fbDiag,100)">🩺 Diagnostic Firebase</button><button class="btn" onclick="fbPush()">☁ Envoyer maintenant</button><button class="btn" onclick="fbPull(CFG.fbPath)">Récupérer depuis l'emplacement</button></div>
   </div>
   <div class="card"><h3>Hypothèses de production & calculateur de rentabilité</h3>
-    <p class="small muted" style="margin-bottom:10px">Mêmes hypothèses que la V30. Le rendement net (rendement × (1 − perte)) sert au calcul théorique des kg produits.</p>
+    <p class="small muted" style="margin-bottom:10px">Le rendement net (rendement × (1 − perte)) sert au calcul théorique des kg produits.</p>
     <div class="fg">${[['prixAchat','Prix achat manioc (F/sac)'],['rendement','Rendement brut par sac (kg)'],['tauxPerte','Taux de perte (%)'],['prixPortion','Poids d\'un pot (kg)'],['prixVente','Prix de vente du pot (F)'],['ch_mo','Main-d\'œuvre (F/sac)'],['ch_transport','Transport (F/sac)'],['ch_gaz','Gaz / énergie (F/sac)'],['ch_emb','Emballages (F/sac)'],['ch_autres','Autres charges (F/sac)']].map(([k,l]) => { const v = hyp()[k]; return `<div><label class="f">${l}</label><input class="inp" type="number" step="any" value="${k==='tauxPerte'?Math.round(num(v)*1000)/10:v}" onchange="setHyp('${k}',this.value)"></div>`; }).join('')}</div>
     <div style="margin-top:12px" id="rentab">${rentabHTML(false)}</div>
   </div>
@@ -1742,10 +1741,7 @@ VIEWS.params = () => {
     <div class="row">${Object.entries(ROLES).map(([k,r]) => `<button class="btn" onclick="changePin('${k}')">Code ${r.name.toLowerCase()}</button>`).join('')}</div>
     <p class="small muted" style="margin-top:8px">Codes de départ : propriétaire 1234 · directrice 1111 · vendeur 0000 · producteur 2222. Changez-les.</p>
     <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
-    <h3>Ancienne application (V30)</h3><p class="small muted" style="margin-bottom:8px">Gardée en secours, avec ses propres données (moayes/data). Saisissez chaque opération dans une seule des deux applications.</p>
-    <div class="row" style="margin-bottom:6px"><button class="btn" onclick="openExt(new URL('v30.html', location.href).href)">Ouvrir la V30</button><button class="btn" onclick="fbPull('moayes/data')">Récupérer ses données dans la V2</button></div>
-    <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
-    <h3>Corbeille</h3><p class="small muted">Tout ce qui est supprimé est gardé ici et peut être restauré. ${DATA.archives.length || calc().orphelins.length ? `<button class="btn sm d" onclick="nettoyerSupprimes()">Vider la corbeille et annuler les soldes des clients supprimés</button>` : ''}</p>
+    <h3>Corbeille</h3><p class="small muted">Tout ce qui est supprimé est gardé ici et peut être restauré. ${DATA.archives.length || calc().orphelins.length ? `<br><button class="btn sm d" style="white-space:normal;text-align:left;margin-top:8px;max-width:100%" onclick="nettoyerSupprimes()">Vider la corbeille et annuler les soldes des clients supprimés</button>` : ''}</p>
     <div class="tw" style="max-height:240px;overflow:auto"><table>${DATA.archives.map((a,i)=>({a,i})).reverse().slice(0,60).map(({a,i}) => `<tr><td class="small">${fmtD(a.date)}</td><td class="small"><span class="tag">${esc(a.collection||'?')}</span> ${esc(arcLabel(a))}</td><td class="n"><button class="btn sm" onclick="restaurer(${i})">Restaurer</button></td></tr>`).join('') || '<tr><td class="empty">Corbeille vide</td></tr>'}</table></div>
     <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
     <h3>Journal</h3><p class="small muted">${DATA.audit.length} entrées · ${DATA.archives.length} éléments archivés.</p>
@@ -2135,8 +2131,8 @@ function start(){
     modal(`<h2>📲 Bilan du jour</h2><p>Il est ${nowH()}. Envoyer le bilan de la journée sur WhatsApp ?</p><div class="act"><button class="btn" onclick="closeModal()">Plus tard</button><button class="btn p" onclick="closeModal();waBilan()">Envoyer</button></div>`);
   }, 60000);
   if (CFG.autoBk && isMgr() && DATA.ventes.length && localStorage.getItem('moayes_v2_lastExport') !== today()) setTimeout(() => { if (localStorage.getItem('moayes_v2_lastExport') !== today()){ exportJSON(); toast('💾 Sauvegarde du jour téléchargée (dossier Téléchargements)'); } }, 6000);
-  if (USER === 'admin') setTimeout(() => { if (!DATA.ventes.length && !document.querySelector('.md')) modal(`<h2>Bienvenue dans Gestion Pro V2</h2><p>Pour démarrer avec vos données, importez votre dernière sauvegarde JSON de la V30, ou récupérez-les directement depuis Firebase.</p>
-    <div class="act" style="flex-wrap:wrap"><button class="btn" onclick="closeModal()">Plus tard</button><button class="btn" onclick="closeModal();fbPull('moayes/data')">Depuis Firebase (V30)</button>
+  if (USER === 'admin') setTimeout(() => { if (!DATA.ventes.length && !document.querySelector('.md')) modal(`<h2>Bienvenue dans Gestion Pro V2</h2><p>Aucune donnée n'est encore arrivée sur cet appareil. Vérifiez la connexion internet (indicateur en haut à droite), ou importez une sauvegarde JSON.</p>
+    <div class="act" style="flex-wrap:wrap"><button class="btn" onclick="closeModal()">Plus tard</button><button class="btn" onclick="closeModal();fbHelp()">Vérifier la synchronisation</button>
     <label class="btn p">Importer le fichier JSON<input type="file" accept=".json" class="hide" onchange="closeModal();importJSON(this.files[0])"></label></div>`); }, CFG.fbAuto ? 3500 : 300);
 }
 load();
