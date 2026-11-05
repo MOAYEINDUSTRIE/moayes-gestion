@@ -10,8 +10,8 @@ android {
         applicationId 'ci.moayes.gestion'
         minSdk 24
         targetSdk 34
-        versionCode (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
-        versionName '2.5'
+        versionCode = Integer.parseInt(System.getenv('GITHUB_RUN_NUMBER') ?: '1')
+        versionName = '2.5'
     }
 
     buildTypes {
