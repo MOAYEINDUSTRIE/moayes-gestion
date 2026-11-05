@@ -210,7 +210,7 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-b
    charges, ajustements). Aucun solde saisi à la main.
    Format de données identique aux sauvegardes V30.
    ========================================================= */
-const VERSION = 'V2.6';
+const VERSION = 'V2.7';
 const LS_DATA = 'moayes_v2_data', LS_CFG = 'moayes_v2_cfg', LS_PIN = 'moayes_v2_pins', LS_TS = 'moayes_v2_ts';
 const FIREBASE_CONFIG = {
   apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
@@ -272,7 +272,7 @@ function defaultCfg(){
 function sanitize(d){
   const b = defaultData();
   for (const k of Object.keys(b)) if (d[k] === undefined || d[k] === null) d[k] = b[k];
-  ['ventes','reglements','clients','production','achats','charges','fournisseurs','rh','rhHistorique','stockAjust','archives','audit','commandes','controlesCaisse','paiementsFourn']
+  ['ventes','reglements','clients','production','achats','charges','fournisseurs','rh','rhHistorique','stockAjust','archives','audit','commandes','controlesCaisse','paiementsFourn','annulations']
     .forEach(k => { if (!Array.isArray(d[k])) d[k] = d[k] && typeof d[k]==='object' ? Object.values(d[k]) : []; });
   if (!d.soldeInit && d.soldeInitial) d.soldeInit = d.soldeInitial;
   d.soldeInitial = d.soldeInit;
@@ -327,6 +327,7 @@ function calc(){
     if (!last[k] || v.date > last[k]) last[k] = v.date;
   }
   for (const r of DATA.reglements){ const k = keyOf(r); cred[k] = (cred[k]||0) - num(r.montant); }
+  for (const a of DATA.annulations){ const k = a.cle || a.idClient || ('NOM:' + norm(a.client)); cred[k] = (cred[k]||0) - num(a.montant); }
 
   const sum = (a, f) => a.reduce((s,x) => s + f(x), 0);
   const prodKg = sum(DATA.production, p => num(p.kg));
@@ -360,7 +361,8 @@ function calc(){
   DATA.charges.filter(c => c.cat !== 'Manioc').forEach(c => { const o = mget(ym(c.date)); o.chHM += num(c.montant); o.cats[c.cat] = (o.cats[c.cat]||0) + num(c.montant); });
   DATA.production.forEach(p => { const o = mget(ym(p.date)); o.prodKg += num(p.kg); o.sacs += num(p.sacs); });
   const months = Object.values(M).filter(o => o.m).sort((a,b) => a.m < b.m ? -1 : 1);
-  months.forEach(o => { o.couts = o.achats + o.chHM; o.res = o.ca - o.couts; o.cash = o.encV + o.regl - o.achCash - o.paieF - o.chHM; o.coutPot = o.pots ? o.couts / o.pots : 0; });
+  DATA.annulations.forEach(a => mget(ym(a.date)).annul = (mget(ym(a.date)).annul||0) + num(a.montant));
+  months.forEach(o => { o.couts = o.achats + o.chHM; o.res = o.ca - o.couts - (o.annul||0); o.cash = o.encV + o.regl - o.achCash - o.paieF - o.chHM; o.coutPot = o.pots ? o.couts / o.pots : 0; });
 
   const ids = new Set(DATA.clients.map(c => c.id));
   const creditTotal = DATA.clients.reduce((s,c) => s + (cred[c.id]||0), 0);
@@ -523,6 +525,7 @@ VIEWS.home = () => {
   if (USER==='admin' && (!lastEx || lastEx < addDays(today(), -7))) al.push(['', `${lastEx ? 'Dernière sauvegarde téléchargée le ' + fmtD(lastEx) : 'Aucune sauvegarde téléchargée sur ce téléphone'}. <a style="text-decoration:underline;cursor:pointer" onclick="exportJSON();render()">Télécharger maintenant</a> (1 fois par semaine).`]);
   const mP = ym(today()), aPayer = DATA.rh.filter(r => r.statut !== 'Inactif' && !paye(r.nom, ym(addDays(mP+'-01', -1))));
   if (USER==='admin' && aPayer.length && today().slice(8) >= '05') al.push(['', `Salaires de ${fmtM(ym(addDays(mP+'-01',-1)))} non enregistrés : ${aPayer.map(r=>esc(r.nom)).join(', ')}. <a style="text-decoration:underline;cursor:pointer" onclick="RHM='${ym(addDays(mP+'-01',-1))}';go('rh')">Voir</a>`]);
+  if (K.orphelins.length && USER === 'admin') al.push(['', `<a style="text-decoration:underline;cursor:pointer" onclick="nettoyerSupprimes()">Nettoyer : annuler ces soldes et vider la corbeille</a>`]);
   if (K.orphelins.length){ const nr = K.orphelins.filter(o => o.arc >= 0).length; al.push(['', `${K.orphelins.length} solde(s) rattaché(s) à des clients sans fiche, non comptés dans le crédit total : ${K.orphelins.map(o=>esc(o.nom)+' '+FC(o.v)).join(' · ')}.${nr && USER==='admin' ? ` <a style="text-decoration:underline;cursor:pointer" onclick="restaurerOrphelins()">Restaurer les ${nr} fiche(s) supprimée(s)</a>` : ''}`]); }
   if (cur.pertesVal) al.push(['', `Pertes déclarées ce mois : ${FC(cur.pertesVal)} (${F1(cur.perteSacs)} sac(s) de manioc, ${F(cur.perteKg)} kg d'attiéké). <a style="text-decoration:underline;cursor:pointer" onclick="go('stock')">Détail</a>`]);
   const ecarts = DATA.stockAjust.filter(a => a.type === 'inventaire' && num(a.delta) < 0 && a.date >= addDays(today(), -30));
@@ -682,7 +685,7 @@ VIEWS.clients = () => {
   else if (CF.f === 'actifs') L = L.filter(x => x.last >= addDays(today(), -14)).sort((a,b) => b.tot - a.tot);
   else L.sort((a,b) => a.c.nom < b.c.nom ? -1 : 1);
   const totCr = L.reduce((s,x)=>s+Math.max(0,x.cr),0);
-  return header('Clients & crédits', `${DATA.clients.length} fiches · crédit total ${FC(K.creditTotal)}`, `<button class="btn p" onclick="editClient()">+ Nouveau client</button>`) + `
+  return header('Clients & crédits', `${DATA.clients.length} fiches · crédit total ${FC(K.creditTotal)}`, `${isMgr()?`<button class="btn" onclick="exportTousClients()">📊 Exporter les historiques</button>`:''}<button class="btn p" onclick="editClient()">+ Nouveau client</button>`) + `
   <div class="card"><div class="row" style="margin-bottom:10px">
     <input class="inp" style="max-width:280px" placeholder="Rechercher un client ou une zone…" value="${esc(CF.q)}" oninput="CF.q=this.value;clearTimeout(window._cq);window._cq=setTimeout(()=>{render();const i=document.querySelector('.card .inp');i.focus();i.setSelectionRange(i.value.length,i.value.length)},250)">
     <div class="seg">${[['dette','Doivent'],['actifs','Actifs 14 j'],['tous','Tous']].map(([k,l]) => `<button class="${CF.f===k?'on':''}" onclick="CF.f='${k}';render()">${l}</button>`).join('')}</div>
@@ -705,19 +708,69 @@ VIEWS.client = () => {
   const pots30 = m30.reduce((s,m)=>s+num(m.o.qty),0);
   const rows = mv.slice().reverse().slice(0, 120);
   return header(esc(c.nom), `${esc(c.type||'')} · ${esc(c.zone||'zone non renseignée')} ${c.tel?'· '+esc(c.tel):''}`,
-    `<button class="btn" onclick="go('clients')">← Retour</button>${isMgr()?`<button class="btn" onclick="editClient('${c.id}')">Modifier</button>`:''}${c.tel?`<button class="btn" onclick="waRelance('${c.id}')">📲 Relancer</button>`:''}<button class="btn" onclick="facture('${c.id}')">🧾 Facture</button><button class="btn p" onclick="addReglement('${c.id}')">Encaisser une dette</button>`) + `
+    `<button class="btn" onclick="go('clients')">← Retour</button>${isMgr()?`<button class="btn" onclick="editClient('${c.id}')">Modifier</button>`:''}${c.tel?`<button class="btn" onclick="waRelance('${c.id}')">📲 Relancer</button>`:''}<button class="btn" onclick="exportClient('${c.id}','xlsx')">📊 Historique Excel</button><button class="btn" onclick="exportClient('${c.id}','pdf')">🧾 Relevé PDF</button><button class="btn" onclick="facture('${c.id}')">🧾 Facture</button><button class="btn p" onclick="addReglement('${c.id}')">Encaisser une dette</button>`) + `
   <div class="grid k3">
     <div class="card kpi ${cr>0?'':'hero'}"><div class="l">Doit actuellement</div><div class="v ${cr>0?'dn':''}">${F(cr)} <small>F</small></div><div class="d">Calculé sur ${mv.length} opérations</div></div>
     <div class="card kpi"><div class="l">30 derniers jours</div><div class="v">${pots30} <small>pots</small></div><div class="d">${m30.length} livraisons · ${FC(pots30*CFG.prix)}</div></div>
     <div class="card kpi"><div class="l">Total depuis le début</div><div class="v">${F(K.tot[c.id]||0)} <small>F</small></div><div class="d">Client depuis le ${fmtD(mv[0]?.d)||'—'}</div></div>
   </div>
-  <div class="card" style="margin-top:14px"><h3>Relevé de compte <button class="btn sm" onclick="printPage()">Imprimer</button></h3>
+  <div class="card" style="margin-top:14px"><h3>Relevé de compte</h3>
   <div class="tw"><table><tr><th>Date</th><th>Opération</th><th class="n">Montant</th><th class="n">Payé</th><th class="n">Solde dû</th><th></th></tr>
   ${rows.map(m => m.t==='v'
     ? `<tr><td>${fmtD(m.d)}</td><td>${num(m.o.qty)} pots${num(m.o.remiseMontant)?` <span class="tag oc">remise ${F(m.o.remiseMontant)}</span>`:''}</td><td class="n">${FC(m.o.montant)}</td><td class="n">${enc(m.o)?FC(enc(m.o)):'<span class="tag cr">crédit</span>'}</td><td class="n"><b>${FC(m.bal)}</b></td><td class="n">${isMgr()?`<button class="btn sm" onclick="editVente(${m.i})">✎</button>`:''}</td></tr>`
     : `<tr style="background:#f6fbf8"><td>${fmtD(m.d)}</td><td><span class="tag">Règlement</span> ${esc(m.o.mode||'')}</td><td class="n"></td><td class="n up"><b>${FC(m.o.montant)}</b></td><td class="n"><b>${FC(m.bal)}</b></td><td class="n">${isMgr()?`<button class="btn sm d" onclick="delItem('reglements',${m.i})">✕</button>`:''}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Aucune opération</td></tr>'}
   </table></div></div>`;
 };
+function releveOf(id){
+  const K = calc(), mv = [];
+  DATA.ventes.forEach(v => { if (K.keyOf(v) === id) mv.push({t:'v', d:v.date, h:v.heure||'', o:v}); });
+  DATA.reglements.forEach(r => { if (K.keyOf(r) === id) mv.push({t:'r', d:r.date, h:r.heure||'', o:r}); });
+  mv.sort((a,b) => a.d===b.d ? (a.t===b.t ? (a.h<b.h?-1:1) : (a.t==='v'?-1:1)) : (a.d<b.d?-1:1));
+  let bal = 0; mv.forEach(m => { if (m.t==='v') bal += num(m.o.montant) - enc(m.o); else bal -= num(m.o.montant); m.bal = bal; });
+  return mv;
+}
+const releveRows = mv => mv.map(m => m.t === 'v'
+  ? {Date:m.d, Heure:m.h, 'Opération':'Livraison', Pots:num(m.o.qty), 'Prix unitaire':num(m.o.prix), Remise:num(m.o.remiseMontant), Montant:num(m.o.montant), 'Payé':enc(m.o), 'Règlement':0, 'Solde dû':Math.round(m.bal), Mode:m.o.mode||''}
+  : {Date:m.d, Heure:m.h, 'Opération':'Règlement de dette', Pots:0, 'Prix unitaire':0, Remise:0, Montant:0, 'Payé':0, 'Règlement':num(m.o.montant), 'Solde dû':Math.round(m.bal), Mode:m.o.mode||''});
+const sheetName = (n, used) => { let b = String(n).replace(/[\\\/\?\*\[\]:]/g, ' ').trim().slice(0, 28) || 'Client', x = b, i = 2; while (used.has(x)) x = b.slice(0, 26) + ' ' + i++; used.add(x); return x; };
+function exportClient(id, fmt){
+  const c = clientById(id), mv = releveOf(id), rows = releveRows(mv), base = `Releve_${norm(c.nom).replace(/[^A-Z0-9]+/g,'_')}_${today()}`;
+  if (fmt === 'pdf') return printReleve(id);
+  if (typeof XLSX === 'undefined'){
+    const H = Object.keys(rows[0] || {Date:''}), csv = [H.join(';'), ...rows.map(r => H.map(h => String(r[h]).replace(/;/g, ',')).join(';'))].join('\n');
+    return saveFile(base + '.csv', 'text/csv', csv);
+  }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.length ? rows : [{'(aucune opération)':''}]), sheetName(c.nom, new Set()));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{Client:c.nom, ID:c.id, 'Téléphone':c.tel||'', Zone:c.zone||'', 'Pots achetés':mv.filter(m=>m.t==='v').reduce((s,m)=>s+num(m.o.qty),0), 'Total acheté':mv.filter(m=>m.t==='v').reduce((s,m)=>s+num(m.o.montant),0), 'Total payé':mv.reduce((s,m)=>s+(m.t==='v'?enc(m.o):num(m.o.montant)),0), 'Doit':creditOf(id), 'Édité le':today()}]), 'Résumé');
+  if (AB) AB.saveFile(base + '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', XLSX.write(wb, {bookType:'xlsx', type:'base64'}));
+  else XLSX.writeFile(wb, base + '.xlsx');
+  audit('clients','export historique','',c.nom,id);
+}
+function exportTousClients(){
+  if (typeof XLSX === 'undefined') return toast('Module Excel indisponible (pas de connexion au chargement). Réessayez avec internet.');
+  const K = calc(), wb = XLSX.utils.book_new(), used = new Set(['Synthèse']);
+  const L = DATA.clients.slice().sort((a,b) => (K.tot[b.id]||0) - (K.tot[a.id]||0));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(L.map(c => ({Client:c.nom, ID:c.id, 'Téléphone':c.tel||'', Zone:c.zone||'', Type:c.type||'', 'Total acheté':Math.round(K.tot[c.id]||0), 'Doit':creditOf(c.id), 'Dernier achat':K.last[c.id]||''}))), 'Synthèse');
+  L.forEach(c => { const rows = releveRows(releveOf(c.id)); if (rows.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), sheetName(c.nom, used)); });
+  const n = `MOAYES_historique_clients_${today()}.xlsx`;
+  if (AB) AB.saveFile(n, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', XLSX.write(wb, {bookType:'xlsx', type:'base64'}));
+  else XLSX.writeFile(wb, n);
+  audit('clients','export de tous les historiques','',L.length+' clients','');
+}
+function printReleve(id){
+  const c = clientById(id), mv = releveOf(id);
+  form('Relevé de compte — ' + esc(c.nom), [{k:'d1', label:'Du', type:'date', value:mv[0] ? mv[0].d : today()}, {k:'d2', label:'Au', type:'date', value:today()}], v => {
+    const L = mv.filter(m => m.d >= v.d1 && m.d <= v.d2), avant = mv.filter(m => m.d < v.d1).at(-1);
+    printDoc('RELEVÉ DE COMPTE', `<p><b>Client :</b> ${esc(c.nom)}${c.tel?' · '+esc(c.tel):''}${c.zone?' · '+esc(c.zone):''}<br><b>Période :</b> du ${fmtD(v.d1)} au ${fmtD(v.d2)}</p>
+      <table><tr><th>Date</th><th>Opération</th><th class="n">Pots</th><th class="n">Montant</th><th class="n">Payé</th><th class="n">Solde dû</th></tr>
+      <tr><td colspan="5"><i>Solde au ${fmtD(v.d1)}</i></td><td class="n"><b>${F(avant ? avant.bal : 0)}</b></td></tr>
+      ${L.map(m => m.t === 'v' ? `<tr><td>${fmtD(m.d)}</td><td>Livraison</td><td class="n">${num(m.o.qty)}</td><td class="n">${F(m.o.montant)}</td><td class="n">${F(enc(m.o))}</td><td class="n">${F(m.bal)}</td></tr>`
+        : `<tr><td>${fmtD(m.d)}</td><td>Règlement (${esc(m.o.mode||'')})</td><td></td><td></td><td class="n">${F(m.o.montant)}</td><td class="n">${F(m.bal)}</td></tr>`).join('')}
+      <tr class="tot"><td colspan="2">Totaux de la période</td><td class="n">${L.filter(m=>m.t==='v').reduce((s,m)=>s+num(m.o.qty),0)}</td><td class="n">${F(L.filter(m=>m.t==='v').reduce((s,m)=>s+num(m.o.montant),0))}</td><td class="n">${F(L.reduce((s,m)=>s+(m.t==='v'?enc(m.o):num(m.o.montant)),0))}</td><td class="n">${F(L.length ? L.at(-1).bal : (avant ? avant.bal : 0))}</td></tr></table>
+      <p style="margin-top:14px"><b>Solde dû à ce jour : ${FC(creditOf(id))}</b></p><div class="sig"><span>Le client</span><span>Pour ${esc((DATA.entreprise||{}).nom||"MOAYÉ'S INDUSTRIE")}</span></div>`);
+  });
+}
 function editClient(id){
   const c = id ? clientById(id) : {};
   form(id ? 'Modifier le client' : 'Nouveau client', [
@@ -910,16 +963,33 @@ function editFourn(nom){
 
 /* ---------- SALAIRES & RH ---------- */
 let RHM = '';
-const paye = (nom, mois) => DATA.rhHistorique.some(h => h.mois === mois && norm(h.nom) === norm(nom));
+/* une paie = une dépense « Salaire » ; le nom saisi est rattaché à la fiche de l'employé */
+const words = n => norm(n).replace(/[^A-Z0-9À-Ÿ ]+/g, ' ').split(/\s+/).filter(Boolean);
+function ficheDe(nom){
+  const n = norm(nom); if (!n) return '';
+  const al = (DATA.rhAlias || {})[n]; if (al) return al;
+  const F_ = DATA.rh.map(r => norm(r.nom));
+  if (F_.includes(n)) return n;
+  const w = words(n); if (!w.length) return n;
+  const c = F_.filter(f => { const fw = words(f); return w.every(x => fw.includes(x)) || fw.every(x => w.includes(x)); });
+  return c.length === 1 ? c[0] : n;
+}
+function paies(){
+  return DATA.charges.map((c,i) => ({c,i})).filter(x => x.c.cat === 'Salaire').map(x => {
+    const m = /Salaire\s+(\d{4}-\d{2})/i.exec(x.c.desc || '');
+    return {i:x.i, date:x.c.date, mois:m ? m[1] : ym(x.c.date), saisi:norm(x.c.fourn || x.c.desc || '?'), nom:ficheDe(x.c.fourn || x.c.desc || '?'), montant:num(x.c.montant), desc:x.c.desc || ''};
+  }).sort((a,b) => a.date < b.date ? -1 : 1);
+}
+const paye = (nom, mois) => DATA.rhHistorique.some(h => h.mois === mois && norm(h.nom) === norm(nom)) || paies().some(p => p.mois === mois && p.nom === norm(nom));
 VIEWS.rh = () => {
   if (!RHM) RHM = ym(today());
   const emp = DATA.rh.map((r,i)=>({r,i}));
   const act = emp.filter(x => x.r.statut !== 'Inactif');
   const masse = act.reduce((s,x) => s + num(x.r.sal) + num(x.r.prime), 0);
-  const hist = DATA.rhHistorique.map((h,i)=>({h,i})).filter(x => x.h.mois === RHM);
+  const hist = paies().filter(p => p.mois === RHM).map(p => ({h:{datePaie:p.date, nom:p.nom, poste:(DATA.rh.find(r => norm(r.nom) === p.nom)||{}).poste||'', total:p.montant, ci:p.i}}));
   const verse = hist.reduce((s,x) => s + num(x.h.total), 0);
   const reste = act.filter(x => !paye(x.r.nom, RHM));
-  const mois = [...new Set([ym(today()), ym(addDays(ym(today())+'-01',-1)), ...DATA.rhHistorique.map(h=>h.mois)])].filter(Boolean).sort().reverse();
+  const mois = [...new Set([ym(today()), ym(addDays(ym(today())+'-01',-1)), ...paies().map(p=>p.mois)])].filter(Boolean).sort().reverse();
   return header('Salaires & RH', 'Chaque paie crée automatiquement la dépense « Salaire » dans Charges', `<button class="btn" onclick="editEmp()">+ Employé</button>${reste.length?`<button class="btn p" onclick="payerTous()">Payer tout ${fmtM(RHM)}</button>`:''}`) + `
   <div class="row" style="margin-bottom:12px"><span class="small muted">Mois de paie</span><select class="inp" style="max-width:170px" onchange="RHM=this.value;render()">${mois.map(m=>`<option value="${m}" ${m===RHM?'selected':''}>${fmtM(m)}</option>`).join('')}</select></div>
   <div class="grid k3">
@@ -930,9 +1000,71 @@ VIEWS.rh = () => {
   <div class="card" style="margin-top:14px"><h3>Employés</h3><div class="tw"><table><tr><th>Nom</th><th>Poste</th><th class="n">Salaire</th><th class="n">Prime</th><th>${fmtM(RHM)}</th><th></th></tr>
   ${emp.map(x => { const ok = paye(x.r.nom, RHM), ina = x.r.statut === 'Inactif'; return `<tr ${ina?'style="opacity:.5"':''}><td><b>${esc(x.r.nom)}</b>${x.r.tel?`<div class="small muted">${esc(x.r.tel)}</div>`:''}</td><td>${esc(x.r.poste||'')}${x.r.obs?`<div class="small muted">${esc(x.r.obs)}</div>`:''}</td><td class="n">${FC(x.r.sal)}</td><td class="n">${num(x.r.prime)?FC(x.r.prime):'—'}</td><td>${ina?'<span class="tag gr">inactif</span>':ok?'<span class="tag">✓ payé</span>':`<button class="btn sm p" onclick="payerEmp(${x.i})">Payer</button>`}</td><td class="n"><button class="btn sm" onclick="editEmp(${x.i})">✎</button></td></tr>`; }).join('') || '<tr><td colspan="6" class="empty">Aucun employé</td></tr>'}
   </table></div></div>
+  ${rhHistoriqueHTML()}
   <div class="card" style="margin-top:14px"><h3>Paies enregistrées · ${fmtM(RHM)}</h3><div class="tw"><table><tr><th>Payé le</th><th>Employé</th><th class="n">Montant</th><th></th></tr>
-  ${hist.map(x => `<tr><td>${fmtD(x.h.datePaie)}</td><td>${esc(x.h.nom)} <span class="small muted">${esc(x.h.poste||'')}</span></td><td class="n"><b>${FC(x.h.total)}</b></td><td class="n"><button class="btn sm d" onclick="annulerPaie(${x.i})">Annuler</button></td></tr>`).join('') || '<tr><td colspan="4" class="empty">Aucune paie ce mois</td></tr>'}</table></div></div>`;
+  ${hist.map(x => `<tr><td>${fmtD(x.h.datePaie)}</td><td>${esc(x.h.nom)} <span class="small muted">${esc(x.h.poste||'')}</span></td><td class="n"><b>${FC(x.h.total)}</b></td><td class="n"><button class="btn sm" onclick="bulletin(${x.h.ci})">Bulletin</button> ${isMgr()?`<button class="btn sm d" onclick="annulerPaieC(${x.h.ci})">Annuler</button>`:''}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">Aucune paie ce mois</td></tr>'}</table></div></div>`;
 };
+let RHY = '';
+function rhHistoriqueHTML(){
+  const P = paies(); if (!RHY) RHY = today().slice(0,4);
+  const years = [...new Set([today().slice(0,4), ...P.map(p => p.mois.slice(0,4))])].sort().reverse();
+  const Y = P.filter(p => p.mois.startsWith(RHY));
+  const mois = [...new Set(Y.map(p => p.mois))].sort();
+  const noms = [...new Set([...DATA.rh.filter(r => r.statut !== 'Inactif').map(r => norm(r.nom)), ...Y.map(p => p.nom)])];
+  const isFiche = n => DATA.rh.some(r => norm(r.nom) === n);
+  const cell = (n, m) => Y.filter(p => p.nom === n && p.mois === m).reduce((s,p) => s + p.montant, 0);
+  const tot = n => Y.filter(p => p.nom === n).reduce((s,p) => s + p.montant, 0);
+  const sansFiche = [...new Set(Y.filter(p => !isFiche(p.nom)).map(p => p.nom))];
+  const mm = m => ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'][+m.slice(5) - 1];
+  return `<div class="card" style="margin-top:14px"><h3>Historique des paies <select class="inp" style="max-width:110px;font-weight:400" onchange="RHY=this.value;render()">${years.map(y => `<option ${y===RHY?'selected':''}>${y}</option>`).join('')}</select>
+    <button class="btn sm" onclick="exportPaies()">📊 Excel</button></h3>
+    <p class="small muted" style="margin-bottom:8px">Tous les salaires versés (dépenses « Salaire »), par employé et par mois. Touchez un nom pour voir le détail de ses paies. ${FC(Y.reduce((s,p)=>s+p.montant,0))} versés en ${RHY}.</p>
+    <div class="tw"><table><tr><th>Employé</th>${mois.map(m => `<th class="n">${mm(m)}</th>`).join('')}<th class="n">Total ${RHY}</th></tr>
+    ${noms.filter(n => tot(n) || isFiche(n)).sort((a,b) => tot(b) - tot(a)).map(n => `<tr class="click" onclick="ficheEmp('${esc(n)}')"><td><b>${esc(n)}</b>${isFiche(n) ? '' : ' <span class="tag oc">sans fiche</span>'}</td>${mois.map(m => { const v = cell(n, m); return `<td class="n">${v ? F(v) : '<span class="muted">—</span>'}</td>`; }).join('')}<td class="n"><b>${F(tot(n))}</b></td></tr>`).join('')}
+    <tr style="border-top:2px solid var(--ink)"><td><b>Total du mois</b></td>${mois.map(m => `<td class="n"><b>${F(Y.filter(p => p.mois === m).reduce((s,p)=>s+p.montant,0))}</b></td>`).join('')}<td class="n"><b>${F(Y.reduce((s,p)=>s+p.montant,0))}</b></td></tr></table></div>
+    ${sansFiche.length && isMgr() ? `<div class="alert" style="margin-top:10px">${sansFiche.length} nom(s) saisi(s) sans fiche employé : ${sansFiche.map(n => `<a style="text-decoration:underline;cursor:pointer" onclick="associerNom('${esc(n)}')">${esc(n)}</a>`).join(', ')}. Touchez un nom pour le rattacher au bon employé.</div>` : ''}</div>`;
+}
+function ficheEmp(nom){
+  const n = norm(nom), L = paies().filter(p => p.nom === n).reverse(), r = DATA.rh.find(x => norm(x.nom) === n);
+  const parAn = {}; L.forEach(p => parAn[p.mois.slice(0,4)] = (parAn[p.mois.slice(0,4)]||0) + p.montant);
+  modal(`<h2>${esc(n)}</h2><p class="small muted" style="margin-bottom:10px">${r ? esc(r.poste||'') + ' · salaire ' + FC(num(r.sal) + num(r.prime)) + ' par mois' : 'Pas de fiche employé'} · ${L.length} paie(s) · ${Object.entries(parAn).map(([y,v]) => y + ' : ' + FC(v)).join(' · ')}</p>
+    <div class="tw" style="max-height:52vh;overflow:auto"><table><tr><th>Mois</th><th>Payé le</th><th class="n">Montant</th><th>Libellé saisi</th><th></th></tr>
+    ${L.map(p => `<tr><td><b>${fmtM(p.mois)}</b></td><td>${fmtD(p.date)}</td><td class="n">${FC(p.montant)}</td><td class="small muted">${esc(p.saisi !== n ? p.saisi : (p.desc || ''))}</td><td class="n"><button class="btn sm" onclick="bulletin(${p.i})">Bulletin</button></td></tr>`).join('') || '<tr><td colspan="5" class="empty">Aucune paie enregistrée</td></tr>'}</table></div>
+    <div class="act">${!r && isMgr() ? `<button class="btn" onclick="closeModal();associerNom('${esc(n)}')">Rattacher à un employé</button>` : ''}<button class="btn" onclick="closeModal();exportPaies('${esc(n)}')">📊 Excel</button><button class="btn p" onclick="closeModal()">Fermer</button></div>`);
+}
+function associerNom(nom){
+  const n = norm(nom);
+  form('Rattacher « ' + esc(n) + ' »', [{k:'emp', label:'Ce nom correspond à l\'employé', type:'select', options:[['','— choisir —'], ...DATA.rh.map(r => [norm(r.nom), norm(r.nom) + ' (' + (r.poste||'') + ')'])], value:''}], v => {
+    if (!v.emp) { toast('Choisissez un employé'); return false; }
+    DATA.rhAlias = Object.assign({}, DATA.rhAlias || {}, {[n]: v.emp});
+    audit('rh','rattachement de nom', n, v.emp, ''); toast(`« ${n} » rattaché à ${v.emp}`);
+  });
+}
+function bulletin(ci){
+  const c = DATA.charges[ci]; if (!c) return;
+  const n = ficheDe(c.fourn || ''), r = DATA.rh.find(x => norm(x.nom) === n) || {}, m = (/Salaire\s+(\d{4}-\d{2})/i.exec(c.desc||'') || [])[1] || ym(c.date);
+  printDoc('BULLETIN DE PAIE', `<p><b>Employé :</b> ${esc(n)}${r.poste ? ' · ' + esc(r.poste) : ''}<br><b>Mois :</b> ${fmtM(m)} · <b>Payé le :</b> ${fmtD(c.date)} · <b>Mode :</b> ${esc(c.mode || 'Espèces')}</p>
+    <table><tr><th>Élément</th><th class="n">Montant</th></tr>
+    ${r.sal && num(c.montant) === num(r.sal) + num(r.prime) ? `<tr><td>Salaire de base</td><td class="n">${FC(r.sal)}</td></tr>${num(r.prime) ? `<tr><td>Prime</td><td class="n">${FC(r.prime)}</td></tr>` : ''}` : `<tr><td>${esc(c.desc || 'Salaire')}</td><td class="n">${FC(c.montant)}</td></tr>`}
+    <tr class="tot"><td>Net payé</td><td class="n">${FC(c.montant)}</td></tr></table>
+    <div class="sig"><span>L'employé</span><span>Pour ${esc((DATA.entreprise||{}).nom || "MOAYÉ'S INDUSTRIE")}</span></div>`);
+}
+function exportPaies(nom){
+  const P = paies().filter(p => !nom || p.nom === norm(nom));
+  const rows = P.map(p => ({Mois:p.mois, 'Payé le':p.date, 'Employé':p.nom, 'Nom saisi':p.saisi, Montant:p.montant, 'Libellé':p.desc}));
+  const name = `MOAYES_paies_${nom ? norm(nom).replace(/[^A-Z0-9]+/g,'_') + '_' : ''}${today()}`;
+  if (typeof XLSX === 'undefined'){
+    const csv = ['Mois;Payé le;Employé;Nom saisi;Montant;Libellé', ...rows.map(r => [r.Mois, r['Payé le'], r['Employé'], r['Nom saisi'], r.Montant, String(r['Libellé']).replace(/;/g, ',')].join(';'))].join('\n');
+    return saveFile(name + '.csv', 'text/csv', csv);
+  }
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.length ? rows : [{'(aucune paie)':''}]), 'Paies');
+  const mois = [...new Set(P.map(p => p.mois))].sort(), noms = [...new Set(P.map(p => p.nom))];
+  const somme = (n, m) => P.filter(p => p.nom === n && (!m || p.mois === m)).reduce((t,p) => t + p.montant, 0);
+  const grille = noms.map(n => { const o = {'Employé':n}; mois.forEach(m => o[m] = somme(n, m)); o.Total = somme(n); return o; });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(grille.length ? grille : [{'(aucune paie)':''}]), 'Par mois');
+  if (AB) AB.saveFile(name + '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', XLSX.write(wb, {bookType:'xlsx', type:'base64'}));
+  else XLSX.writeFile(wb, name + '.xlsx');
+}
 function editEmp(i){
   const r = i !== undefined ? DATA.rh[i] : {};
   form(i !== undefined ? 'Modifier l\'employé' : 'Nouvel employé', [
@@ -967,6 +1099,14 @@ function payerTous(){
   if (!L.length) return toast('Tout est déjà payé');
   const t = L.reduce((s,r)=>s+num(r.sal)+num(r.prime),0);
   confirmBox(`Payer <b>${L.length}</b> employé(s) pour ${fmtM(RHM)} : <b>${FC(t)}</b> ?`, () => { L.forEach(_paie); audit('rh','paie groupée','',RHM+' '+FC(t),''); save(); render(); toast('✅ ' + L.length + ' salaires enregistrés'); }, 'Payer tout');
+}
+function annulerPaieC(ci){
+  const c = DATA.charges[ci]; if (!c) return;
+  confirmBox(`Annuler la paie de <b>${esc(c.fourn||'')}</b> (${FC(c.montant)}, ${fmtD(c.date)}) ? La dépense « Salaire » est retirée des Charges.`, () => {
+    const hi = DATA.rhHistorique.findIndex(h => norm(h.nom) === norm(c.fourn) && num(h.total) === num(c.montant) && (h.datePaie === c.date || (c.desc||'').includes(h.mois)));
+    archive('charges', ci); if (hi >= 0) archive('rhHistorique', hi);
+    save(); render(); toast('Paie annulée');
+  }, 'Annuler la paie');
 }
 function annulerPaie(hi){
   const h = DATA.rhHistorique[hi];
@@ -1163,11 +1303,12 @@ function flux(d1, d2){
   const o = {ca:0, encV:0, regl:0, achats:0, chHM:0, pots:0, remises:0, cats:{}};
   DATA.ventes.forEach(v => { if (ok(v.date)){ o.ca += num(v.montant); o.encV += enc(v); o.pots += num(v.qty); o.remises += num(v.remiseMontant); } });
   DATA.reglements.forEach(r => { if (ok(r.date)) o.regl += num(r.montant); });
+  o.annul = 0; DATA.annulations.forEach(a => { if (ok(a.date)) o.annul += num(a.montant); });
   o.achCash = 0; o.paieF = 0; o.achCredit = 0;
   DATA.achats.forEach(a => { if (ok(a.date)){ o.achats += num(a.montant); if (isCredF(a)) o.achCredit += num(a.montant); else o.achCash += num(a.montant); } });
   DATA.paiementsFourn.forEach(x => { if (ok(x.date)) o.paieF += num(x.montant); });
   DATA.charges.forEach(c => { if (c.cat !== 'Manioc' && ok(c.date)){ o.chHM += num(c.montant); o.cats[c.cat] = (o.cats[c.cat]||0) + num(c.montant); } });
-  o.entrees = o.encV + o.regl; o.sorties = o.achCash + o.paieF + o.chHM; o.res = o.ca - o.achats - o.chHM;
+  o.entrees = o.encV + o.regl; o.sorties = o.achCash + o.paieF + o.chHM; o.res = o.ca - o.achats - o.chHM - o.annul;
   return o;
 }
 const finMois = m => { const [y,mo] = m.split('-').map(Number); return m + '-' + String(new Date(y, mo, 0).getDate()).padStart(2,'0'); };
@@ -1240,6 +1381,18 @@ function restaurer(i, silent){
   };
   if (silent) return go_();
   confirmBox(`Restaurer cet élément ?<br><b>${esc(arcLabel(a))}</b>`, go_, 'Restaurer');
+}
+function nettoyerSupprimes(silent){
+  const K = calc(), L = K.orphelins, nA = DATA.archives.length;
+  const go_ = () => {
+    L.forEach(o => DATA.annulations.push({date:today(), cle:o.k, idClient:o.k.startsWith('NOM:') ? '' : o.k, client:o.nom, montant:Math.round(o.v), motif:'Client supprimé : solde annulé', user:'GOLI — '+ROLES[USER].name}));
+    DATA.archives = []; DATA._nettoyage1 = today();
+    audit('système', 'nettoyage des données supprimées', '', `${nA} élément(s) de corbeille effacé(s), ${L.length} solde(s) annulé(s)`, '');
+    save(); render(); toast(`✅ Corbeille vidée (${nA}) et ${L.length} solde(s) de clients supprimés annulés`);
+  };
+  if (!L.length && !nA){ if (!silent) toast('Rien à nettoyer'); DATA._nettoyage1 = today(); return; }
+  confirmBox(`<b>Nettoyage des données supprimées</b><br>• ${nA} élément(s) de la corbeille effacé(s) définitivement<br>• ${L.length} solde(s) de clients supprimés annulé(s) : ${L.map(o => esc(o.nom) + ' ' + FC(o.v)).join(', ') || '—'}<br><span class="small muted">Le chiffre d'affaires, la caisse et l'historique des ventes ne changent pas. Une sauvegarde est téléchargée avant.</span>`,
+    () => { exportJSON(); go_(); }, 'Nettoyer');
 }
 function restaurerOrphelins(){
   const L = calc().orphelins.filter(o => o.arc >= 0);
@@ -1343,7 +1496,7 @@ VIEWS.etats = () => {
   const opts = [...years.map(y => [y, 'Année ' + y]), ...K.months.map(m => [m.m, fmtM(m.m)]).reverse()];
   const d1 = EFP.length === 4 ? EFP + '-01-01' : EFP + '-01', d2r = EFP.length === 4 ? EFP + '-12-31' : finMois(EFP), d2 = d2r < today() ? d2r : today();
   const f = flux(d1, d2), cum = flux('', d2);
-  const treso = num(DATA.soldeInit) + cum.entrees - cum.sorties, creances = cum.ca - cum.encV - cum.regl;
+  const treso = num(DATA.soldeInit) + cum.entrees - cum.sorties, creances = cum.ca - cum.encV - cum.regl - cum.annul;
   const detF = cum.achCredit - cum.paieF;
   const resCum = cum.res, actif = treso + creances, passif = num(DATA.soldeInit) + resCum + detF;
   const lastPrix = num((DATA.achats.slice().sort((a,b)=>a.date<b.date?-1:1).pop()||{}).prix);
@@ -1358,7 +1511,8 @@ VIEWS.etats = () => {
     ${row('Achats de manioc', -f.achats)}
     ${CATS.map(c => f.cats[c] ? row('Charges · ' + c, -f.cats[c]) : '').join('')}
     ${Object.keys(f.cats).filter(c => !CATS.includes(c)).map(c => row('Charges · ' + esc(c), -f.cats[c])).join('')}
-    ${row('Total des charges', -(f.achats + f.chHM), true)}
+    ${f.annul ? row('Soldes clients annulés', -f.annul) : ''}
+    ${row('Total des charges', -(f.achats + f.chHM + f.annul), true)}
     ${row('Résultat', f.res, true, f.res >= 0 ? 'up' : 'dn')}
     <tr><td class="small muted">Marge nette</td><td class="n small muted">${f.ca ? Math.round(f.res/f.ca*100) : 0} %</td></tr>
     <tr><td class="small muted">Coût de revient du pot</td><td class="n small muted">${f.pots ? FC((f.achats+f.chHM)/f.pots) : '—'}</td></tr>
@@ -1588,7 +1742,10 @@ VIEWS.params = () => {
     <div class="row">${Object.entries(ROLES).map(([k,r]) => `<button class="btn" onclick="changePin('${k}')">Code ${r.name.toLowerCase()}</button>`).join('')}</div>
     <p class="small muted" style="margin-top:8px">Codes de départ : propriétaire 1234 · directrice 1111 · vendeur 0000 · producteur 2222. Changez-les.</p>
     <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
-    <h3>Corbeille</h3><p class="small muted">Tout ce qui est supprimé est gardé ici et peut être restauré.</p>
+    <h3>Ancienne application (V30)</h3><p class="small muted" style="margin-bottom:8px">Gardée en secours, avec ses propres données (moayes/data). Saisissez chaque opération dans une seule des deux applications.</p>
+    <div class="row" style="margin-bottom:6px"><button class="btn" onclick="openExt(new URL('v30.html', location.href).href)">Ouvrir la V30</button><button class="btn" onclick="fbPull('moayes/data')">Récupérer ses données dans la V2</button></div>
+    <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+    <h3>Corbeille</h3><p class="small muted">Tout ce qui est supprimé est gardé ici et peut être restauré. ${DATA.archives.length || calc().orphelins.length ? `<button class="btn sm d" onclick="nettoyerSupprimes()">Vider la corbeille et annuler les soldes des clients supprimés</button>` : ''}</p>
     <div class="tw" style="max-height:240px;overflow:auto"><table>${DATA.archives.map((a,i)=>({a,i})).reverse().slice(0,60).map(({a,i}) => `<tr><td class="small">${fmtD(a.date)}</td><td class="small"><span class="tag">${esc(a.collection||'?')}</span> ${esc(arcLabel(a))}</td><td class="n"><button class="btn sm" onclick="restaurer(${i})">Restaurer</button></td></tr>`).join('') || '<tr><td class="empty">Corbeille vide</td></tr>'}</table></div>
     <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
     <h3>Journal</h3><p class="small muted">${DATA.audit.length} entrées · ${DATA.archives.length} éléments archivés.</p>
