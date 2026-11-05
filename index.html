@@ -210,7 +210,7 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-b
    charges, ajustements). Aucun solde saisi à la main.
    Format de données identique aux sauvegardes V30.
    ========================================================= */
-const VERSION = 'V2.8';
+const VERSION = 'V2.8.1';
 const LS_DATA = 'moayes_v2_data', LS_CFG = 'moayes_v2_cfg', LS_PIN = 'moayes_v2_pins', LS_TS = 'moayes_v2_ts';
 const FIREBASE_CONFIG = {
   apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
@@ -1869,28 +1869,36 @@ async function fbDiag(){
   const step = async (label, fn, fix) => { L.push([null, label]); show(); try { const r = await fn(); L[L.length-1] = [true, label + (r ? ' — ' + r : '')]; show(); return true; } catch(e){ FB_ERR = e; L[L.length-1] = [false, `${label} — ${esc(String(e.code||e.message||e))}<br><b>À faire :</b> ${fix}`]; show(); return false; } };
   const tmo = (p, ms) => Promise.race([p, new Promise((_, ko) => setTimeout(() => ko(new Error('délai dépassé (réseau trop lent ou bloqué)')), ms))]);
   if (!await step('Internet et bibliothèque Firebase', async () => { if (typeof firebase === 'undefined') throw new Error('bibliothèque Firebase non chargée'); }, 'vérifiez la connexion internet puis rechargez la page.')) return;
-  if (!await step('Connexion anonyme', async () => { await tmo(fbReady(), 12000); return 'identifiant ' + _auth.currentUser.uid.slice(0,8) + '…'; }, 'étape 1 : activer « Anonyme » dans Authentication → Sign-in method.')) { setFb('err', fbShort(FB_ERR)); return; }
-  if (!await step('Lecture de ' + CFG.fbPath, async () => { const sn = await tmo(_db.ref(CFG.fbPath).once('value'), 12000); const d = sn.val(); return d ? ((Array.isArray(d.ventes)?d.ventes:Object.values(d.ventes||{})).length + ' ventes dans le cloud') : 'vide (normal la première fois)'; }, 'étape 2 : coller les règles dans Realtime Database → Règles → Publier.')) {
-    setFb('err', fbShort(FB_ERR));
-    // recherche d'un emplacement déjà autorisé par les règles actuelles (celles de la V30)
+  if (!await step('Connexion anonyme', async () => { await tmo(fbReady(), 25000); return 'identifiant ' + _auth.currentUser.uid.slice(0,8) + '…'; }, 'étape 1 : activer « Anonyme » dans Authentication → Sign-in method.')) { setFb('err', fbShort(FB_ERR)); return; }
+  const isPerm = e => /PERMISSION|permission/i.test(String((e && (e.code || e.message)) || ''));
+  // test léger : on lit seulement l'horodatage de la dernière synchronisation, pas toutes les données
+  if (!await step('Lecture de ' + CFG.fbPath, async () => { const sn = await tmo(_db.ref(CFG.fbPath + '/_lastSaved').once('value'), 25000); const t = sn.val(); return t ? 'dernière synchronisation le ' + new Date(t).toLocaleString('fr-FR') : 'emplacement vide (normal la première fois)'; },
+      'voir le résultat ci-dessous.')) {
+    if (!isPerm(FB_ERR)){
+      L[L.length-1] = [false, `Lecture de ${esc(CFG.fbPath)} — <b>la connexion est trop lente ou coupée</b> (aucune réponse en 25 secondes). Ce n'est <b>pas</b> un problème de règles : rien à changer dans Firebase.<br><b>À faire :</b> passez en Wi-Fi ou rapprochez-vous d'une zone avec du réseau, désactivez l'économiseur de données, puis relancez le diagnostic. Vos saisies restent sur le téléphone et partiront au retour du réseau.`];
+      setFb('err', 'Hors ligne'); show(); return;
+    }
+    setFb('err', 'Accès refusé');
     L.push([null, 'Recherche d\'un emplacement déjà autorisé…']); show();
-    const can = async (fn) => { try { await tmo(fn(), 10000); return true; } catch(e){ return false; } };
-    const v30 = await can(() => _db.ref('moayes/data').once('value'));
+    const probe = async (fn) => { try { await tmo(fn(), 20000); return 'ok'; } catch(e){ return isPerm(e) ? 'refus' : 'reseau'; } };
+    const v30 = await probe(() => _db.ref('moayes/data/_lastSaved').once('value'));
     const alt = 'moayes/v2_data';
-    const altOk = v30 && await can(() => _db.ref('moayes/v2_ping').set({t: Date.now()})) && await can(() => _db.ref(alt).once('value'));
+    const altOk = v30 === 'ok' && await probe(() => _db.ref('moayes/v2_ping').set({t: Date.now()})) === 'ok' && await probe(() => _db.ref(alt + '/_lastSaved').once('value')) === 'ok';
     L.pop();
     if (altOk && CFG.fbPath !== alt){
-      L.push([true, `<b>Solution immédiate trouvée.</b> Vos règles actuelles autorisent le dossier « moayes » de la V30. La V2 peut y travailler dans son propre emplacement <b>${alt}</b>, sans toucher aux données de la V30 (<i>moayes/data</i>) et sans rien changer dans Firebase.<br><button class="btn p sm" style="margin-top:8px" onclick="CFG.fbPath='${alt}';saveCfg();REMOTE_SEEN=false;LISTEN_PATH='';fbDiag()">Utiliser ${alt}</button>`]);
-    } else if (!v30){
+      L.push([true, `<b>Solution immédiate trouvée.</b> Vos règles autorisent le dossier « moayes ». L'application peut y travailler à l'emplacement <b>${alt}</b>, sans rien changer dans Firebase.<br><button class="btn p sm" style="margin-top:8px" onclick="CFG.fbPath='${alt}';saveCfg();REMOTE_SEEN=false;LISTEN_PATH='';fbDiag()">Utiliser ${alt}</button>`]);
+    } else if (v30 === 'refus'){
       const uid = _auth && _auth.currentUser ? _auth.currentUser.uid : '?';
-      L.push([false, `<b>Cet appareil est entièrement bloqué</b>, même pour la V30 : la base est verrouillée sur un autre appareil (règle « auth.uid === … » de la V30). Identifiant de cet appareil : <b style="user-select:all">${esc(uid)}</b>.<br><b>Seule solution :</b> remplacer les règles (étape 2 ci-dessus, bouton « Copier les règles »), puis <b>Publier</b>.`]);
+      L.push([false, `<b>Cet appareil est refusé par les règles de la base</b> (Firebase a répondu « accès refusé »). Identifiant de cet appareil : <b style="user-select:all">${esc(uid)}</b>.<br><b>Solution :</b> remplacer les règles (étape 2 ci-dessus, bouton « Copier les règles »), puis <b>Publier</b>.`]);
+    } else if (v30 === 'reseau'){
+      L.push([false, '<b>La connexion est trop lente pour terminer le test.</b> Repassez le diagnostic en Wi-Fi avant de changer quoi que ce soit dans Firebase.']);
     } else {
-      L.push([false, '<b>Les règles refusent aussi les autres emplacements.</b> Remplacez les règles (étape 2, bouton « Copier les règles ») puis <b>Publier</b>.']);
+      L.push([false, '<b>Les règles refusent cet emplacement.</b> Remplacez les règles (étape 2, bouton « Copier les règles ») puis <b>Publier</b>.']);
     }
     show(); return;
   }
   const root = CFG.fbPath.split('/')[0];
-  if (!await step('Écriture (test)', async () => { await tmo(_db.ref(root + '/ping').set({t: Date.now(), by: ROLES[USER].name}), 12000); }, 'étape 2 : les règles doivent autoriser « .write » sur ' + esc(root) + '.')) { setFb('err', fbShort(FB_ERR)); return; }
+  if (!await step('Écriture (test)', async () => { await tmo(_db.ref(root + '/ping').set({t: Date.now(), by: ROLES[USER].name}), 25000); }, 'étape 2 : les règles doivent autoriser « .write » sur ' + esc(root) + '.')) { setFb('err', fbShort(FB_ERR)); return; }
   L.push([true, '<b>Firebase fonctionne.</b>' + (CFG.fbAuto ? ' Synchronisation automatique active.' : ' Activez la synchronisation automatique dans Paramètres.')]); show();
   FB_ERR = null; REMOTE_SEEN = false; LISTEN_PATH = ''; if (CFG.fbAuto) fbListen(); setFb('', '☁ En ligne');
 }
