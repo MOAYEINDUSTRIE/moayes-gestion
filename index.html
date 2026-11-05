@@ -6,7 +6,6 @@
 <meta name="theme-color" content="#173f2f">
 <title>MOAYÉ'S INDUSTRIE — Gestion Pro V2</title>
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#173f2f">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="MOAYÉ'S">
@@ -36,7 +35,7 @@ h1,h2,.serif{font-family:Fraunces,Georgia,serif;letter-spacing:-.01em}
 @media (max-height:820px){.nav a{padding:6px 12px;font-size:13.5px}.nav .grp{padding:6px 12px 2px}}
 .qa{width:34px;height:34px;border-radius:99px;border:1px solid var(--line);background:var(--card);cursor:pointer;display:inline-grid;place-items:center;color:var(--ink);padding:0}.qa svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .brand{padding:4px 10px 18px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:10px}
-.brand b{display:block;font-family:Fraunces,serif;font-size:19px;color:#fff}
+.brand b{display:block;font-family:Fraunces,serif;font-size:19px;color:#fff}.brand img{display:block;width:150px;max-width:100%;margin:0 auto 6px}.brand small{display:block;text-align:center}
 .brand small{color:#9fbfb0;font-size:12px}
 .nav a{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;color:#cfe0d6;text-decoration:none;cursor:pointer;font-weight:500;font-size:14px}
 .nav a:hover{background:rgba(255,255,255,.06)}
@@ -181,7 +180,7 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-b
 .toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;z-index:200;font-weight:600;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
 .login{position:fixed;inset:0;background:var(--g9);display:flex;align-items:center;justify-content:center;z-index:300;padding:20px}
 .login .box{background:var(--card);border-radius:20px;padding:26px;width:100%;max-width:360px;text-align:center}
-.login h1{font-size:24px;color:var(--g9)}
+.login h1{font-size:24px;color:var(--g9)}.login .llogo{display:block;width:220px;max-width:80%;margin:-6px auto 4px}
 .pin{font-size:26px;letter-spacing:.5em;text-align:center;font-weight:700}
 .muted{color:var(--muted)}.small{font-size:12px}
 .chart text{font-size:11px;fill:var(--muted);font-family:Inter}
@@ -192,7 +191,7 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-b
 <body>
 <div class="app">
   <aside class="side">
-    <div class="brand"><b>MOAYÉ'S INDUSTRIE</b><small>Gestion Pro · V2</small></div>
+    <div class="brand"><img src="logo.png" alt="MOAYÉ'S INDUSTRIE" onerror="this.remove()"><small>Gestion Pro · V2</small></div>
     <nav class="nav" id="nav"></nav>
     <div class="foot" id="footUser"></div>
   </aside>
@@ -211,7 +210,7 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-b
    charges, ajustements). Aucun solde saisi à la main.
    Format de données identique aux sauvegardes V30.
    ========================================================= */
-const VERSION = 'V2.5';
+const VERSION = 'V2.6';
 const LS_DATA = 'moayes_v2_data', LS_CFG = 'moayes_v2_cfg', LS_PIN = 'moayes_v2_pins', LS_TS = 'moayes_v2_ts';
 const FIREBASE_CONFIG = {
   apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
@@ -436,7 +435,7 @@ function renderNav(){
   $('#footUser').innerHTML = `${esc(ROLES[USER].name)} · ${VERSION}<br><a style="color:#cfe0d6;cursor:pointer" onclick="logout()">Se déconnecter</a>`;
 }
 function moreMenu(){
-  modal(`<h2>Tous les modules</h2><div class="tiles">${
+  modal(`<img src="logo.png" alt="" onerror="this.remove()" style="display:block;width:150px;margin:-4px auto 10px"><h2>Tous les modules</h2><div class="tiles">${
     PAGES.map(x=>x[0]).filter(k => allowed(k) && !(window._mob||[]).includes(k)).map(k => { const p = PAGES.find(x=>x[0]===k);
       return `<button class="tile ${PAGE===k?'on':''}" onclick="closeModal();go('${k}')"><span class="ic">${ico(k)}</span>${p[2]}</button>`; }).join('')
   }<button class="tile out" onclick="closeModal();logout()"><span class="ic">${ico('logout')}</span>Se déconnecter</button></div><p class="small muted" style="margin-top:12px;text-align:center">${esc(ROLES[USER].name)} · ${VERSION}</p>`);
@@ -444,7 +443,7 @@ function moreMenu(){
 function header(title, sub, actions){
   const st = fbState;
   const E = DATA.entreprise || {};
-  return `<div class="printhead"><b>${esc(E.nom||"MOAYÉ'S INDUSTRIE")}</b> · ${esc(E.ville||'')} ${E.tel?'· '+esc(E.tel):''}<br><span class="small">Édité le ${new Date().toLocaleString('fr-FR')}</span></div><div class="top"><div class="ttl"><h1>${title}</h1>${sub?`<div class="sub">${sub}</div>`:''}</div>
+  return `<div class="printhead"><img src="${E.logo || 'logo.png'}" style="height:56px;vertical-align:middle;margin-right:10px" onerror="this.remove()"><b>${esc(E.nom||"MOAYÉ'S INDUSTRIE")}</b> · ${esc(E.ville||'')} ${E.tel?'· '+esc(E.tel):''}<br><span class="small">Édité le ${new Date().toLocaleString('fr-FR')}</span></div><div class="top"><div class="ttl"><h1>${title}</h1>${sub?`<div class="sub">${sub}</div>`:''}</div>
     ${actions?`<div class="acts">${actions}</div>`:''}<div class="util">${CFG.sbOn?`<span class="sync sbc" id="sbChip" title="Supabase" onclick="${USER==='admin'?"go('params')":''}">${SB.txt||'Supabase'}</span>`:''}<span class="sync ${st.cls}" onclick="fbHelp()" title="Synchronisation : ${esc(st.txt)}">${st.txt}</span><button class="qa" title="Mode d'emploi" aria-label="Mode d'emploi" onclick="go('guide')">${ico('guide')}</button>${allowed('params')?`<button class="qa" title="Paramètres" aria-label="Paramètres" onclick="go('params')">${ico('params')}</button>`:''}</div></div>`;
 }
 function render(){
@@ -1172,6 +1171,9 @@ function flux(d1, d2){
   return o;
 }
 const finMois = m => { const [y,mo] = m.split('-').map(Number); return m + '-' + String(new Date(y, mo, 0).getDate()).padStart(2,'0'); };
+/* copie intégrée du logo, pour les factures et bons (fenêtre d'impression, Android, hors ligne) */
+let LOGO_DATA = '';
+try { fetch('logo.png').then(r => r.ok ? r.blob() : null).then(b => { if (!b) return; const fr = new FileReader(); fr.onload = () => LOGO_DATA = fr.result; fr.readAsDataURL(b); }).catch(() => {}); } catch(e){}
 function printDoc(title, body){
   const E = DATA.entreprise || {};
   const html = (`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>
@@ -1181,7 +1183,7 @@ function printDoc(title, body){
     table{width:100%;border-collapse:collapse;margin-top:10px}th{background:#173f2f;color:#fff;text-align:left;padding:7px}td{padding:6px 7px;border-bottom:1px solid #ddd}
     .n{text-align:right}.tot td{font-weight:700;border-top:2px solid #173f2f}.small{font-size:11px;color:#555}.sig{display:flex;justify-content:space-between;margin-top:40px}
     @media print{.np{display:none}}</style></head><body>
-    <div class="h"><div>${E.logo?`<img src="${E.logo}" style="max-height:60px;margin-bottom:6px"><br>`:''}<b style="font-size:18px">${esc(E.nom||"MOAYÉ'S INDUSTRIE")}</b><br><span class="small">${esc(E.slogan||'')}</span><br>${esc(E.ville||'')}${E.tel?' · '+esc(E.tel):''}<br><span class="small">${E.rccm?'RCCM : '+esc(E.rccm):''}${E.cc?' · CC : '+esc(E.cc):''}</span></div><div class="t">${title}</div></div>
+    <div class="h"><div><img src="${E.logo || LOGO_DATA || new URL('logo.png', location.href).href}" style="max-height:72px;margin-bottom:6px" onerror="this.remove()"><br><b style="font-size:18px">${esc(E.nom||"MOAYÉ'S INDUSTRIE")}</b><br><span class="small">${esc(E.slogan||'')}</span><br>${esc(E.ville||'')}${E.tel?' · '+esc(E.tel):''}<br><span class="small">${E.rccm?'RCCM : '+esc(E.rccm):''}${E.cc?' · CC : '+esc(E.cc):''}</span></div><div class="t">${title}</div></div>
     ${body}<p class="np" style="margin-top:24px"><button onclick="print()" style="padding:10px 18px;font-size:15px">Imprimer / Enregistrer en PDF</button></p>
     ${AB ? '' : '<script>setTimeout(function(){print()},400)<\/script>'}</body></html>`);
   if (AB){ AB.printHtml(html, title); return; }
@@ -1908,7 +1910,7 @@ async function pins(){
 }
 function loginScreen(){
   $('#layer').innerHTML = `<div class="login"><div class="box">
-    <h1>MOAYÉ'S INDUSTRIE</h1><p class="muted small" style="margin:4px 0 18px">Gestion Pro ${VERSION} · Filière attiéké</p>
+    <img class="llogo" src="logo.png" alt="MOAYÉ'S INDUSTRIE" onerror="this.outerHTML='<h1>MOAYÉ&#39;S INDUSTRIE</h1>'"><p class="muted small" style="margin:4px 0 18px">Gestion Pro ${VERSION} · Cultiver, transformer, valoriser</p>
     <div class="seg" id="roles" style="margin-bottom:14px">${Object.entries(ROLES).map(([k,r],i) => `<button class="${i?'':'on'}" onclick="window._role='${k}';[...this.parentNode.children].forEach(b=>b.classList.remove('on'));this.classList.add('on');$('#pin').focus()">${r.name}</button>`).join('')}</div>
     <input class="inp pin" id="pin" type="password" inputmode="numeric" maxlength="8" placeholder="••••" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="btn p big" style="margin-top:12px" onclick="doLogin()">Entrer</button>
