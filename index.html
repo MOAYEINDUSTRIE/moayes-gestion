@@ -62,7 +62,7 @@ h1,h2,.serif{font-family:Fraunces,Georgia,serif;letter-spacing:-.01em}
   .top{position:sticky;top:0;z-index:25;margin:0 -12px 12px;padding:12px 12px 10px;background:rgba(238,242,237,.94);backdrop-filter:blur(10px);grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"ttl util" "acts acts";gap:8px 10px}
   .top h1{font-size:21px;line-height:1.2}
   .top .sub{font-size:12px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .top .acts{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;margin:0 -12px;padding:0 12px 2px;scrollbar-width:none}
+  .top .acts{flex-wrap:wrap;justify-content:flex-start;gap:6px}
   .top .acts::-webkit-scrollbar{display:none}
   .top .acts .btn{flex:none;padding:9px 13px;border-radius:99px;font-size:13.5px}
   .top .util{gap:4px;align-self:start}
@@ -210,7 +210,7 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-b
    charges, ajustements). Aucun solde saisi à la main.
    Format de données identique aux sauvegardes V30.
    ========================================================= */
-const VERSION = 'V2.8.3';
+const VERSION = 'V2.9';
 const LS_DATA = 'moayes_v2_data', LS_CFG = 'moayes_v2_cfg', LS_PIN = 'moayes_v2_pins', LS_TS = 'moayes_v2_ts';
 const FIREBASE_CONFIG = {
   apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
@@ -233,10 +233,10 @@ const homeOf = () => isMgr() ? 'home' : USER === 'producteur' ? 'production' : U
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num = v => { const n = parseFloat(String(v ?? '').replace(/\s/g,'').replace(',','.')); return isFinite(n) ? n : 0; };
-const F = n => Math.round(n || 0).toLocaleString('fr-FR').replace(/ | /g,' ');
-const FC = n => F(n) + ' F';
-const F1 = n => (Math.round((n||0)*10)/10).toLocaleString('fr-FR',{maximumFractionDigits:1}).replace(/ | /g,' ');
-const F2 = n => (Math.round((n||0)*100)/100).toLocaleString('fr-FR',{maximumFractionDigits:2}).replace(/ | /g,' ');
+const F = n => Math.round(n || 0).toLocaleString('fr-FR').replace(/[\u202f\u00a0 ]/g,'\u00a0'); // espace insécable : un nombre ne se coupe jamais sur deux lignes
+const FC = n => F(n) + '\u00a0F';
+const F1 = n => (Math.round((n||0)*10)/10).toLocaleString('fr-FR',{maximumFractionDigits:1}).replace(/[\u202f\u00a0 ]/g,'\u00a0');
+const F2 = n => (Math.round((n||0)*100)/100).toLocaleString('fr-FR',{maximumFractionDigits:2}).replace(/[\u202f\u00a0 ]/g,'\u00a0');
 const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset()*6e4).toISOString().slice(0,10); };
 const nowH = () => new Date().toTimeString().slice(0,5);
 const ym = d => (d || '').slice(0,7);
@@ -525,7 +525,7 @@ VIEWS.home = () => {
   if (gros.length) al.push(['', `${gros.length} client(s) au-dessus de ${FC(CFG.seuilCredit)} de crédit : ${gros.map(c=>esc(c.nom)).join(', ')}.`]);
   if (USER==='admin' && WEAK.length) al.push(['r', `Codes d'accès encore par défaut : ${WEAK.join(', ')}. <a style="text-decoration:underline;cursor:pointer" onclick="go('params')">Les changer</a>.`]);
   const lastEx = localStorage.getItem('moayes_v2_lastExport');
-  if (USER==='admin' && (!lastEx || lastEx < addDays(today(), -7))) al.push(['', `${lastEx ? 'Dernière sauvegarde téléchargée le ' + fmtD(lastEx) : 'Aucune sauvegarde téléchargée sur ce téléphone'}. <a style="text-decoration:underline;cursor:pointer" onclick="exportJSON();render()">Télécharger maintenant</a> (1 fois par semaine).`]);
+  if (USER==='admin' && (!lastEx || lastEx < addDays(today(), -7))) al.push(['', `${lastEx ? 'Dernière sauvegarde téléchargée le ' + fmtD(lastEx) : 'Aucune sauvegarde téléchargée sur ce téléphone'}. <a style="text-decoration:underline;cursor:pointer" onclick="backupDrive()">☁ Sauvegarder vers Drive</a> (1 fois par semaine, le dimanche).`]);
   const mP = ym(today()), aPayer = DATA.rh.filter(r => r.statut !== 'Inactif' && !paye(r.nom, ym(addDays(mP+'-01', -1))));
   if (USER==='admin' && aPayer.length && today().slice(8) >= '05') al.push(['', `Salaires de ${fmtM(ym(addDays(mP+'-01',-1)))} non enregistrés : ${aPayer.map(r=>esc(r.nom)).join(', ')}. <a style="text-decoration:underline;cursor:pointer" onclick="RHM='${ym(addDays(mP+'-01',-1))}';go('rh')">Voir</a>`]);
   if (K.orphelins.length && USER === 'admin') al.push(['', `<a style="text-decoration:underline;cursor:pointer" onclick="nettoyerSupprimes()">Nettoyer : annuler ces soldes et vider la corbeille</a>`]);
@@ -1145,7 +1145,7 @@ VIEWS.guide = () => {
     ${st('S','Relancer les dettes', 'Clients & crédits → filtre « Doivent » → ouvrez le client → <b>Relancer</b> (message WhatsApp prêt) ou <b>Encaisser une dette</b>.')}
     ${st('!','Une perte (sac pourri, volé, attiéké avarié)', 'Stock → <b>Déclarer une perte</b> (ou Production → <b>Perte de manioc</b>) : choisissez l\'article, la quantité (0,5 = demi-sac) et la cause. Le stock baisse, la valeur perdue est calculée et apparaît dans les rapports.')}
     ${st('S','Compter le stock', 'Stock → <b>Saisir un inventaire</b> : entrez ce que vous comptez réellement. L\'écart est enregistré et justifié.')}
-    ${st('S','Sauvegarde', 'Paramètres → <b>Télécharger une sauvegarde</b>, et envoyez le fichier sur WhatsApp ou Drive.')}
+    ${st('S','Sauvegarde', 'Chaque dimanche : Paramètres → <b>☁ Sauvegarder vers Drive</b>, dossier « MOAYES sauvegardes ». Le contrôle du lundi utilise cette sauvegarde.')}
     ${st('M','Salaires', 'Salaires & RH → <b>Payer tout</b> : la paie et la dépense Salaire sont créées ensemble.')}
     ${st('M','Résultat du mois', 'Rapports : CA, coûts, résultat, coût de revient du pot. Si le coût du pot dépasse 500 F, le mois perd de l\'argent.')}
   </div>
@@ -1698,7 +1698,7 @@ VIEWS.params = () => {
   <div class="grid k2">
   <div class="card"><h3>Données</h3>
     <p class="small muted" style="margin-bottom:10px">${DATA.ventes.length} ventes · ${DATA.reglements.length} règlements · ${DATA.clients.length} clients · ${DATA.production.length} productions · ${DATA.achats.length} achats · ${DATA.charges.length} charges<br>Dernier enregistrement : ${ts?new Date(ts).toLocaleString('fr-FR'):'—'}</p>
-    <div class="row"><button class="btn p" onclick="exportJSON()">⬇ Télécharger une sauvegarde</button>
+    <div class="row"><button class="btn p" onclick="backupDrive()">☁ Sauvegarder vers Drive</button><button class="btn" onclick="exportJSON()">⬇ Télécharger une sauvegarde</button>
     <label class="btn">⬆ Importer une sauvegarde (V30 ou V2)<input type="file" accept=".json,application/json" class="hide" onchange="importJSON(this.files[0])"></label>
     <button class="btn" onclick="exportXLSX()">📊 Export Excel complet</button></div>
     <label class="row small" style="margin-top:10px"><input type="checkbox" ${CFG.autoBk?'checked':''} onchange="CFG.autoBk=this.checked;saveCfg()"> Télécharger automatiquement une sauvegarde chaque jour</label>
@@ -1795,6 +1795,21 @@ window.__back = () => {
   return false;
 };
 if ('serviceWorker' in navigator && location.protocol === 'https:') window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+/* Sauvegarde vers Google Drive (ou WhatsApp, e-mail…) via le menu « Partager » du téléphone */
+async function backupDrive(){
+  syncLegacy();
+  const name = `MOAYES_sauvegarde_${today()}.json`, txt = JSON.stringify(DATA, null, 2);
+  const done = () => { localStorage.setItem('moayes_v2_lastExport', today()); render(); };
+  if (AB && AB.shareFile){ AB.shareFile(name, 'application/json', b64utf8(txt)); toast('Choisissez « Drive » puis le dossier « MOAYES sauvegardes »'); done(); return; }
+  try {
+    const file = new File([txt], name, {type:'application/json'});
+    if (navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:name}); toast('✅ Sauvegarde envoyée'); done(); return; }
+  } catch(e){ if (e && e.name === 'AbortError') return; }
+  saveFile(name, 'application/json', txt); done();
+  modal(`<h2>☁ Mettre la sauvegarde sur Drive</h2><p>Le fichier <b>${name}</b> est enregistré dans <b>Téléchargements${AB ? '/MOAYES' : ''}</b>.</p>
+  <ol class="small"><li>Ouvrez l'application <b>Google Drive</b>.</li><li>Ouvrez le dossier <b>MOAYES sauvegardes</b> (créez-le la première fois avec <b>+ → Dossier</b>).</li><li>Touchez <b>+ → Importer</b>, puis choisissez le fichier ${name}.</li></ol>
+  <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn p" onclick="closeModal()">Compris</button></div>`);
+}
 function exportJSON(){
   syncLegacy();
   saveFile(`MOAYES_sauvegarde_${today()}.json`, 'application/json', JSON.stringify(DATA, null, 2));

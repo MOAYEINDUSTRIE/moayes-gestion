@@ -217,11 +217,31 @@ public class MainActivity extends Activity {
         printView.loadDataWithBaseURL(APP_URL, html, "text/html", "UTF-8", null);
     }
 
+    private void shareFile(String name, String mime, String b64) {
+        try {
+            byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
+            File dir = new File(getCacheDir(), "partage");
+            if (!dir.exists()) dir.mkdirs();
+            File f = new File(dir, name);
+            try (FileOutputStream fos = new FileOutputStream(f)) { fos.write(bytes); }
+            Uri uri = androidx.core.content.FileProvider.getUriForFile(this, getPackageName() + ".fichiers", f);
+            Intent i = new Intent(Intent.ACTION_SEND);
+            i.setType(mime);
+            i.putExtra(Intent.EXTRA_STREAM, uri);
+            i.putExtra(Intent.EXTRA_SUBJECT, name);
+            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(i, "Envoyer la sauvegarde vers…"));
+        } catch (Exception e) {
+            saveFile(name, mime, b64);
+        }
+    }
+
     private void toast(String m) { Toast.makeText(this, m, Toast.LENGTH_LONG).show(); }
 
     /* ---------- pont appelé depuis la page ---------- */
     private class Bridge {
         @JavascriptInterface public void saveFile(String name, String mime, String b64) { runOnUiThread(() -> MainActivity.this.saveFile(name, mime, b64)); }
+        @JavascriptInterface public void shareFile(String name, String mime, String b64) { runOnUiThread(() -> MainActivity.this.shareFile(name, mime, b64)); }
         @JavascriptInterface public void openExternal(String url) { runOnUiThread(() -> MainActivity.this.openExternal(url)); }
         @JavascriptInterface public void printHtml(String html, String title) { runOnUiThread(() -> MainActivity.this.printHtml(html, title)); }
         @JavascriptInterface public void reload() { runOnUiThread(() -> web.loadUrl(APP_URL)); }
