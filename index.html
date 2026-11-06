@@ -210,7 +210,7 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-b
    charges, ajustements). Aucun solde saisi à la main.
    Format de données identique aux sauvegardes V30.
    ========================================================= */
-const VERSION = 'V2.9';
+const VERSION = 'V2.10';
 const LS_DATA = 'moayes_v2_data', LS_CFG = 'moayes_v2_cfg', LS_PIN = 'moayes_v2_pins', LS_TS = 'moayes_v2_ts';
 const FIREBASE_CONFIG = {
   apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
@@ -290,7 +290,7 @@ function load(){
 }
 let pushTimer = null, DIRTY = false, REMOTE_SEEN = false, REMOTE_NV = 0, LISTEN_PATH = '';
 function save(){
-  CACHE = null;
+  CACHE = null; MVAL = null;
   syncLegacy();
   const ts = Date.now();
   DATA._lastSaved = ts;
@@ -316,8 +316,29 @@ function archive(collection, idx){
 /* ---------- moteur de calcul (source unique) ---------- */
 function clientKey(o){ return o.idClient || ('NOM:' + norm(o.client)); }
 function clientById(id){ return DATA.clients.find(c => c.id === id); }
+/* Stock de manioc valorisé au coût moyen pondéré (CMUP) : l'achat de manioc est une matière première
+   stockée ; il ne devient une charge que lorsqu'il est transformé (ou perdu). */
+let MVAL = null;
+function maniocValo(){
+  if (MVAL) return MVAL;
+  const ev = [];
+  DATA.achats.forEach(a => ev.push({d:a.date||'', o:0, s:num(a.sacs), v:num(a.montant)}));
+  DATA.production.forEach(p => { if (num(p.achetes)) ev.push({d:p.date||'', o:0, s:num(p.achetes), v:num(p.cout)}); if (num(p.sacs)) ev.push({d:p.date||'', o:1, s:-num(p.sacs)}); });
+  DATA.stockAjust.filter(a => a.key === 'manioc').forEach(a => ev.push({d:a.date||'', o:num(a.delta) > 0 ? 0 : 1, s:num(a.delta), aj:true}));
+  ev.sort((a,b) => a.d < b.d ? -1 : a.d > b.d ? 1 : a.o - b.o);
+  let sacs = 0, val = 0; const pts = [];
+  for (const e of ev){
+    if (e.v !== undefined){ sacs += e.s; val += e.v; }                      // achat : + sacs, + valeur payée
+    else { const cmu = sacs > 0 ? val / sacs : 0; sacs += e.s; val += e.s * cmu; if (sacs <= 0.0001 || val < 0){ if (sacs <= 0.0001) val = 0; } } // sortie (ou inventaire +) au coût moyen
+    pts.push({d:e.d, sacs, val:Math.max(0, val)});
+  }
+  const at = d => { let r = {sacs:0, val:0}; for (const p of pts){ if (p.d <= d) r = p; else break; } return r; };   // situation à la fin du jour d
+  MVAL = {at, cmu: () => { const l = pts[pts.length-1]; return l && l.sacs > 0 ? l.val / l.sacs : 0; }};
+  return MVAL;
+}
 function calc(){
   if (CACHE) return CACHE;
+  MVAL = null;
   const cred = {}, last = {}, tot = {}, nbAch = {};
   const nameToId = {};
   DATA.clients.forEach(c => nameToId[norm(c.nom)] = c.id);
@@ -365,7 +386,8 @@ function calc(){
   DATA.production.forEach(p => { const o = mget(ym(p.date)); o.prodKg += num(p.kg); o.sacs += num(p.sacs); });
   const months = Object.values(M).filter(o => o.m).sort((a,b) => a.m < b.m ? -1 : 1);
   DATA.annulations.forEach(a => mget(ym(a.date)).annul = (mget(ym(a.date)).annul||0) + num(a.montant));
-  months.forEach(o => { o.couts = o.achats + o.chHM; o.res = o.ca - o.couts - (o.annul||0); o.cash = o.encV + o.regl - o.achCash - o.paieF - o.chHM; o.coutPot = o.pots ? o.couts / o.pots : 0; });
+  const MV = maniocValo();
+  months.forEach(o => { o.stockManiocVal = MV.at(finMois(o.m)).val; o.varStock = o.stockManiocVal - MV.at(o.m + '-00').val; o.consoManioc = o.achats - o.varStock; o.couts = o.consoManioc + o.chHM; o.res = o.ca - o.couts - (o.annul||0); o.cash = o.encV + o.regl - o.achCash - o.paieF - o.chHM; o.coutPot = o.pots ? o.couts / o.pots : 0; });
 
   const ids = new Set(DATA.clients.map(c => c.id));
   const creditTotal = DATA.clients.reduce((s,c) => s + (cred[c.id]||0), 0);
@@ -547,7 +569,7 @@ VIEWS.home = () => {
     <div class="card kpi"><div class="l">Stock attiéké</div><div class="v ${K.stockKg<CFG.seuilKg?'dn':''}">${F(Math.max(0,pots))} <small>pots</small></div><div class="d">${F(K.stockKg)} kg · manioc ${F(K.stockSacs)} sacs</div></div>
   </div>
   <div class="grid k2" style="margin-top:14px">
-    <div class="card"><h3>Résultat par mois <span class="small muted">CA − (achats manioc + charges)</span></h3>${chartMonths(last6)}</div>
+    <div class="card"><h3>Résultat par mois <span class="small muted">CA − (manioc consommé + charges)</span></h3>${chartMonths(last6)}</div>
     <div class="card"><h3>Aujourd'hui</h3>
       <table><tr><td>Ventes</td><td class="n"><b>${FC(caJ)}</b></td></tr>
       <tr><td>Encaissé sur ventes</td><td class="n">${FC(encJ)}</td></tr>
@@ -1279,7 +1301,7 @@ VIEWS.rapports = () => {
   const K = calc(), ms = K.months;
   if (!RM) RM = ym(today());
   const m = ms.find(x=>x.m===RM) || ms[ms.length-1] || {};
-  const tot = ms.reduce((t,x) => { ['ca','encV','regl','achats','chHM','couts','res','pots','sacs','prodKg'].forEach(k => t[k] = (t[k]||0) + x[k]); return t; }, {});
+  const tot = ms.reduce((t,x) => { ['ca','encV','regl','achats','consoManioc','chHM','couts','res','pots','sacs','prodKg'].forEach(k => t[k] = (t[k]||0) + x[k]); return t; }, {});
   // ventes par client sur le mois
   const pc = {};
   DATA.ventes.filter(v => ym(v.date)===RM).forEach(v => { const k = K.keyOf(v); const o = pc[k] || (pc[k] = {nom:v.client, pots:0, ca:0, enc:0}); o.pots += num(v.qty); o.ca += num(v.montant); o.enc += enc(v); });
@@ -1289,10 +1311,10 @@ VIEWS.rapports = () => {
   if (window.RT === 'j') return header('Rapports', 'Rapport journalier complet', `<button class="btn" onclick="waBilan(window.RJD||today())">📲 WhatsApp</button><button class="btn" onclick="printPage()">Imprimer / PDF</button>`) + tabs + rapportJour(window.RJD || today());
   return header('Rapports', 'Compte de résultat mensuel et indicateurs', `<button class="btn" onclick="exportXLSX()">📊 Excel</button><button class="btn" onclick="printPage()">Imprimer / PDF</button>`) + tabs + `
   <div class="card"><h3>Compte de résultat par mois</h3><div class="tw"><table>
-    <tr><th>Mois</th><th class="n">Pots</th><th class="n">CA</th><th class="n">Achats manioc</th><th class="n">Autres charges</th><th class="n">Résultat</th><th class="n">Marge</th><th class="n">Coût / pot</th><th class="n">Cash net</th><th class="n">Pertes</th></tr>
-    ${ms.map(x => `<tr class="click" onclick="RM='${x.m}';render()" ${x.m===RM?'style="background:#f6fbf8"':''}><td><b>${fmtM(x.m)}</b></td><td class="n">${F(x.pots)}</td><td class="n">${F(x.ca)}</td><td class="n">${F(x.achats)}</td><td class="n">${F(x.chHM)}</td><td class="n ${x.res>=0?'up':'dn'}"><b>${F(x.res)}</b></td><td class="n">${x.ca?Math.round(x.res/x.ca*100):0} %</td><td class="n">${F(x.coutPot)}</td><td class="n ${x.cash>=0?'up':'dn'}">${F(x.cash)}</td><td class="n ${x.pertesVal?'dn':''}">${x.pertesVal?F(x.pertesVal):''}</td></tr>`).join('')}
-    <tr style="border-top:2px solid var(--ink)"><td><b>Total</b></td><td class="n"><b>${F(tot.pots)}</b></td><td class="n"><b>${F(tot.ca)}</b></td><td class="n"><b>${F(tot.achats)}</b></td><td class="n"><b>${F(tot.chHM)}</b></td><td class="n ${tot.res>=0?'up':'dn'}"><b>${F(tot.res)}</b></td><td class="n"><b>${tot.ca?Math.round(tot.res/tot.ca*100):0} %</b></td><td class="n"><b>${F(tot.pots?tot.couts/tot.pots:0)}</b></td><td class="n"></td><td class="n"><b>${F(ms.reduce((s,x)=>s+x.pertesVal,0))}</b></td></tr>
-  </table></div><div class="small muted" style="margin-top:8px">Cash net = encaissé (ventes + règlements) − dépenses payées du mois. Pertes = valeur du manioc et de l'attiéké perdus (information : leur coût est déjà dans les achats). Cliquez un mois pour le détail.</div></div>
+    <tr><th>Mois</th><th class="n">Pots</th><th class="n">CA</th><th class="n">Manioc consommé</th><th class="n">Autres charges</th><th class="n">Résultat</th><th class="n">Marge</th><th class="n">Coût / pot</th><th class="n">Cash net</th><th class="n">Pertes</th></tr>
+    ${ms.map(x => `<tr class="click" onclick="RM='${x.m}';render()" ${x.m===RM?'style="background:#f6fbf8"':''}><td><b>${fmtM(x.m)}</b></td><td class="n">${F(x.pots)}</td><td class="n">${F(x.ca)}</td><td class="n" title="Acheté ${FC(x.achats)} · stock fin de mois ${FC(x.stockManiocVal)}">${F(x.consoManioc)}</td><td class="n">${F(x.chHM)}</td><td class="n ${x.res>=0?'up':'dn'}"><b>${F(x.res)}</b></td><td class="n">${x.ca?Math.round(x.res/x.ca*100):0} %</td><td class="n">${F(x.coutPot)}</td><td class="n ${x.cash>=0?'up':'dn'}">${F(x.cash)}</td><td class="n ${x.pertesVal?'dn':''}">${x.pertesVal?F(x.pertesVal):''}</td></tr>`).join('')}
+    <tr style="border-top:2px solid var(--ink)"><td><b>Total</b></td><td class="n"><b>${F(tot.pots)}</b></td><td class="n"><b>${F(tot.ca)}</b></td><td class="n"><b>${F(tot.consoManioc)}</b></td><td class="n"><b>${F(tot.chHM)}</b></td><td class="n ${tot.res>=0?'up':'dn'}"><b>${F(tot.res)}</b></td><td class="n"><b>${tot.ca?Math.round(tot.res/tot.ca*100):0} %</b></td><td class="n"><b>${F(tot.pots?tot.couts/tot.pots:0)}</b></td><td class="n"></td><td class="n"><b>${F(ms.reduce((s,x)=>s+x.pertesVal,0))}</b></td></tr>
+  </table></div><div class="small muted" style="margin-top:8px">Résultat = ventes − manioc consommé (transformé ou perdu, au coût moyen d'achat) − autres charges : le manioc acheté mais encore en stock n'est pas une dépense, c'est une réserve. Cash net = encaissé (ventes + règlements) − dépenses payées du mois (achats de manioc compris). Pertes = valeur du manioc et de l'attiéké perdus (information : leur coût est déjà dans les achats). Cliquez un mois pour le détail.</div></div>
   <div class="card" style="margin-top:14px"><h3>Rentabilité : théorique (hypothèses) et réelle</h3>${rentabHTML(true)}</div>
   <div class="grid k2" style="margin-top:14px">
     <div class="card"><h3>Clients · ${fmtM(RM)}</h3><div class="tw"><table><tr><th>Client</th><th class="n">Pots</th><th class="n">CA</th><th class="n">Part</th><th class="n">Non payé</th></tr>
@@ -1321,7 +1343,8 @@ function flux(d1, d2){
   DATA.achats.forEach(a => { if (ok(a.date)){ o.achats += num(a.montant); if (isCredF(a)) o.achCredit += num(a.montant); else o.achCash += num(a.montant); } });
   DATA.paiementsFourn.forEach(x => { if (ok(x.date)) o.paieF += num(x.montant); });
   DATA.charges.forEach(c => { if (c.cat !== 'Manioc' && ok(c.date)){ o.chHM += num(c.montant); o.cats[c.cat] = (o.cats[c.cat]||0) + num(c.montant); } });
-  o.entrees = o.encV + o.regl; o.sorties = o.achCash + o.paieF + o.chHM; o.res = o.ca - o.achats - o.chHM - o.annul;
+  const MV = maniocValo(); o.stockFin = MV.at(d2 || '9999-12-31').val; o.stockDebut = d1 ? MV.at(addDays(d1, -1)).val : 0; o.varStock = o.stockFin - o.stockDebut; o.consoManioc = o.achats - o.varStock;
+  o.entrees = o.encV + o.regl; o.sorties = o.achCash + o.paieF + o.chHM; o.res = o.ca - o.consoManioc - o.chHM - o.annul;
   return o;
 }
 const finMois = m => { const [y,mo] = m.split('-').map(Number); return m + '-' + String(new Date(y, mo, 0).getDate()).padStart(2,'0'); };
@@ -1418,7 +1441,7 @@ function exportXLSX(){
   if (typeof XLSX === 'undefined') return toast('Module Excel indisponible (pas de connexion au chargement). Réessayez avec internet.');
   const K = calc(), wb = XLSX.utils.book_new();
   const add = (n, rows) => XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.length ? rows : [{'(vide)':''}]), n);
-  add('Résultat mensuel', K.months.map(m => ({Mois:m.m, Pots:m.pots, 'CA':m.ca, 'Encaissé ventes':m.encV, 'Règlements':m.regl, 'Achats manioc':m.achats, 'Autres charges':m.chHM, 'Résultat':m.res, 'Coût/pot':Math.round(m.coutPot), 'Cash net':m.cash})));
+  add('Résultat mensuel', K.months.map(m => ({Mois:m.m, Pots:m.pots, 'CA':m.ca, 'Encaissé ventes':m.encV, 'Règlements':m.regl, 'Achats manioc':m.achats, 'Manioc consommé':Math.round(m.consoManioc), 'Stock manioc fin de mois':Math.round(m.stockManiocVal), 'Autres charges':m.chHM, 'Résultat':m.res, 'Coût/pot':Math.round(m.coutPot), 'Cash net':m.cash})));
   add('Clients', DATA.clients.map(c => ({ID:c.id, Nom:c.nom, 'Téléphone':c.tel||'', Zone:c.zone||'', Type:c.type||'', 'Crédit':creditOf(c.id), 'Total acheté':Math.round(K.tot[c.id]||0), 'Dernier achat':K.last[c.id]||''})));
   add('Ventes', DATA.ventes.map(v => ({Date:v.date, Heure:v.heure||'', Client:v.client, ID:v.idClient||'', Pots:num(v.qty), Prix:num(v.prix), Remise:num(v.remiseMontant), Montant:num(v.montant), 'Encaissé':enc(v), Reste:num(v.montant)-enc(v), Mode:v.mode||'', Saisi:v.user||''})));
   add('Règlements', DATA.reglements.map(r => ({Date:r.date, Client:r.client, ID:r.idClient||'', Montant:num(r.montant), Mode:r.mode||'', Saisi:r.user||''})));
@@ -1511,7 +1534,7 @@ VIEWS.etats = () => {
   const f = flux(d1, d2), cum = flux('', d2);
   const treso = num(DATA.soldeInit) + cum.entrees - cum.sorties, creances = cum.ca - cum.encV - cum.regl - cum.annul;
   const detF = cum.achCredit - cum.paieF;
-  const resCum = cum.res, actif = treso + creances, passif = num(DATA.soldeInit) + resCum + detF;
+  const stockM = cum.stockFin, resCum = cum.res, actif = treso + creances + stockM, passif = num(DATA.soldeInit) + resCum + detF;
   const lastPrix = num((DATA.achats.slice().sort((a,b)=>a.date<b.date?-1:1).pop()||{}).prix);
   const cp = K.months.slice(-3).reduce((t,m) => ({c:t.c+m.couts, p:t.p+m.pots}), {c:0,p:0}), coutPot = cp.p ? cp.c/cp.p : 0;
   const row = (l, v, b, cls) => `<tr ${b?'style="border-top:2px solid var(--ink)"':''}><td>${b?'<b>'+l+'</b>':l}</td><td class="n ${cls||''}">${b?'<b>'+F(v)+'</b>':F(v)}</td></tr>`;
@@ -1522,18 +1545,21 @@ VIEWS.etats = () => {
     ${row("Ventes d'attiéké (" + F(f.pots) + ' pots)', f.ca)}
     ${f.remises ? `<tr><td class="small muted">dont remises accordées</td><td class="n small muted">${F(f.remises)}</td></tr>` : ''}
     ${row('Achats de manioc', -f.achats)}
+    ${f.varStock ? row(f.varStock > 0 ? 'Manioc mis en stock (non consommé)' : 'Manioc pris dans le stock', f.varStock) : ''}
+    <tr><td class="small muted">= manioc réellement consommé (transformé ou perdu)</td><td class="n small muted">${F(f.consoManioc)}</td></tr>
     ${CATS.map(c => f.cats[c] ? row('Charges · ' + c, -f.cats[c]) : '').join('')}
     ${Object.keys(f.cats).filter(c => !CATS.includes(c)).map(c => row('Charges · ' + esc(c), -f.cats[c])).join('')}
     ${f.annul ? row('Soldes clients annulés', -f.annul) : ''}
-    ${row('Total des charges', -(f.achats + f.chHM + f.annul), true)}
+    ${row('Total des charges', -(f.consoManioc + f.chHM + f.annul), true)}
     ${row('Résultat', f.res, true, f.res >= 0 ? 'up' : 'dn')}
     <tr><td class="small muted">Marge nette</td><td class="n small muted">${f.ca ? Math.round(f.res/f.ca*100) : 0} %</td></tr>
-    <tr><td class="small muted">Coût de revient du pot</td><td class="n small muted">${f.pots ? FC((f.achats+f.chHM)/f.pots) : '—'}</td></tr>
+    <tr><td class="small muted">Coût de revient du pot</td><td class="n small muted">${f.pots ? FC((f.consoManioc+f.chHM)/f.pots) : '—'}</td></tr>
   </table></div>
   <div class="card"><h3>Bilan simplifié au ${fmtD(d2)}</h3><table>
     <tr><td colspan="2" class="small muted"><b>ACTIF</b> — ce que l'entreprise possède</td></tr>
     ${row('Trésorerie (caisse)', treso)}
     ${row('Créances clients (crédits à encaisser)', creances)}
+    ${row('Stock de manioc (' + F1(maniocValo().at(d2).sacs) + ' sacs, au prix d\'achat)', stockM)}
     ${row('Total actif', actif, true)}
     <tr><td colspan="2" class="small muted" style="padding-top:14px"><b>PASSIF</b> — d'où vient l'argent</td></tr>
     ${row('Apport / solde initial', num(DATA.soldeInit))}
@@ -1542,7 +1568,7 @@ VIEWS.etats = () => {
     ${row('Total passif', passif, true)}
   </table>
   <div class="alert ${Math.abs(actif - passif) < 1 ? 'g' : 'r'}" style="margin-top:10px">${Math.abs(actif - passif) < 1 ? '✓ Bilan équilibré : actif = passif.' : 'Écart de ' + FC(actif - passif) + ' : données à vérifier.'}</div>
-  <p class="small muted" style="margin-top:8px">Hors bilan (valeurs estimées) : stock attiéké ${F(Math.max(0,K.stockKg))} kg ≈ ${FC(Math.max(0,K.stockKg)/CFG.poids*coutPot)} au coût de revient · stock manioc ${F1(K.stockSacs)} sacs ≈ ${FC(Math.max(0,K.stockSacs)*lastPrix)}.</p></div>
+  <p class="small muted" style="margin-top:8px">Le manioc acheté est une matière première : il entre au bilan comme stock, et ne devient une charge qu'une fois transformé ou perdu (coût moyen pondéré). Hors bilan (estimation) : stock attiéké ${F(Math.max(0,K.stockKg))} kg ≈ ${FC(Math.max(0,K.stockKg)/CFG.poids*coutPot)} au coût de revient.</p></div>
   </div>`;
 };
 
