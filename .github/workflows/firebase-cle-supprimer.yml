@@ -1,0 +1,43 @@
+name: Firebase - supprimer une ancienne clé
+on:
+  workflow_dispatch:
+    inputs:
+      prefixe:
+        description: "Début du numéro de la clé à supprimer"
+        required: true
+jobs:
+  supprimer:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Supprimer l'ancienne clé
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          PREFIXE: ${{ github.event.inputs.prefixe }}
+        run: |
+          pip install --quiet google-auth requests
+          python - <<'PY'
+          import json, os, sys, requests
+          from google.oauth2 import service_account
+          from google.auth.transport.requests import Request
+          info = json.loads(os.environ['SA']); pre = os.environ['PREFIXE'].strip()
+          actuelle = info['private_key_id']
+          print("Clé en service (secret) :", actuelle[:8] + "…")
+          if len(pre) < 6 or actuelle.startswith(pre):
+              sys.exit("Refus : préfixe trop court ou c'est la clé en service.")
+          cred = service_account.Credentials.from_service_account_info(info, scopes=['https://www.googleapis.com/auth/cloud-platform'])
+          cred.refresh(Request())
+          h = {'Authorization': 'Bearer ' + cred.token}
+          base = f"https://iam.googleapis.com/v1/projects/{info['project_id']}/serviceAccounts/{info['client_email']}/keys"
+          r = requests.get(base + "?keyTypes=USER_MANAGED", headers=h)
+          print("Liste :", r.status_code)
+          if r.status_code != 200: sys.exit("Google refuse la lecture des clés : " + r.text[:300])
+          ids = [k['name'].split('/')[-1] for k in r.json().get('keys', [])]
+          print("Clés existantes :", [i[:8] + "…" for i in ids])
+          cibles = [i for i in ids if i.startswith(pre) and i != actuelle]
+          if not cibles: sys.exit("Aucune clé ne correspond à " + pre)
+          for i in cibles:
+              d = requests.delete(base + "/" + i, headers=h)
+              print("Suppression", i[:8] + "…", ":", d.status_code)
+              if d.status_code != 200: sys.exit("Échec : " + d.text[:300])
+          print("Ancienne clé supprimée ✔")
+          PY
