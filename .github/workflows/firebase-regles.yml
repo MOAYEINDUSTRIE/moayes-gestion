@@ -1,0 +1,54 @@
+name: Règles Firebase (mise à jour automatique)
+
+# Publie end/regles-firebase.json dans la base Firebase (moayes-industrie) à chaque modification.
+# Nécessite le secret FIREBASE_SERVICE_ACCOUNT (clé de compte de service Firebase, au format JSON).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'end/regles-firebase.json'
+      - '.github/workflows/firebase-regles.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: firebase-regles
+  cancel-in-progress: false
+
+jobs:
+  publier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Publier les règles
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "::warning::Secret FIREBASE_SERVICE_ACCOUNT absent : règles non publiées (voir le guide d'installation)."
+            exit 0
+          fi
+          pip install --quiet google-auth requests
+          python - <<'PY'
+          import json, os, sys, requests
+          from google.oauth2 import service_account
+          from google.auth.transport.requests import Request
+          regles = open('end/regles-firebase.json', encoding='utf-8').read()
+          json.loads(regles)  # refuse un fichier mal formé
+          info = json.loads(os.environ['SA'])
+          cred = service_account.Credentials.from_service_account_info(info, scopes=[
+              'https://www.googleapis.com/auth/firebase.database',
+              'https://www.googleapis.com/auth/userinfo.email'])
+          cred.refresh(Request())
+          base = 'https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app/.settings/rules.json'
+          h = {'Authorization': 'Bearer ' + cred.token}
+          r = requests.put(base, data=regles.encode('utf-8'), headers=h, timeout=60)
+          print('Publication :', r.status_code, r.text[:300])
+          if r.status_code != 200: sys.exit(1)
+          v = requests.get(base, headers=h, timeout=60)
+          ok = v.status_code == 200 and json.loads(v.text) == json.loads(regles)
+          print('Vérification :', 'règles en place ✔' if ok else 'différence détectée ✘')
+          sys.exit(0 if ok else 1)
+          PY
