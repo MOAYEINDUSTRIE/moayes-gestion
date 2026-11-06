@@ -88,7 +88,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  END — Dons des volontaires  ===================== */
-const VERSION = 'V1.2';
+const VERSION = 'V1.3';
 const ADMIN_EMAIL = 'moayepos@gmail.com';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -388,19 +388,19 @@ VIEWS.membres = () => {
   const q = MQ.toLowerCase(), P = parMembre(donsActifs());
   const tot = Object.fromEntries(P.map(x => [x.code, x]));
   const L = vals(S.membres).filter(m => (!FL.groupe || m.groupe === FL.groupe) && (!FL.pays || m.pays === FL.pays))
-    .filter(m => !q || (m.code + ' ' + (m.pays || '') + ' ' + groupeDe(m.groupe).nom + ' ' + (can('noms') ? nomDe(m.code) + ' ' + ((S.prive[m.code] || {}).tel || '') : '')).toLowerCase().includes(q))
+    .filter(m => !q || (m.code + ' ' + (m.pays || '') + ' ' + groupeDe(m.groupe).nom + ' ' + (can('noms') ? nomDe(m.code) + ' ' + ((S.prive[m.code] || {}).tel || '') + ' ' + ((S.prive[m.code] || {}).ident || '') + ' ' + ((S.prive[m.code] || {}).email || '') : '')).toLowerCase().includes(q))
     .sort((a, b) => a.code.localeCompare(b.code));
   return `<div class="bar"><input class="grow" placeholder="🔍 Code${can('noms') ? ', nom, téléphone' : ''}, pays, groupe" value="${esc(MQ)}" oninput="MQ=this.value;clearTimeout(window._mq);window._mq=setTimeout(()=>{render();const i=document.querySelector('.bar .grow');i.focus();i.setSelectionRange(i.value.length,i.value.length)},300)">
     <select onchange="FL.groupe=this.value;render()"><option value="">Tous groupes</option>${opts(groupesTries().map(([k, g]) => [k, g.nom]), FL.groupe)}</select>
     <select onchange="FL.pays=this.value;render()"><option value="">Tous pays</option>${opts(pays(), FL.pays)}</select>
-    ${can('membres') ? '<button class="btn g" onclick="editMembre()">+ Nouveau membre</button>' : ''}</div>
+    ${can('membres') ? '<label class="btn">⬆ Importer Excel<input type="file" accept=".xlsx,.xls,.csv,.json" multiple style="display:none" onchange="importerFichiers(Array.from(this.files));this.value=\'\'"></label><button class="btn g" onclick="editMembre()">+ Nouveau membre</button>' : ''}</div>
   <div class="card"><div class="small muted" style="margin-bottom:6px">${L.length} membre(s)</div>${tbl([['Code'], ...(can('noms') ? [['Nom']] : []), ['Pays'], ['Groupe'], ['Statut'], ['Dons','n'], ['Total','n']], L.map(m => `<tr class="click" onclick="go('membre','${esc(m.code)}')"><td class="code">${esc(m.code)}</td>${can('noms') ? `<td>${esc(nomDe(m.code))}</td>` : ''}<td>${esc(m.pays || '')}</td><td>${esc(groupeDe(m.groupe).nom)}</td><td><span class="tag ${m.statut === 'inactif' ? '' : 'g'}">${m.statut === 'inactif' ? 'Inactif' : 'Actif'}</span></td><td class="n">${tot[m.code] ? tot[m.code].nb : 0}</td><td class="n b">${FCFA(tot[m.code] ? tot[m.code].total : 0)}</td></tr>`), 'Aucun membre.')}</div>`;
 };
 VIEWS.membre = code => {
   const m = S.membres[code]; if (!m) return '<div class="empty">Membre introuvable.</div>';
   const p = S.prive[code] || {}, D = vals(S.dons).filter(d => d.code === code).sort((a, b) => b.date.localeCompare(a.date)), tot = D.filter(d => !d.supprime).reduce((s, d) => s + num(d.fcfa), 0);
   return `<div class="bar"><button class="btn sm" onclick="go('membres')">← Membres</button>${can('membres') ? `<button class="btn sm" onclick="editMembre('${esc(code)}')">✏ Modifier</button>` : ''}${can('saisie') ? `<button class="btn sm g" onclick="editDon();setTimeout(()=>{$('#d_code').value='${esc(code)}';majGroupe()},50)">+ Don</button>` : ''}</div>
-  <div class="grid g3" style="margin-bottom:12px"><div class="card"><h3><span class="code">${esc(code)}</span></h3><div class="small">${can('noms') ? `<b>${esc(nomDe(code))}</b><br>${esc(p.tel || '')} ${esc(p.email || '')}<br>` : ''}Pays : ${esc(m.pays || '—')}<br>Groupe : ${esc(groupeDe(m.groupe).nom)}<br>Adhésion : ${dfr(m.adhesion) || '—'}<br><span class="tag ${m.statut === 'inactif' ? '' : 'g'}">${m.statut === 'inactif' ? 'Inactif' : 'Actif'}</span></div></div>
+  <div class="grid g3" style="margin-bottom:12px"><div class="card"><h3><span class="code">${esc(code)}</span></h3><div class="small">${can('noms') ? `<b>${esc(nomDe(code))}</b>${p.ident ? ' <span class="tag b">' + esc(p.ident) + '</span>' : ''}<br>${esc(p.tel || '')} ${esc(p.email || '')}<br>${p.ville ? 'Ville : ' + esc(p.ville) + '<br>' : ''}` : ''}Pays : ${esc(m.pays || '—')}<br>Groupe : ${esc(groupeDe(m.groupe).nom)}<br>Adhésion : ${dfr(m.adhesion) || '—'}<br><span class="tag ${m.statut === 'inactif' ? '' : 'g'}">${m.statut === 'inactif' ? 'Inactif' : 'Actif'}</span></div></div>
     <div class="card kpi dark"><div class="l">Total donné</div><div class="v">${FCFA(tot)}</div></div><div class="card kpi"><div class="l">Nombre de dons</div><div class="v">${D.filter(d => !d.supprime).length}</div></div></div>
   <div class="card"><h3>Dons</h3>${tbl([['Date'],['Reçu'],['Origine','n'],['FCFA','n'],['Mode'],['Objet']], D.map(d => `<tr class="click ${d.supprime ? 'del' : ''}" onclick="ficheDon('${d.id}')"><td>${dfr(d.date)}</td><td>${esc(d.recu)}</td><td class="n">${F2(d.montant)} ${esc(d.devise)}</td><td class="n b">${FCFA(d.fcfa)}</td><td>${esc(d.mode)}</td><td>${esc(d.objet || '')}</td></tr>`), 'Aucun don.')}</div>`;
 };
@@ -411,6 +411,7 @@ function editMembre(code){
     <div><label>Nom *</label><input id="m_nom" value="${esc(p.nom)}"></div><div><label>Prénoms</label><input id="m_pre" value="${esc(p.prenoms)}"></div>
     <div><label>Pays *</label><input id="m_pays" list="paysl" value="${esc(m.pays)}"><datalist id="paysl">${pays().map(x => `<option value="${esc(x)}">`).join('')}</datalist></div>
     <div><label>Groupe *</label><select id="m_grp"><option value="">— Choisir —</option>${opts(groupesTries().map(([k, g]) => [k, g.nom + (g.pays ? ' (' + g.pays + ')' : '')]), m.groupe)}</select></div>
+    <div><label>Ville</label><input id="m_ville" value="${esc(p.ville)}"></div><div><label>Identifiant END (registre)</label><input id="m_ident" value="${esc(p.ident)}" placeholder="ex. END-2026-008"></div>
     <div><label>Téléphone / WhatsApp</label><input id="m_tel" inputmode="tel" value="${esc(p.tel)}"></div><div><label>E-mail</label><input id="m_mail" type="email" value="${esc(p.email)}"></div>
     <div><label>Date d'adhésion</label><input id="m_adh" type="date" value="${m.adhesion || ''}"></div>
     <div><label>Statut</label><select id="m_st">${opts([['actif','Actif'],['inactif','Inactif']], m.statut)}</select></div></div>
@@ -418,7 +419,7 @@ function editMembre(code){
 }
 async function saveMembre(code){
   const nom = val('m_nom'), paysV = val('m_pays'), groupe = val('m_grp'); if (!nom || !paysV || !groupe) return toast('Nom, pays et groupe obligatoires');
-  const pub = { pays: paysV, groupe, adhesion: val('m_adh'), statut: val('m_st') }, priv = { nom, prenoms: val('m_pre'), tel: val('m_tel'), email: val('m_mail') };
+  const pub = { pays: paysV, groupe, adhesion: val('m_adh'), statut: val('m_st') }, priv = Object.assign({}, code ? (S.prive[code] || {}) : {}, { nom, prenoms: val('m_pre'), tel: val('m_tel'), email: val('m_mail'), ville: val('m_ville'), ident: val('m_ident') });
   $('#m_ok').disabled = true;
   try {
     if (code){
@@ -435,6 +436,86 @@ async function saveMembre(code){
     }
     closeModal(); go('membre', code);
   } catch(e){ $('#m_ok').disabled = false; toast('Refusé : ' + (e.code || e.message)); }
+}
+
+/* ----- import Excel (registre des membres) ----- */
+function chargerXLSX(){
+  if (window.XLSX) return Promise.resolve();
+  return new Promise((ok, ko) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; sc.onload = ok; sc.onerror = () => ko(new Error('Lecteur Excel indisponible (internet ?)')); document.head.appendChild(sc); });
+}
+const normTxt = s => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+function isoDate(v){
+  if (!v) return '';
+  if (v instanceof Date && !isNaN(v)) return new Date(v.getTime() - v.getTimezoneOffset() * 60000 + 12 * 3600000).toISOString().slice(0, 10);
+  if (typeof v === 'number') return new Date(Math.round((v - 25569) * 86400000) + 12 * 3600000).toISOString().slice(0, 10);
+  const t = String(v).trim(), m = t.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/); if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  return /^\d{4}-\d{2}-\d{2}/.test(t) ? t.slice(0, 10) : '';
+}
+async function lireLignes(file){
+  if (/\.json$/i.test(file.name)) { const j = JSON.parse(await file.text()); return Array.isArray(j) ? j : (j.membres || []); }
+  await chargerXLSX();
+  const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+  const out = [];
+  for (const name of wb.SheetNames){
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: '' });
+    const hi = rows.findIndex(r => r.some(c => /identit|nom/i.test(String(c))) && r.some(c => /pays/i.test(String(c))));
+    if (hi < 0) continue;
+    const H = rows[hi].map(c => normTxt(c)), col = re => H.findIndex(h => re.test(h));
+    const c = { ident: col(/identifiant|^id$|matricule/), nom: col(/identite|^nom/), prenoms: col(/^prenom/), pays: col(/^pays/), ville: col(/^ville/), tel: col(/telephone|whatsapp|tel/), email: col(/mail|electronique/), groupe: col(/^groupe/), date: col(/date/), statut: col(/statut/) };
+    for (const r of rows.slice(hi + 1)){
+      const g = k => c[k] >= 0 ? r[c[k]] : '';
+      const nom = String(g('nom')).replace(/\s+/g, ' ').trim(); if (!nom) continue;
+      out.push({ ident: String(g('ident')).trim(), nom, prenoms: String(g('prenoms')).trim(), pays: String(g('pays')).trim(), ville: String(g('ville')).trim(), tel: String(g('tel')).trim(), email: String(g('email')).trim().toLowerCase(), groupe: String(g('groupe')).trim() || name, adhesion: isoDate(g('date')), statut: /inactif|abandon|exclu|suspendu|radi/i.test(String(g('statut'))) ? 'inactif' : 'actif' });
+    }
+  }
+  return out;
+}
+let IMPORT = null;
+async function importerFichiers(files){
+  if (!files || !files.length) return;
+  try {
+    let L = []; for (const f of files) L = L.concat(await lireLignes(f));
+    if (!L.length) return toast('Aucune ligne reconnue (colonnes « Identité » et « Pays » attendues)');
+    const deja = new Set(), dejaMail = new Set();
+    vals(S.prive).forEach(p => { if (p.ident) deja.add(normTxt(p.ident)); if (p.email) dejaMail.add(normTxt(p.email)); });
+    const vus = new Set();
+    L.forEach(x => { const k = normTxt(x.ident) || ('@' + normTxt(x.email)) || normTxt(x.nom); x.existe = (x.ident && deja.has(normTxt(x.ident))) || (!x.ident && x.email && dejaMail.has(normTxt(x.email))); x.doublon = vus.has(k); vus.add(k); });
+    const nouveaux = L.filter(x => !x.existe && !x.doublon), parG = {};
+    nouveaux.forEach(x => parG[x.groupe] = (parG[x.groupe] || 0) + 1);
+    const gExist = new Set(vals(S.groupes).map(g => normTxt(g.nom)));
+    IMPORT = nouveaux;
+    modal(`<h2>Importer des membres</h2><p class="small">${L.length} ligne(s) lue(s) dans ${files.length} fichier(s).</p>
+      <table>${Object.entries(parG).map(([g, n]) => `<tr><td><b>${esc(g)}</b> ${gExist.has(normTxt(g)) ? '' : '<span class="tag b">groupe créé</span>'}</td><td class="n">${n} nouveau(x)</td></tr>`).join('')}</table>
+      ${L.filter(x => x.existe).length ? `<p class="small muted">${L.filter(x => x.existe).length} déjà enregistré(s) : ignoré(s).</p>` : ''}${L.filter(x => x.doublon).length ? `<p class="small muted">${L.filter(x => x.doublon).length} doublon(s) dans les fichiers : ignoré(s).</p>` : ''}
+      <p class="small">Chaque membre reçoit un code donateur (D-0001…). Nom, téléphone, e-mail, ville et identifiant END sont rangés dans la partie protégée, invisible pour le Grand Maître.</p>
+      <div id="imp_prog" class="small"></div>
+      <div class="act"><button class="btn" onclick="closeModal()">Annuler</button>${nouveaux.length ? `<button class="btn g" id="imp_ok" onclick="lancerImport()">Importer ${nouveaux.length} membre(s)</button>` : ''}</div>`);
+  } catch(e){ toast('Import impossible : ' + e.message); }
+}
+async function lancerImport(){
+  const L = IMPORT || []; if (!L.length) return;
+  $('#imp_ok').disabled = true; const prog = $('#imp_prog');
+  const gid = {}; Object.entries(S.groupes).forEach(([id, g]) => gid[normTxt(g.nom)] = id);
+  let ok = 0, err = 0;
+  try {
+    for (const nomG of [...new Set(L.map(x => x.groupe))]){
+      if (gid[normTxt(nomG)]) continue;
+      const id = ref('groupes').push().key, g = { id, nom: nomG, pays: '', responsable: '', u: Date.now() };
+      await ref('groupes/' + id).set(g); journal('Création d\'un groupe (import)', 'groupe ' + nomG, null, g); gid[normTxt(nomG)] = id;
+    }
+    for (const x of L){
+      try {
+        const n = await compteur('donateur'), code = 'D-' + String(n).padStart(4, '0');
+        const m = { code, pays: x.pays, groupe: gid[normTxt(x.groupe)], adhesion: x.adhesion, statut: x.statut, cree: Date.now(), u: Date.now() };
+        const priv = { nom: x.nom, prenoms: x.prenoms, tel: x.tel, email: x.email, ville: x.ville, ident: x.ident };
+        await ref('prive/' + code).set(priv); await ref('membres/' + code).set(m);
+        journal('Création d\'un membre (import)', 'membre ' + code, null, { ...m, ...priv }); ok++;
+      } catch(e){ err++; }
+      prog.innerHTML = `<div class="hbar" style="margin:8px 0"><i style="width:${(ok + err) / L.length * 100}%"></i></div>${ok + err} / ${L.length}${err ? ' — ' + err + ' erreur(s)' : ''}`;
+    }
+    journal('Import Excel terminé', ok + ' membre(s) importé(s)', null, null);
+    IMPORT = null; closeModal(); toast(`✅ ${ok} membre(s) importé(s)${err ? ', ' + err + ' erreur(s)' : ''}`); go('membres');
+  } catch(e){ toast('Import interrompu : ' + (e.code || e.message)); $('#imp_ok').disabled = false; }
 }
 
 /* ----- groupes ----- */
