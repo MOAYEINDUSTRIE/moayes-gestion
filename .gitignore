@@ -7,3 +7,7 @@ android-igc/.gradle/
 android-igc/build/
 android-igc/app/build/
 android-igc/local.properties
+android-end/.gradle/
+android-end/build/
+android-end/app/build/
+android-end/local.properties

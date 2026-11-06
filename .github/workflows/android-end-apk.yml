@@ -1,0 +1,57 @@
+name: Application Android END (APK)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'android-end/**'
+      - '.github/workflows/android-end-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk-end
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Construire l'APK
+        run: |
+          echo "sdk.dir=${ANDROID_HOME:-$ANDROID_SDK_ROOT}" > android-end/local.properties
+          yes | "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          gradle -p android-end assembleRelease --no-daemon --stacktrace
+
+      - name: Renommer
+        run: cp android-end/app/build/outputs/apk/release/app-release.apk END-Dons.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: END-Dons-apk
+          path: END-Dons.apk
+
+      - name: Publier dans « Releases »
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-end
+          name: Application Android END Dons
+          make_latest: false
+          files: END-Dons.apk
+          body: |
+            Application Android de l'École de Navigation Divine — END Dons.
+            Téléchargez END-Dons.apk ci-dessous, ouvrez-le sur le téléphone et autorisez l'installation.
+            L'application affiche toujours la dernière version publiée : pas besoin de réinstaller après une mise à jour.
