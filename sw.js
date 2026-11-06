@@ -1,7 +1,7 @@
 /* MOAYÉ'S Gestion Pro — fonctionnement hors ligne.
    La page est d'abord demandée au réseau (pour avoir toujours la dernière version),
    puis à la copie locale quand il n'y a pas de connexion. Les données passent par Firebase, jamais par ce cache. */
-const CACHE = 'moayes-v2-shell-4';
+const CACHE = 'moayes-v2-shell-5';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './logo.png'];
 const LIBS = ['www.gstatic.com', 'cdnjs.cloudflare.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
@@ -11,7 +11,7 @@ self.addEventListener('fetch', e => {
   const u = new URL(r.url);
   if (u.origin === location.origin && (u.pathname.includes('/igc/') || u.pathname.includes('/end/'))) return; // IGC Gestion a son propre fonctionnement hors ligne
   if (r.mode === 'navigate' || (u.origin === location.origin && /\/(index\.html)?$/.test(u.pathname))){
-    e.respondWith(fetch(r).then(res => { const cp = res.clone(); caches.open(CACHE).then(c => c.put('./index.html', cp)); return res; })
+    e.respondWith(fetch(r, { cache: 'no-cache' }).then(res => { const cp = res.clone(); caches.open(CACHE).then(c => c.put('./index.html', cp)); return res; }) // toujours la dernière version publiée
       .catch(() => caches.match('./index.html').then(x => x || caches.match('./'))));
     return;
   }
