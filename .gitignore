@@ -3,3 +3,7 @@ android/build/
 android/app/build/
 android/local.properties
 *.apk
+android-igc/.gradle/
+android-igc/build/
+android-igc/app/build/
+android-igc/local.properties

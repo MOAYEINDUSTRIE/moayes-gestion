@@ -1,0 +1,57 @@
+name: Application Android IGC (APK)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'android-igc/**'
+      - '.github/workflows/android-igc-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk-igc
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Construire l'APK
+        run: |
+          echo "sdk.dir=${ANDROID_HOME:-$ANDROID_SDK_ROOT}" > android-igc/local.properties
+          yes | "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          gradle -p android-igc assembleRelease --no-daemon --stacktrace
+
+      - name: Renommer
+        run: cp android-igc/app/build/outputs/apk/release/app-release.apk IGC-Gestion.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IGC-Gestion-apk
+          path: IGC-Gestion.apk
+
+      - name: Publier dans « Releases »
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-igc
+          name: Application Android IGC Gestion
+          make_latest: false
+          files: IGC-Gestion.apk
+          body: |
+            Application Android d'Impact Global Consulting — IGC Gestion.
+            Téléchargez IGC-Gestion.apk ci-dessous, ouvrez-le sur le téléphone et autorisez l'installation.
+            L'application affiche toujours la dernière version publiée : pas besoin de réinstaller après une mise à jour.
