@@ -210,7 +210,7 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-b
    charges, ajustements). Aucun solde saisi à la main.
    Format de données identique aux sauvegardes V30.
    ========================================================= */
-const VERSION = 'V2.8.2';
+const VERSION = 'V2.8.3';
 const LS_DATA = 'moayes_v2_data', LS_CFG = 'moayes_v2_cfg', LS_PIN = 'moayes_v2_pins', LS_TS = 'moayes_v2_ts';
 const FIREBASE_CONFIG = {
   apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
@@ -806,8 +806,14 @@ function addReglement(id){
     {k:'obs', label:'Observation', value:''}
   ], v => {
     if (v.montant <= 0) { toast('Montant invalide'); return false; }
-    DATA.reglements.push({date:v.date, client:c.nom, idClient:c.id, montant:v.montant, creditAvant:cr, creditApres:cr-v.montant, mode:v.mode, obs:v.obs, heure:nowH(), user:'GOLI — '+ROLES[USER].name});
-    toast(`✅ ${FC(v.montant)} encaissés`);
+    const enreg = () => { DATA.reglements.push({date:v.date, client:c.nom, idClient:c.id, montant:v.montant, creditAvant:cr, creditApres:cr-v.montant, mode:v.mode, obs:v.obs, heure:nowH(), user:'GOLI — '+ROLES[USER].name});
+      toast(`✅ ${FC(v.montant)} encaissés`); };
+    // montant supérieur à la dette : on demande confirmation (évite les soldes négatifs par erreur de frappe)
+    if (v.montant > Math.max(cr, 0)){
+      confirmBox(`${esc(c.nom)} ne doit que <b>${FC(Math.max(cr, 0))}</b>. Enregistrer <b>${FC(v.montant)}</b> quand même ?<br><span class="small muted">Le client aura une avance de ${FC(v.montant - Math.max(cr, 0))}.</span>`, () => { enreg(); save(); render(); }, 'Enregistrer');
+      return false;
+    }
+    enreg();
   });
 }
 
