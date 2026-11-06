@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>IGC Gestion</title>
+<meta name="description" content="Impact Global Consulting — clients, devis, missions, factures, trésorerie">
+<meta name="theme-color" content="#14213a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<style>
+:root{--bg:#f3f4f7;--card:#fff;--ink:#16202e;--muted:#667085;--line:#e3e6ec;--pri:#14213a;--pri2:#24365c;--gold:#c9962a;--gold2:#f6ead0;--ok:#1d7a46;--okb:#e3f3e9;--ko:#b42318;--kob:#fdecea;--wa:#a15c07;--wab:#fdf3e1}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,select,textarea{font:inherit}
+.app{display:grid;grid-template-columns:230px minmax(0,1fr);min-height:100vh}
+.side{background:var(--pri);color:#e8ecf4;padding:14px 10px;position:sticky;top:0;height:100vh;overflow-y:auto}
+.brand{display:flex;gap:10px;align-items:center;padding:4px 6px 14px;border-bottom:1px solid rgba(255,255,255,.12);margin-bottom:10px}
+.logo{width:40px;height:40px;border-radius:10px;background:var(--gold);color:var(--pri);display:grid;place-items:center;font-weight:800;letter-spacing:.5px;flex:none}
+.brand b{display:block;font-size:15px}.brand small{opacity:.7;font-size:12px}
+.nav a{display:flex;gap:10px;align-items:center;padding:9px 10px;border-radius:8px;color:inherit;text-decoration:none;cursor:pointer;font-size:14.5px}
+.nav a:hover{background:rgba(255,255,255,.08)}.nav a.on{background:var(--gold);color:var(--pri);font-weight:700}
+.nav .grp{font-size:11px;text-transform:uppercase;letter-spacing:1px;opacity:.55;margin:12px 10px 4px}
+.main{min-width:0;padding:18px 22px 90px}
+.top{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.top h1{font-size:21px;margin:0;flex:1;min-width:0}
+.pill{font-size:12px;padding:4px 9px;border-radius:99px;background:#e9ecf2;color:var(--muted);cursor:pointer;white-space:nowrap}
+.pill.g{background:var(--okb);color:var(--ok)}.pill.r{background:var(--kob);color:var(--ko)}.pill.w{background:var(--wab);color:var(--wa)}
+.btn{border:1px solid var(--line);background:#fff;color:var(--ink);padding:8px 13px;border-radius:9px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:#c5cad3}.btn.p{background:var(--pri);border-color:var(--pri);color:#fff}.btn.g{background:var(--gold);border-color:var(--gold);color:var(--pri);font-weight:700}
+.btn.d{color:var(--ko);border-color:#f2c4bf}.btn.sm{padding:5px 9px;font-size:13px}
+.grid{display:grid;gap:12px}.g4{grid-template-columns:repeat(4,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0}
+.card h3{margin:0 0 10px;font-size:15px}
+.kpi .v{font-size:22px;font-weight:800;margin-top:2px;overflow-wrap:anywhere}.kpi .l{font-size:12.5px;color:var(--muted)}.kpi .s{font-size:12px;color:var(--muted);margin-top:3px}
+.kpi.gold{background:var(--pri);color:#fff;border-color:var(--pri)}.kpi.gold .l,.kpi.gold .s{color:#c9d2e3}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:hover td{background:#f8f9fb}
+.tag{display:inline-block;font-size:11.5px;padding:2px 8px;border-radius:99px;background:#eef0f4;color:#475467;white-space:nowrap}
+.tag.g{background:var(--okb);color:var(--ok)}.tag.r{background:var(--kob);color:var(--ko)}.tag.w{background:var(--wab);color:var(--wa)}.tag.b{background:#e7eefb;color:#1f4fa3}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.bar input,.bar select{padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;min-width:0}
+.bar .grow{flex:1;min-width:150px}
+.muted{color:var(--muted)}.small{font-size:13px}.r{text-align:right}.b{font-weight:700}
+.empty{padding:26px;text-align:center;color:var(--muted)}
+.alert{padding:10px 12px;border-radius:9px;background:#eef0f4;margin:6px 0;font-size:14px}.alert.g{background:var(--okb)}.alert.r{background:var(--kob)}.alert.w{background:var(--wab)}
+.modal-bg{position:fixed;inset:0;background:rgba(10,16,30,.45);display:flex;align-items:flex-start;justify-content:center;padding:4vh 10px;z-index:50;overflow-y:auto}
+.modal{background:#fff;border-radius:14px;max-width:760px;width:100%;padding:18px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.modal h2{margin:0 0 12px;font-size:19px}
+.f{display:grid;gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))}.f .full{grid-column:1/-1}.f.f4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.f label{font-size:12.5px;color:var(--muted);display:block;margin-bottom:3px}
+.f input,.f select,.f textarea{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:#fff}
+.f textarea{min-height:70px;resize:vertical}
+.act{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
+.lines td{padding:4px}.lines input{width:100%;padding:7px;border:1px solid var(--line);border-radius:7px}
+.tot{margin-left:auto;max-width:320px}.tot div{display:flex;justify-content:space-between;padding:3px 0}.tot .big{font-weight:800;font-size:17px;border-top:2px solid var(--ink);margin-top:4px;padding-top:6px}
+.toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:#16202e;color:#fff;padding:10px 16px;border-radius:10px;z-index:80;font-size:14px;max-width:92vw}
+.prog{height:7px;background:#eceef2;border-radius:9px;overflow:hidden}.prog i{display:block;height:100%;background:var(--gold)}
+.login{min-height:100vh;display:grid;place-items:center;background:linear-gradient(160deg,#14213a,#24365c);padding:16px}
+.login .box{background:#fff;border-radius:16px;padding:24px;width:100%;max-width:360px;text-align:center}
+.pinpad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.pinpad button{padding:14px;font-size:19px;border-radius:12px;border:1px solid var(--line);background:#f7f8fa;cursor:pointer}
+.dots{font-size:28px;letter-spacing:10px;height:36px}
+.tabbar{display:none}
+.list-mob{display:none}
+@media (max-width:900px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:760px){
+ .app{grid-template-columns:minmax(0,1fr)}.side{display:none}.side.open{display:block;position:fixed;inset:0 25% 0 0;z-index:60;height:100%;box-shadow:0 0 0 100vmax rgba(0,0,0,.4)}
+ .main{padding:12px 12px 96px}.top h1{font-size:18px}
+ .g2,.g3{grid-template-columns:minmax(0,1fr)}.f,.f.f4{grid-template-columns:minmax(0,1fr)}
+ .tabbar{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);z-index:40;padding-bottom:env(safe-area-inset-bottom)}
+ .tabbar a{display:flex;flex-direction:column;align-items:center;font-size:11px;padding:7px 2px;color:var(--muted);text-decoration:none;cursor:pointer}.tabbar a.on{color:var(--pri);font-weight:700}.tabbar a span{font-size:19px}
+ table.resp thead{display:none}table.resp tr{display:block;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;padding:6px 8px;background:#fff}
+ table.resp td{display:flex;justify-content:space-between;gap:10px;border:0;padding:4px 2px;text-align:right}table.resp td::before{content:attr(data-l);color:var(--muted);font-size:12.5px;text-align:left}
+ table.resp td.n{white-space:normal}
+ .menu-btn{display:inline-flex!important}
+}
+.menu-btn{display:none}
+@media print{.side,.tabbar,.top,.no-print{display:none!important}.main{padding:0}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+'use strict';
+/* =====================  IGC Gestion  ===================== */
+const VERSION = 'V1.0';
+const KEY = 'igc_gestion_v1';
+const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
+  databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
+const FB_PATH = 'moayes/igc_data';
+const COLS = ['clients','devis','missions','factures','paiements','depenses'];
+const ROLES = { gerant:{nom:'Gérant', all:true}, cogerant:{nom:'Cogérante', all:true}, assistant:{nom:'Assistant(e)', all:false} };
+const DOMAINES = ['Communication politique et électorale','Communication institutionnelle','Affaires publiques','Communication corporate','Consultance stratégique','Branding et digital','Événementiel','Applications et start-up','Formation','Autre'];
+const TYPES_CLI = ['Institution publique','Entreprise','Parti / candidat','ONG / association','Organisation internationale','Particulier','Autre'];
+const CATS_DEP = ['Loyer','Salaires et honoraires','Transport','Communication et téléphone','Internet et logiciels','Impression et fournitures','Prestataires','Impôts et taxes','CNPS','Banque','Événementiel (frais mission)','Divers'];
+const MODES = ['Virement','Chèque','Espèces','Mobile Money','Wave'];
+
+/* ---------- utilitaires ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = v => { const n = parseFloat(String(v ?? '').replace(/\s/g,'').replace(',','.')); return isFinite(n) ? n : 0; };
+const F = n => Math.round(num(n)).toLocaleString('fr-FR').replace(/ | /g,' ');
+const FCFA = n => F(n) + ' F';
+const today = () => new Date().toISOString().slice(0,10);
+const addDays = (d, k) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + k); return x.toISOString().slice(0,10); };
+const dfr = d => d ? d.split('-').reverse().join('/') : '';
+const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+const now = () => Date.now();
+const mois = d => (d || '').slice(0,7);
+const MOIS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+const moisLib = m => m ? MOIS_FR[+m.slice(5,7)-1] + ' ' + m.slice(0,4) : '';
+function toast(t){ document.querySelectorAll('.toast').forEach(x => x.remove()); const d = document.createElement('div'); d.className = 'toast'; d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 2600); }
+async function sha(s){ const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('igc|' + s)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2,'0')).join(''); }
+
+/* montant en lettres (français) */
+function enLettres(n){
+  n = Math.round(Math.abs(num(n)));
+  if (n === 0) return 'zéro';
+  const U = ['','un','deux','trois','quatre','cinq','six','sept','huit','neuf','dix','onze','douze','treize','quatorze','quinze','seize','dix-sept','dix-huit','dix-neuf'];
+  const D = ['','dix','vingt','trente','quarante','cinquante','soixante','soixante','quatre-vingt','quatre-vingt'];
+  const cent = x => {
+    let s = ''; const c = Math.floor(x/100), r = x % 100;
+    if (c) s = (c > 1 ? U[c] + ' cent' + (r === 0 ? 's' : '') : 'cent');
+    if (r){
+      let t;
+      if (r < 20) t = U[r];
+      else { const d = Math.floor(r/10), u = r % 10;
+        if (d === 7 || d === 9) t = D[d] + (d === 7 && u === 1 ? ' et ' : '-') + U[10+u];
+        else t = D[d] + (u === 1 && d !== 8 ? ' et un' : u ? '-' + U[u] : (d === 8 ? 's' : '')); }
+      s += (s ? ' ' : '') + t;
+    }
+    return s;
+  };
+  const parts = [[1e9,'milliard'],[1e6,'million'],[1e3,'mille']];
+  let s = '', rest = n;
+  for (const [v, w] of parts){
+    const q = Math.floor(rest / v); rest %= v;
+    if (!q) continue;
+    if (w === 'mille') s += (q === 1 ? 'mille' : cent(q).replace(/(cent|vingt)s$/,'$1') + ' mille') + ' ';
+    else s += cent(q) + ' ' + w + (q > 1 ? 's' : '') + ' ';
+  }
+  if (rest) s += cent(rest);
+  return s.trim();
+}
+
+/* ---------- données ---------- */
+function blank(){
+  return { societe:{ nom:'IMPACT GLOBAL CONSULTING', sigle:'IGC', forme:'SARL', capital:1000000, rccm:'', cc:'', adresse:'Abidjan, Côte d\'Ivoire', tel:'', email:'', banque:'', rib:'', tvaTaux:18, tvaDefaut:false, mentions:'' },
+    clients:[], devis:[], missions:[], factures:[], paiements:[], depenses:[],
+    soldes:{ caisse:0, banque:0, mobile:0, date:today() }, compteurs:{}, _del:{}, _pins:{}, audit:[], _lastSaved:0 };
+}
+let DATA = load();
+function load(){
+  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.societe) return sanitize(d); } catch(e){}
+  return blank();
+}
+function sanitize(d){
+  const b = blank();
+  for (const k of Object.keys(b)) if (d[k] === undefined) d[k] = b[k];
+  d.societe = Object.assign(b.societe, d.societe || {});
+  for (const c of COLS) d[c] = (Array.isArray(d[c]) ? d[c] : Object.values(d[c] || {})).filter(x => x && x.id);
+  d.devis.concat(d.factures).forEach(x => { if (!Array.isArray(x.lignes)) x.lignes = Object.values(x.lignes || {}); });
+  if (!Array.isArray(d.audit)) d.audit = Object.values(d.audit || {});
+  return d;
+}
+let DIRTY = false;
+function save(action){
+  DATA._lastSaved = now();
+  if (action) { DATA.audit.unshift({ t: now(), u: SESSION ? SESSION.role : '', a: action }); DATA.audit = DATA.audit.slice(0, 300); }
+  try { localStorage.setItem(KEY, JSON.stringify(DATA)); } catch(e){ toast('Mémoire du téléphone pleine : exportez une sauvegarde'); }
+  DIRTY = true; fbPush();
+}
+function put(col, obj, action){
+  obj.u = now();
+  const i = DATA[col].findIndex(x => x.id === obj.id);
+  if (i >= 0) DATA[col][i] = obj; else DATA[col].push(obj);
+  delete DATA._del[obj.id];
+  save(action);
+  return obj;
+}
+function del(col, id, action){
+  DATA[col] = DATA[col].filter(x => x.id !== id);
+  DATA._del[id] = now();
+  save(action);
+}
+const get = (col, id) => DATA[col].find(x => x.id === id);
+const cli = id => get('clients', id) || { nom:'(client supprimé)' };
+function nextNum(prefix){
+  const y = new Date().getFullYear(), k = prefix + y;
+  const used = DATA[prefix === 'F' ? 'factures' : 'devis'].map(x => x.num).filter(n => n && n.startsWith('IGC-' + prefix + '-' + y)).map(n => +n.split('-').pop());
+  const n = Math.max(DATA.compteurs[k] || 0, ...used, 0) + 1;
+  DATA.compteurs[k] = n;
+  return `IGC-${prefix}-${y}-${String(n).padStart(3,'0')}`;
+}
+
+/* ---------- calculs ---------- */
+function totaux(doc){
+  const ht = (doc.lignes || []).reduce((s, l) => s + num(l.q) * num(l.pu), 0);
+  const remise = num(doc.remise);
+  const base = Math.max(0, ht - remise);
+  const tva = doc.tva ? Math.round(base * num(DATA.societe.tvaTaux) / 100) : 0;
+  return { ht, remise, base, tva, ttc: base + tva };
+}
+const payeF = f => DATA.paiements.filter(p => p.factureId === f.id).reduce((s, p) => s + num(p.montant), 0);
+function etatF(f){
+  if (f.statut === 'annulee') return { k:'annulee', t:'Annulée', c:'' };
+  const t = totaux(f).ttc, p = payeF(f), reste = t - p;
+  if (reste <= 0) return { k:'payee', t:'Payée', c:'g', reste:0 };
+  if (f.echeance && f.echeance < today()) return { k:'retard', t: p ? 'Partielle, en retard' : 'En retard', c:'r', reste };
+  return { k: p ? 'partielle' : 'attente', t: p ? 'Partielle' : 'À encaisser', c:'w', reste };
+}
+const facturesActives = () => DATA.factures.filter(f => f.statut !== 'annulee');
+function tresorerie(){
+  const s = DATA.soldes, from = s.date || '0000';
+  const res = { caisse: num(s.caisse), banque: num(s.banque), mobile: num(s.mobile) };
+  const compte = m => m === 'Espèces' ? 'caisse' : (m === 'Mobile Money' || m === 'Wave') ? 'mobile' : 'banque';
+  DATA.paiements.filter(p => p.date >= from).forEach(p => res[compte(p.mode)] += num(p.montant));
+  DATA.depenses.filter(d => d.date >= from).forEach(d => res[compte(d.mode)] -= num(d.montant));
+  res.total = res.caisse + res.banque + res.mobile;
+  return res;
+}
+function periode(m){ // m = 'AAAA-MM' ou 'AAAA'
+  const inP = d => (d || '').startsWith(m);
+  const fac = facturesActives().filter(f => inP(f.date));
+  return {
+    facture: fac.reduce((s, f) => s + totaux(f).ttc, 0),
+    factureHT: fac.reduce((s, f) => s + totaux(f).base, 0),
+    tva: fac.reduce((s, f) => s + totaux(f).tva, 0),
+    encaisse: DATA.paiements.filter(p => inP(p.date)).reduce((s, p) => s + num(p.montant), 0),
+    depenses: DATA.depenses.filter(d => inP(d.date)).reduce((s, d) => s + num(d.montant), 0),
+    nbFac: fac.length,
+  };
+}
+const aRecevoir = () => facturesActives().reduce((s, f) => s + Math.max(0, etatF(f).reste || 0), 0);
+
+/* ---------- session / accès ---------- */
+let SESSION = null;
+try { SESSION = JSON.parse(sessionStorage.getItem('igc_session')); } catch(e){}
+const DEFAULT_PINS = { gerant:'1234', cogerant:'5678', assistant:'0000' };
+async function checkPin(role, pin){
+  const h = DATA._pins[role];
+  if (h) return h === await sha(role + ':' + pin);
+  return pin === DEFAULT_PINS[role];
+}
+const can = () => SESSION && ROLES[SESSION.role] && ROLES[SESSION.role].all;
+
+/* ---------- Firebase (chemin moayes/igc_data) ---------- */
+let fb = null, fbRef = null, FBST = { c:'', t:'Hors ligne' };
+function setFb(c, t){ FBST = { c, t }; const el = $('#fbpill'); if (el){ el.className = 'pill ' + c; el.textContent = '☁ ' + t; } }
+function mergeData(remote){
+  remote = sanitize(remote);
+  const dels = Object.assign({}, remote._del || {}, DATA._del || {});
+  for (const id in dels) dels[id] = Math.max(num((remote._del || {})[id]), num((DATA._del || {})[id]));
+  let changed = false;
+  for (const c of COLS){
+    const map = new Map();
+    for (const x of DATA[c]) map.set(x.id, x);
+    for (const x of remote[c]){
+      const l = map.get(x.id);
+      if (!l || num(x.u) > num(l.u)){ map.set(x.id, x); if (!l || JSON.stringify(l) !== JSON.stringify(x)) changed = true; }
+    }
+    const arr = [...map.values()].filter(x => !(dels[x.id] && dels[x.id] >= num(x.u)));
+    if (arr.length !== DATA[c].length) changed = true;
+    DATA[c] = arr;
+  }
+  if (num(remote._lastSaved) > num(DATA._lastSaved)){
+    for (const k of ['societe','soldes','_pins']) if (JSON.stringify(DATA[k]) !== JSON.stringify(remote[k])){ DATA[k] = remote[k]; changed = true; }
+  }
+  for (const k in remote.compteurs || {}) DATA.compteurs[k] = Math.max(DATA.compteurs[k] || 0, remote.compteurs[k]);
+  const seen = new Set(DATA.audit.map(a => a.t + a.a));
+  (remote.audit || []).forEach(a => { if (!seen.has(a.t + a.a)) DATA.audit.push(a); });
+  DATA.audit.sort((a, b) => b.t - a.t); DATA.audit = DATA.audit.slice(0, 300);
+  DATA._del = dels;
+  DATA._lastSaved = Math.max(num(DATA._lastSaved), num(remote._lastSaved));
+  return changed;
+}
+function fbInit(){
+  if (typeof firebase === 'undefined'){ setFb('', 'Hors ligne'); return; }
+  try {
+    fb = firebase.apps.length ? firebase.app() : firebase.initializeApp(FB_CFG);
+    setFb('w', 'Connexion…');
+    firebase.auth().signInAnonymously().then(() => {
+      fbRef = firebase.database().ref(FB_PATH);
+      fbRef.on('value', snap => {
+        const r = snap.val();
+        if (r && r.societe){
+          const ch = mergeData(r);
+          try { localStorage.setItem(KEY, JSON.stringify(DATA)); } catch(e){}
+          if (ch && SESSION) render();
+          const localNewer = JSON.stringify(stripForCompare(DATA)) !== JSON.stringify(stripForCompare(sanitize(r)));
+          if (localNewer) fbPush(true); else { DIRTY = false; setFb('g', 'Synchronisé'); }
+        } else fbPush(true);
+      }, err => setFb('r', err && err.code === 'PERMISSION_DENIED' ? 'Accès refusé' : 'Erreur'));
+    }).catch(e => setFb('r', 'Connexion refusée'));
+  } catch(e){ setFb('r', 'Erreur'); }
+}
+function stripForCompare(d){ const o = {}; for (const c of COLS) o[c] = d[c].map(x => x.id + ':' + x.u).sort(); o.del = Object.keys(d._del || {}).sort(); return o; }
+let pushT = null;
+function fbPush(now_){
+  if (!fbRef) return;
+  clearTimeout(pushT);
+  pushT = setTimeout(() => {
+    setFb('w', 'Envoi…');
+    fbRef.set(JSON.parse(JSON.stringify(DATA))).then(() => { DIRTY = false; setFb('g', 'Synchronisé'); }).catch(e => setFb('r', e && e.code === 'PERMISSION_DENIED' ? 'Accès refusé' : 'Envoi impossible'));
+  }, now_ ? 50 : 600);
+}
+window.addEventListener('online', () => fbPush(true));
+window.addEventListener('offline', () => setFb('', 'Hors ligne'));
+
+/* ---------- navigation ---------- */
+const MENU = [
+  ['Pilotage', [['tableau','📊','Tableau de bord'],['agents','🤖','Agents IA']]],
+  ['Commercial', [['clients','👥','Clients'],['devis','📝','Devis'],['missions','🎯','Missions']]],
+  ['Finances', [['factures','🧾','Factures'],['paiements','💰','Encaissements'],['depenses','💸','Dépenses'],['tresorerie','🏦','Trésorerie'],['rapports','📈','Rapports']]],
+  ['Système', [['parametres','⚙️','Paramètres'],['aide','❓','Mode d\'emploi']]],
+];
+const TABS = [['tableau','📊','Accueil'],['factures','🧾','Factures'],['devis','📝','Devis'],['clients','👥','Clients'],['__menu','☰','Menu']];
+let VIEW = 'tableau', ARG = null;
+function go(v, a){ VIEW = v; ARG = a ?? null; $('.side') && $('.side').classList.remove('open'); render(); window.scrollTo(0,0); history.replaceState(null, '', '#' + v); }
+window.__back = () => { if ($('.modal-bg')){ closeModal(); return true; } if (VIEW !== 'tableau'){ go('tableau'); return true; } return false; };
+
+function render(){
+  const root = $('#root');
+  if (!SESSION){ root.innerHTML = loginHTML(); return; }
+  const titre = (MENU.flatMap(g => g[1]).find(m => m[0] === VIEW) || [,,'Fiche'])[2];
+  const body = (VIEWS[VIEW] || VIEWS.tableau)(ARG);
+  root.innerHTML = `<div class="app">
+    <aside class="side"><div class="brand"><div class="logo">IGC</div><div><b>IGC Gestion</b><small>Impact Global Consulting</small></div></div>
+      <nav class="nav">${MENU.map(([g, items]) => `<div class="grp">${g}</div>` + items.map(([k, i, t]) => `<a class="${VIEW === k ? 'on' : ''}" onclick="go('${k}')"><span>${i}</span>${t}</a>`).join('')).join('')}
+      <div class="grp">Session</div><a onclick="logout()"><span>🚪</span>Déconnexion (${esc(ROLES[SESSION.role].nom)})</a></nav>
+      <p class="small" style="opacity:.5;padding:10px">${VERSION}</p></aside>
+    <main class="main"><div class="top"><button class="btn sm menu-btn" onclick="$('.side').classList.add('open')">☰</button><h1>${esc(titre)}</h1>
+      <span id="fbpill" class="pill ${FBST.c}" onclick="go('parametres')">☁ ${esc(FBST.t)}</span></div>${body}</main>
+    <nav class="tabbar">${TABS.map(([k, i, t]) => `<a class="${VIEW === k ? 'on' : ''}" onclick="${k === '__menu' ? "$('.side').classList.add('open')" : `go('${k}')`}"><span>${i}</span>${t}</a>`).join('')}</nav>
+  </div>`;
+  document.querySelectorAll('table.resp').forEach(t => { const h = [...t.querySelectorAll('thead th')].map(x => x.textContent); t.querySelectorAll('tbody tr').forEach(tr => [...tr.children].forEach((td, i) => td.setAttribute('data-l', h[i] || ''))); });
+}
+document.addEventListener('click', e => { const s = $('.side.open'); if (s && !s.contains(e.target) && !e.target.closest('.menu-btn') && !e.target.closest('.tabbar')) s.classList.remove('open'); });
+
+/* ---------- connexion ---------- */
+let PIN = '', PINROLE = 'gerant';
+function loginHTML(){
+  return `<div class="login"><div class="box"><div class="logo" style="margin:0 auto 10px;width:56px;height:56px;font-size:18px">IGC</div>
+    <h2 style="margin:0">IGC Gestion</h2><p class="muted small" style="margin:4px 0 12px">Impact Global Consulting</p>
+    <div class="f" style="grid-template-columns:1fr"><div><select id="role" onchange="PINROLE=this.value">${Object.entries(ROLES).map(([k, r]) => `<option value="${k}" ${k === PINROLE ? 'selected' : ''}>${r.nom}</option>`).join('')}</select></div></div>
+    <div class="dots" id="dots">${'•'.repeat(PIN.length) || '<span class="muted small">Code PIN</span>'}</div>
+    <div class="pinpad">${[1,2,3,4,5,6,7,8,9,'⌫',0,'OK'].map(k => `<button onclick="pinKey('${k}')">${k}</button>`).join('')}</div>
+    <p class="small muted" style="margin-top:12px">${VERSION}</p></div></div>`;
+}
+async function pinKey(k){
+  if (k === '⌫') PIN = PIN.slice(0, -1);
+  else if (k === 'OK'){
+    if (await checkPin(PINROLE, PIN)){ SESSION = { role: PINROLE, t: now() }; sessionStorage.setItem('igc_session', JSON.stringify(SESSION)); PIN = ''; const h = location.hash.slice(1); VIEW = VIEWS[h] ? h : 'tableau'; render(); if (!DATA._pins[PINROLE]) toast('Pensez à changer votre code PIN dans Paramètres'); return; }
+    PIN = ''; toast('Code incorrect');
+  } else if (PIN.length < 8) PIN += k;
+  $('#dots').innerHTML = '•'.repeat(PIN.length) || '<span class="muted small">Code PIN</span>';
+}
+document.addEventListener('keydown', e => { if (SESSION || $('.modal-bg')) return; if (/^\d$/.test(e.key)) pinKey(e.key); else if (e.key === 'Backspace') pinKey('⌫'); else if (e.key === 'Enter') pinKey('OK'); });
+function logout(){ SESSION = null; sessionStorage.removeItem('igc_session'); render(); }
+
+/* ---------- fenêtres ---------- */
+function modal(html){ closeModal(); const d = document.createElement('div'); d.className = 'modal-bg'; d.innerHTML = `<div class="modal">${html}</div>`; d.addEventListener('mousedown', e => { if (e.target === d) closeModal(); }); document.body.appendChild(d); const f = d.querySelector('input,select,textarea'); if (f && innerWidth > 760) f.focus(); }
+function closeModal(){ document.querySelectorAll('.modal-bg').forEach(x => x.remove()); }
+const val = id => { const e = document.getElementById(id); return e ? e.value.trim() : ''; };
+const opts = (arr, sel) => arr.map(x => `<option ${x === sel ? 'selected' : ''}>${esc(x)}</option>`).join('');
+const cliOpts = sel => `<option value="">— Choisir —</option>` + [...DATA.clients].sort((a, b) => a.nom.localeCompare(b.nom)).map(c => `<option value="${c.id}" ${c.id === sel ? 'selected' : ''}>${esc(c.nom)}</option>`).join('');
+const tbl = (head, rows, empty) => rows.length ? `<table class="resp"><thead><tr>${head.map(h => `<th class="${h[1] || ''}">${h[0]}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>` : `<div class="empty">${empty}</div>`;
+
+/* =====================  VUES  ===================== */
+const VIEWS = {};
+
+VIEWS.tableau = () => {
+  const m = mois(today()), P = periode(m), Y = periode(today().slice(0,4)), T = tresorerie(), ar = aRecevoir();
+  const retard = facturesActives().filter(f => etatF(f).k === 'retard');
+  const devisAtt = DATA.devis.filter(d => d.statut === 'envoye');
+  const enCours = DATA.missions.filter(x => x.statut === 'en_cours');
+  const alerts = [];
+  if (retard.length) alerts.push(`<div class="alert r">⚠ ${retard.length} facture(s) en retard : ${FCFA(retard.reduce((s, f) => s + etatF(f).reste, 0))} à relancer. <a href="#" onclick="go('factures','retard');return false">Voir</a></div>`);
+  if (devisAtt.filter(d => d.date < addDays(today(), -10)).length) alerts.push(`<div class="alert w">📝 ${devisAtt.filter(d => d.date < addDays(today(), -10)).length} devis envoyé(s) depuis plus de 10 jours sans réponse : relancez.</div>`);
+  if (T.total < 0) alerts.push(`<div class="alert r">🏦 Trésorerie négative : vérifiez les soldes de départ (Trésorerie).</div>`);
+  if (!DATA.clients.length) alerts.push(`<div class="alert w">👋 Bienvenue. Commencez par <a href="#" onclick="go('parametres');return false">Paramètres</a> (informations du cabinet), puis ajoutez vos clients.</div>`);
+  return `${alerts.join('')}
+  <div class="grid g4" style="margin-bottom:12px">
+    <div class="card kpi gold"><div class="l">Trésorerie disponible</div><div class="v">${FCFA(T.total)}</div><div class="s">Banque ${FCFA(T.banque)} · Caisse ${FCFA(T.caisse)} · Mobile ${FCFA(T.mobile)}</div></div>
+    <div class="card kpi"><div class="l">Facturé en ${moisLib(m)}</div><div class="v">${FCFA(P.facture)}</div><div class="s">Année : ${FCFA(Y.facture)}</div></div>
+    <div class="card kpi"><div class="l">Encaissé en ${moisLib(m)}</div><div class="v">${FCFA(P.encaisse)}</div><div class="s">Dépenses du mois : ${FCFA(P.depenses)}</div></div>
+    <div class="card kpi"><div class="l">Reste à encaisser</div><div class="v" style="color:${ar ? 'var(--ko)' : 'inherit'}">${FCFA(ar)}</div><div class="s">${retard.length} en retard</div></div>
+  </div>
+  <div class="grid g2">
+    <div class="card"><h3>🎯 Missions en cours (${enCours.length})</h3>${enCours.length ? enCours.slice(0, 8).map(x => `<div style="margin-bottom:10px;cursor:pointer" onclick="editMission('${x.id}')"><div class="small"><b>${esc(x.titre)}</b> — ${esc(cli(x.clientId).nom)}${x.fin ? ` · fin ${dfr(x.fin)}` : ''}</div><div class="prog"><i style="width:${num(x.avancement)}%"></i></div></div>`).join('') : '<div class="muted small">Aucune mission en cours.</div>'}
+      <div class="act"><button class="btn sm" onclick="editMission()">+ Mission</button></div></div>
+    <div class="card"><h3>🧾 À encaisser en priorité</h3>${facturesActives().filter(f => etatF(f).reste > 0).sort((a, b) => (a.echeance || '').localeCompare(b.echeance || '')).slice(0, 6).map(f => `<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);cursor:pointer" onclick="go('facture','${f.id}')"><span class="small"><b>${esc(f.num)}</b> ${esc(cli(f.clientId).nom)}<br><span class="tag ${etatF(f).c}">${etatF(f).t}</span> ${f.echeance ? 'échéance ' + dfr(f.echeance) : ''}</span><b class="small">${FCFA(etatF(f).reste)}</b></div>`).join('') || '<div class="muted small">Rien à encaisser. 👍</div>'}
+      <div class="act"><button class="btn sm" onclick="editDevis()">+ Devis</button><button class="btn sm p" onclick="editFacture()">+ Facture</button></div></div>
+  </div>
+  <div class="card" style="margin-top:12px"><h3>📝 Devis en attente de réponse (${devisAtt.length})</h3>${tbl([['N°'],['Client'],['Objet'],['Montant','n'],['Envoyé']], devisAtt.map(d => `<tr class="click" onclick="editDevis('${d.id}')"><td>${esc(d.num)}</td><td>${esc(cli(d.clientId).nom)}</td><td>${esc(d.objet)}</td><td class="n">${FCFA(totaux(d).ttc)}</td><td>${dfr(d.date)}</td></tr>`), 'Aucun devis en attente.')}</div>`;
+};
+
+/* ----- clients ----- */
+let CQ = '';
+VIEWS.clients = () => {
+  const q = CQ.toLowerCase();
+  const L = DATA.clients.filter(c => !q || (c.nom + ' ' + (c.contact || '') + ' ' + (c.tel || '') + ' ' + (c.type || '')).toLowerCase().includes(q)).sort((a, b) => a.nom.localeCompare(b.nom));
+  return `<div class="bar"><input class="grow" placeholder="🔍 Rechercher un client, un contact, un téléphone" value="${esc(CQ)}" oninput="CQ=this.value;clearTimeout(window._cq);window._cq=setTimeout(()=>{render();const i=document.querySelector('.bar input');i.focus();i.setSelectionRange(i.value.length,i.value.length)},250)"><button class="btn p" onclick="editClient()">+ Nouveau client</button></div>
+  <div class="card">${tbl([['Client'],['Type'],['Contact'],['Facturé','n'],['Reste dû','n']], L.map(c => {
+    const fs = facturesActives().filter(f => f.clientId === c.id);
+    const tot = fs.reduce((s, f) => s + totaux(f).ttc, 0), reste = fs.reduce((s, f) => s + (etatF(f).reste || 0), 0);
+    return `<tr class="click" onclick="go('client','${c.id}')"><td><b>${esc(c.nom)}</b></td><td>${esc(c.type || '')}</td><td>${esc(c.contact || '')}${c.tel ? '<br><span class="small muted">' + esc(c.tel) + '</span>' : ''}</td><td class="n">${FCFA(tot)}</td><td class="n" style="color:${reste ? 'var(--ko)' : 'inherit'}">${FCFA(reste)}</td></tr>`;
+  }), DATA.clients.length ? 'Aucun résultat.' : 'Aucun client. Touchez « + Nouveau client ».')}</div>`;
+};
+VIEWS.client = id => {
+  const c = get('clients', id); if (!c) return '<div class="empty">Client introuvable.</div>';
+  const fs = DATA.factures.filter(f => f.clientId === id), ds = DATA.devis.filter(d => d.clientId === id), ms = DATA.missions.filter(m => m.clientId === id);
+  const reste = fs.filter(f => f.statut !== 'annulee').reduce((s, f) => s + (etatF(f).reste || 0), 0);
+  return `<div class="bar"><button class="btn sm" onclick="go('clients')">← Clients</button><button class="btn sm" onclick="editClient('${id}')">✏ Modifier</button><button class="btn sm" onclick="editDevis(null,'${id}')">+ Devis</button><button class="btn sm p" onclick="editFacture(null,'${id}')">+ Facture</button>${c.tel ? `<button class="btn sm" onclick="wa('${esc(c.tel)}','')">WhatsApp</button>` : ''}</div>
+  <div class="grid g3" style="margin-bottom:12px"><div class="card"><h3>${esc(c.nom)}</h3><div class="small">${esc(c.type || '')}<br>${esc(c.contact || '')}<br>${esc(c.tel || '')} ${esc(c.email || '')}<br>${esc(c.adresse || '')}${c.notes ? '<br><span class="muted">' + esc(c.notes) + '</span>' : ''}</div></div>
+    <div class="card kpi"><div class="l">Total facturé</div><div class="v">${FCFA(fs.filter(f => f.statut !== 'annulee').reduce((s, f) => s + totaux(f).ttc, 0))}</div></div>
+    <div class="card kpi"><div class="l">Reste dû</div><div class="v" style="color:${reste ? 'var(--ko)' : 'inherit'}">${FCFA(reste)}</div></div></div>
+  <div class="card" style="margin-bottom:12px"><h3>Factures</h3>${tbl([['N°'],['Date'],['Objet'],['Montant','n'],['État']], fs.map(f => `<tr class="click" onclick="go('facture','${f.id}')"><td>${esc(f.num)}</td><td>${dfr(f.date)}</td><td>${esc(f.objet)}</td><td class="n">${FCFA(totaux(f).ttc)}</td><td><span class="tag ${etatF(f).c}">${etatF(f).t}</span></td></tr>`), 'Aucune facture.')}</div>
+  <div class="grid g2"><div class="card"><h3>Devis</h3>${tbl([['N°'],['Objet'],['Montant','n'],['Statut']], ds.map(d => `<tr class="click" onclick="editDevis('${d.id}')"><td>${esc(d.num)}</td><td>${esc(d.objet)}</td><td class="n">${FCFA(totaux(d).ttc)}</td><td>${devisTag(d)}</td></tr>`), 'Aucun devis.')}</div>
+  <div class="card"><h3>Missions</h3>${tbl([['Mission'],['Statut'],['Avancement','n']], ms.map(m => `<tr class="click" onclick="editMission('${m.id}')"><td>${esc(m.titre)}</td><td>${missionTag(m)}</td><td class="n">${num(m.avancement)} %</td></tr>`), 'Aucune mission.')}</div></div>`;
+};
+function editClient(id){
+  const c = id ? get('clients', id) : {};
+  modal(`<h2>${id ? 'Modifier le client' : 'Nouveau client'}</h2><div class="f">
+    <div class="full"><label>Nom / raison sociale *</label><input id="c_nom" value="${esc(c.nom)}"></div>
+    <div><label>Type</label><select id="c_type">${opts(TYPES_CLI, c.type || 'Entreprise')}</select></div>
+    <div><label>Personne à contacter</label><input id="c_contact" value="${esc(c.contact)}"></div>
+    <div><label>Téléphone</label><input id="c_tel" inputmode="tel" value="${esc(c.tel)}"></div>
+    <div><label>E-mail</label><input id="c_email" type="email" value="${esc(c.email)}"></div>
+    <div class="full"><label>Adresse</label><input id="c_adr" value="${esc(c.adresse)}"></div>
+    <div><label>N° compte contribuable (si entreprise)</label><input id="c_cc" value="${esc(c.cc)}"></div>
+    <div><label>Notes</label><input id="c_notes" value="${esc(c.notes)}"></div></div>
+    <div class="act">${id && can() ? `<button class="btn d" onclick="delClient('${id}')">Supprimer</button>` : ''}<button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" onclick="saveClient('${id || ''}')">Enregistrer</button></div>`);
+}
+function saveClient(id){
+  const nom = val('c_nom'); if (!nom) return toast('Le nom est obligatoire');
+  const c = Object.assign(id ? get('clients', id) : { id: uid('C'), cree: today() }, { nom, type: val('c_type'), contact: val('c_contact'), tel: val('c_tel'), email: val('c_email'), adresse: val('c_adr'), cc: val('c_cc'), notes: val('c_notes') });
+  put('clients', c, (id ? 'Modification' : 'Création') + ' client ' + nom); closeModal(); toast('Client enregistré'); go('client', c.id);
+}
+function delClient(id){
+  if (DATA.factures.some(f => f.clientId === id)) return toast('Ce client a des factures : impossible de le supprimer');
+  if (!confirm('Supprimer ce client ?')) return;
+  del('clients', id, 'Suppression client'); closeModal(); go('clients');
+}
+
+/* ----- lignes (devis/factures) ----- */
+let LIG = [];
+function lignesHTML(){
+  return `<table class="lines"><thead><tr><th style="width:55%">Prestation</th><th class="n" style="width:12%">Qté</th><th class="n" style="width:22%">Prix unitaire</th><th></th></tr></thead><tbody>${LIG.map((l, i) => `<tr><td><input value="${esc(l.d)}" oninput="LIG[${i}].d=this.value" placeholder="Désignation"></td><td><input inputmode="decimal" value="${esc(l.q)}" oninput="LIG[${i}].q=this.value;majTot()"></td><td><input inputmode="numeric" value="${esc(l.pu)}" oninput="LIG[${i}].pu=this.value;majTot()"></td><td><button class="btn sm d" onclick="LIG.splice(${i},1);$('#lig').innerHTML=lignesHTML();majTot()">✕</button></td></tr>`).join('')}</tbody></table>
+  <button class="btn sm" style="margin-top:6px" onclick="LIG.push({d:'',q:1,pu:''});$('#lig').innerHTML=lignesHTML()">+ Ligne</button>`;
+}
+function majTot(){
+  const t = totaux({ lignes: LIG, remise: val('x_remise'), tva: $('#x_tva') && $('#x_tva').checked });
+  const el = $('#x_tot'); if (el) el.innerHTML = `<div><span>Total HT</span><b>${FCFA(t.ht)}</b></div>${t.remise ? `<div><span>Remise</span><b>− ${FCFA(t.remise)}</b></div>` : ''}${t.tva ? `<div><span>TVA ${DATA.societe.tvaTaux} %</span><b>${FCFA(t.tva)}</b></div>` : ''}<div class="big"><span>Total ${t.tva ? 'TTC' : ''}</span><span>${FCFA(t.ttc)}</span></div>`;
+}
+const commonDocFields = (d, cid) => `
+  <div><label>Client *</label><select id="x_cli">${cliOpts(d.clientId || cid)}</select></div>
+  <div><label>Date</label><input id="x_date" type="date" value="${d.date || today()}"></div>
+  <div class="full"><label>Objet *</label><input id="x_obj" value="${esc(d.objet)}" placeholder="ex. Plan de communication institutionnelle 2027"></div>
+  <div class="full" id="lig">${lignesHTML()}</div>
+  <div><label>Remise (F)</label><input id="x_remise" inputmode="numeric" value="${esc(d.remise || '')}" oninput="majTot()"></div>
+  <div><label style="display:flex;gap:8px;align-items:center;margin-top:22px"><input id="x_tva" type="checkbox" style="width:auto" ${(d.tva ?? DATA.societe.tvaDefaut) ? 'checked' : ''} onchange="majTot()"> Appliquer la TVA (${DATA.societe.tvaTaux} %)</label></div>
+  <div class="full"><div class="tot" id="x_tot"></div></div>
+  <div class="full"><label>Conditions / notes (imprimées)</label><textarea id="x_notes">${esc(d.notes || '')}</textarea></div>`;
+function readDoc(){ return { clientId: val('x_cli'), date: val('x_date') || today(), objet: val('x_obj'), lignes: LIG.filter(l => l.d || num(l.pu)).map(l => ({ d: l.d, q: num(l.q) || 1, pu: num(l.pu) })), remise: num(val('x_remise')), tva: $('#x_tva').checked, notes: val('x_notes') }; }
+
+/* ----- devis ----- */
+const DST = { brouillon:['Brouillon',''], envoye:['Envoyé','w'], accepte:['Accepté','g'], refuse:['Refusé','r'] };
+const devisTag = d => `<span class="tag ${DST[d.statut || 'brouillon'][1]}">${DST[d.statut || 'brouillon'][0]}</span>`;
+let DF = 'tous';
+VIEWS.devis = () => {
+  const L = DATA.devis.filter(d => DF === 'tous' || d.statut === DF).sort((a, b) => (b.date + b.num).localeCompare(a.date + a.num));
+  return `<div class="bar"><select onchange="DF=this.value;render()">${[['tous','Tous'],...Object.entries(DST).map(([k, v]) => [k, v[0]])].map(([k, t]) => `<option value="${k}" ${DF === k ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="grow"></span><button class="btn p" onclick="editDevis()">+ Nouveau devis</button></div>
+  <div class="card">${tbl([['N°'],['Date'],['Client'],['Objet'],['Montant','n'],['Statut']], L.map(d => `<tr class="click" onclick="editDevis('${d.id}')"><td>${esc(d.num)}</td><td>${dfr(d.date)}</td><td>${esc(cli(d.clientId).nom)}</td><td>${esc(d.objet)}</td><td class="n">${FCFA(totaux(d).ttc)}</td><td>${devisTag(d)}</td></tr>`), 'Aucun devis.')}</div>`;
+};
+function editDevis(id, cid){
+  if (!DATA.clients.length) { toast('Ajoutez d\'abord un client'); return editClient(); }
+  const d = id ? get('devis', id) : { statut:'brouillon', validite: 30 };
+  LIG = (d.lignes && d.lignes.length ? d.lignes : [{ d:'', q:1, pu:'' }]).map(l => ({ ...l }));
+  modal(`<h2>${id ? 'Devis ' + esc(d.num) : 'Nouveau devis'}</h2><div class="f">${commonDocFields(d, cid)}
+    <div><label>Statut</label><select id="x_st">${Object.entries(DST).map(([k, v]) => `<option value="${k}" ${d.statut === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></div>
+    <div><label>Validité (jours)</label><input id="x_val" inputmode="numeric" value="${esc(d.validite ?? 30)}"></div></div>
+    <div class="act">${id && can() ? `<button class="btn d" onclick="if(confirm('Supprimer ce devis ?')){del('devis','${id}','Suppression devis');closeModal();render()}">Supprimer</button>` : ''}
+    ${id ? `<button class="btn" onclick="printDoc('devis','${id}')">🖨 Imprimer / PDF</button>` : ''}
+    ${id && d.statut !== 'refuse' ? `<button class="btn g" onclick="devisVersFacture('${id}')">→ Facturer</button>` : ''}
+    <button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" onclick="saveDevis('${id || ''}')">Enregistrer</button></div>`);
+  majTot();
+}
+function saveDevis(id, silent){
+  const x = readDoc(); if (!x.clientId || !x.objet) { toast('Client et objet obligatoires'); return null; }
+  if (!x.lignes.length) { toast('Ajoutez au moins une prestation'); return null; }
+  const d = Object.assign(id ? get('devis', id) : { id: uid('D'), num: nextNum('D') }, x, { statut: val('x_st'), validite: num(val('x_val')) || 30 });
+  put('devis', d, (id ? 'Modification' : 'Création') + ' devis ' + d.num);
+  if (!silent){ closeModal(); toast('Devis ' + d.num + ' enregistré'); render(); }
+  return d;
+}
+function devisVersFacture(id){
+  const d = saveDevis(id, true); if (!d) return;
+  d.statut = 'accepte'; put('devis', d);
+  let m = DATA.missions.find(x => x.devisId === d.id);
+  if (!m) m = put('missions', { id: uid('M'), devisId: d.id, clientId: d.clientId, titre: d.objet, domaine: '', montant: totaux(d).ttc, debut: today(), fin: '', responsable: '', statut: 'en_cours', avancement: 0, notes: '' }, 'Mission créée depuis devis ' + d.num);
+  closeModal();
+  editFacture(null, d.clientId, { objet: d.objet, lignes: d.lignes, remise: d.remise, tva: d.tva, notes: d.notes, devisId: d.id, missionId: m.id });
+}
+
+/* ----- missions ----- */
+const MST = { a_venir:['À venir','b'], en_cours:['En cours','w'], terminee:['Terminée','g'], suspendue:['Suspendue','r'] };
+const missionTag = m => `<span class="tag ${MST[m.statut || 'a_venir'][1]}">${MST[m.statut || 'a_venir'][0]}</span>`;
+let MF = 'actives';
+VIEWS.missions = () => {
+  const L = DATA.missions.filter(m => MF === 'toutes' || (MF === 'actives' ? m.statut !== 'terminee' : m.statut === MF)).sort((a, b) => (b.debut || '').localeCompare(a.debut || ''));
+  return `<div class="bar"><select onchange="MF=this.value;render()">${[['actives','En cours et à venir'],['toutes','Toutes'],...Object.entries(MST).map(([k, v]) => [k, v[0]])].map(([k, t]) => `<option value="${k}" ${MF === k ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="grow"></span><button class="btn p" onclick="editMission()">+ Nouvelle mission</button></div>
+  <div class="card">${tbl([['Mission'],['Client'],['Domaine'],['Montant','n'],['Facturé','n'],['Statut'],['Avancement','n']], L.map(m => {
+    const fac = facturesActives().filter(f => f.missionId === m.id).reduce((s, f) => s + totaux(f).ttc, 0);
+    return `<tr class="click" onclick="editMission('${m.id}')"><td><b>${esc(m.titre)}</b>${m.fin ? `<br><span class="small muted">fin ${dfr(m.fin)}${m.fin < today() && m.statut !== 'terminee' ? ' ⚠ dépassée' : ''}</span>` : ''}</td><td>${esc(cli(m.clientId).nom)}</td><td>${esc(m.domaine || '')}</td><td class="n">${FCFA(m.montant)}</td><td class="n">${FCFA(fac)}</td><td>${missionTag(m)}</td><td class="n">${num(m.avancement)} %</td></tr>`;
+  }), 'Aucune mission.')}</div>`;
+};
+function editMission(id){
+  if (!DATA.clients.length) { toast('Ajoutez d\'abord un client'); return editClient(); }
+  const m = id ? get('missions', id) : { statut:'en_cours', avancement:0, debut: today() };
+  modal(`<h2>${id ? 'Mission' : 'Nouvelle mission'}</h2><div class="f">
+    <div class="full"><label>Intitulé *</label><input id="m_t" value="${esc(m.titre)}"></div>
+    <div><label>Client *</label><select id="m_c">${cliOpts(m.clientId)}</select></div>
+    <div><label>Domaine</label><select id="m_d"><option></option>${opts(DOMAINES, m.domaine)}</select></div>
+    <div><label>Montant prévu (F)</label><input id="m_mt" inputmode="numeric" value="${esc(m.montant || '')}"></div>
+    <div><label>Responsable</label><input id="m_r" value="${esc(m.responsable)}" placeholder="Moaye, consultant, agent…"></div>
+    <div><label>Début</label><input id="m_db" type="date" value="${m.debut || ''}"></div>
+    <div><label>Fin prévue</label><input id="m_fn" type="date" value="${m.fin || ''}"></div>
+    <div><label>Statut</label><select id="m_s">${Object.entries(MST).map(([k, v]) => `<option value="${k}" ${m.statut === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></div>
+    <div><label>Avancement : <b id="m_av_l">${num(m.avancement)} %</b></label><input id="m_av" type="range" min="0" max="100" step="5" value="${num(m.avancement)}" oninput="$('#m_av_l').textContent=this.value+' %'"></div>
+    <div class="full"><label>Livrables, étapes, notes</label><textarea id="m_n">${esc(m.notes)}</textarea></div></div>
+    <div class="act">${id && can() ? `<button class="btn d" onclick="if(confirm('Supprimer cette mission ?')){del('missions','${id}','Suppression mission');closeModal();render()}">Supprimer</button>` : ''}
+    ${id ? `<button class="btn" onclick="closeModal();editFacture(null,'${m.clientId}',{objet:${esc(JSON.stringify(m.titre))},missionId:'${id}'})">+ Facture</button>` : ''}
+    <button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" onclick="saveMission('${id || ''}')">Enregistrer</button></div>`);
+}
+function saveMission(id){
+  const titre = val('m_t'), clientId = val('m_c'); if (!titre || !clientId) return toast('Intitulé et client obligatoires');
+  let st = val('m_s'), av = num(val('m_av')); if (st === 'terminee') av = 100;
+  const m = Object.assign(id ? get('missions', id) : { id: uid('M') }, { titre, clientId, domaine: val('m_d'), montant: num(val('m_mt')), responsable: val('m_r'), debut: val('m_db'), fin: val('m_fn'), statut: st, avancement: av, notes: val('m_n') });
+  put('missions', m, (id ? 'Modification' : 'Création') + ' mission ' + titre); closeModal(); toast('Mission enregistrée'); render();
+}
+
+/* ----- factures ----- */
+let FF = 'tous';
+VIEWS.factures = a => {
+  if (a) FF = a;
+  const L = DATA.factures.filter(f => FF === 'tous' || (FF === 'impayees' ? etatF(f).reste > 0 : etatF(f).k === FF)).sort((a, b) => (b.date + b.num).localeCompare(a.date + a.num));
+  return `<div class="bar"><select onchange="FF=this.value;ARG=null;render()">${[['tous','Toutes'],['impayees','Non soldées'],['retard','En retard'],['payee','Payées'],['annulee','Annulées']].map(([k, t]) => `<option value="${k}" ${FF === k ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="grow"></span><button class="btn" onclick="exportCSV('factures')">⬇ Excel</button><button class="btn p" onclick="editFacture()">+ Nouvelle facture</button></div>
+  <div class="card">${tbl([['N°'],['Date'],['Client'],['Objet'],['Montant','n'],['Reste','n'],['État']], L.map(f => { const e = etatF(f); return `<tr class="click" onclick="go('facture','${f.id}')"><td>${esc(f.num)}</td><td>${dfr(f.date)}</td><td>${esc(cli(f.clientId).nom)}</td><td>${esc(f.objet)}</td><td class="n">${FCFA(totaux(f).ttc)}</td><td class="n">${FCFA(e.reste || 0)}</td><td><span class="tag ${e.c}">${e.t}</span></td></tr>`; }), 'Aucune facture.')}</div>`;
+};
+VIEWS.facture = id => {
+  const f = get('factures', id); if (!f) return '<div class="empty">Facture introuvable.</div>';
+  const t = totaux(f), e = etatF(f), ps = DATA.paiements.filter(p => p.factureId === id).sort((a, b) => a.date.localeCompare(b.date)), c = cli(f.clientId);
+  return `<div class="bar"><button class="btn sm" onclick="go('factures')">← Factures</button>${f.statut !== 'annulee' ? `<button class="btn sm" onclick="editFacture('${id}')">✏ Modifier</button>` : ''}<button class="btn sm" onclick="printDoc('facture','${id}')">🖨 Imprimer / PDF</button>
+    ${e.reste > 0 ? `<button class="btn sm g" onclick="editPaiement(null,'${id}')">+ Encaissement</button>` : ''}${e.reste > 0 && c.tel ? `<button class="btn sm" onclick="relance('${id}')">📲 Relancer</button>` : ''}
+    ${can() && f.statut !== 'annulee' && !ps.length ? `<button class="btn sm d" onclick="annulerF('${id}')">Annuler la facture</button>` : ''}</div>
+  <div class="grid g3" style="margin-bottom:12px"><div class="card"><h3>${esc(f.num)}</h3><div class="small"><b>${esc(c.nom)}</b><br>${esc(f.objet)}<br>Date ${dfr(f.date)}${f.echeance ? ' · échéance ' + dfr(f.echeance) : ''}<br><span class="tag ${e.c}">${e.t}</span></div></div>
+    <div class="card kpi"><div class="l">Montant ${t.tva ? 'TTC' : ''}</div><div class="v">${FCFA(t.ttc)}</div><div class="s">${t.tva ? 'dont TVA ' + FCFA(t.tva) : 'sans TVA'}</div></div>
+    <div class="card kpi"><div class="l">Reste à encaisser</div><div class="v" style="color:${e.reste ? 'var(--ko)' : 'var(--ok)'}">${FCFA(e.reste || 0)}</div><div class="s">Encaissé ${FCFA(payeF(f))}</div></div></div>
+  <div class="card" style="margin-bottom:12px"><h3>Prestations</h3>${tbl([['Désignation'],['Qté','n'],['P.U.','n'],['Montant','n']], f.lignes.map(l => `<tr><td>${esc(l.d)}</td><td class="n">${l.q}</td><td class="n">${FCFA(l.pu)}</td><td class="n">${FCFA(num(l.q) * num(l.pu))}</td></tr>`), '—')}</div>
+  <div class="card"><h3>Encaissements</h3>${tbl([['Date'],['Mode'],['Référence'],['Montant','n'],['']], ps.map(p => `<tr><td>${dfr(p.date)}</td><td>${esc(p.mode)}</td><td>${esc(p.ref || '')}</td><td class="n">${FCFA(p.montant)}</td><td class="n"><button class="btn sm" onclick="editPaiement('${p.id}')">✏</button></td></tr>`), 'Aucun encaissement.')}</div>`;
+};
+function editFacture(id, cid, pre){
+  if (!DATA.clients.length) { toast('Ajoutez d\'abord un client'); return editClient(); }
+  const f = id ? get('factures', id) : Object.assign({ date: today(), echeance: addDays(today(), 30) }, pre || {}, { clientId: (pre && pre.clientId) || cid });
+  LIG = (f.lignes && f.lignes.length ? f.lignes : [{ d:'', q:1, pu:'' }]).map(l => ({ ...l }));
+  const ms = DATA.missions.filter(m => !f.clientId || m.clientId === f.clientId);
+  modal(`<h2>${id ? 'Modifier ' + esc(f.num) : 'Nouvelle facture'}</h2><div class="f">${commonDocFields(f, cid)}
+    <div><label>Échéance de paiement</label><input id="x_ech" type="date" value="${f.echeance || ''}"></div>
+    <div><label>Mission liée</label><select id="x_mis"><option value="">— Aucune —</option>${ms.map(m => `<option value="${m.id}" ${m.id === f.missionId ? 'selected' : ''}>${esc(m.titre)}</option>`).join('')}</select></div></div>
+    <div class="act"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" onclick="saveFacture('${id || ''}','${f.devisId || ''}')">Enregistrer la facture</button></div>`);
+  majTot();
+}
+function saveFacture(id, devisId){
+  const x = readDoc(); if (!x.clientId || !x.objet) return toast('Client et objet obligatoires');
+  if (!x.lignes.length) return toast('Ajoutez au moins une prestation');
+  const f = Object.assign(id ? get('factures', id) : { id: uid('F'), num: nextNum('F'), statut: 'emise', devisId: devisId || '' }, x, { echeance: val('x_ech'), missionId: val('x_mis') });
+  put('factures', f, (id ? 'Modification' : 'Création') + ' facture ' + f.num + ' (' + FCFA(totaux(f).ttc) + ')');
+  closeModal(); toast('Facture ' + f.num + ' enregistrée'); go('facture', f.id);
+}
+function annulerF(id){
+  const f = get('factures', id); if (!confirm('Annuler la facture ' + f.num + ' ? Elle reste dans l\'historique (numérotation continue).')) return;
+  f.statut = 'annulee'; put('factures', f, 'Annulation facture ' + f.num); render();
+}
+function relance(id){
+  const f = get('factures', id), c = cli(f.clientId), e = etatF(f);
+  const msg = `Bonjour ${c.contact || c.nom},\n\nSauf erreur de notre part, la facture ${f.num} du ${dfr(f.date)} (${f.objet}) présente un solde de ${FCFA(e.reste)}${f.echeance ? ', échu le ' + dfr(f.echeance) : ''}.\nMerci de bien vouloir procéder au règlement ou de nous indiquer la date prévue.\n\nCordialement,\n${DATA.societe.nom}${DATA.societe.tel ? '\n' + DATA.societe.tel : ''}`;
+  wa(c.tel, msg);
+}
+function wa(tel, msg){
+  let t = String(tel || '').replace(/\D/g, ''); if (t.length === 10) t = '225' + t;
+  const url = 'https://wa.me/' + t + (msg ? '?text=' + encodeURIComponent(msg) : '');
+  if (window.AndroidBridge && AndroidBridge.openExternal) AndroidBridge.openExternal(url); else window.open(url, '_blank');
+}
+
+/* ----- encaissements ----- */
+VIEWS.paiements = () => {
+  const L = [...DATA.paiements].sort((a, b) => b.date.localeCompare(a.date));
+  return `<div class="bar"><span class="grow muted small">Chaque encaissement est rattaché à une facture.</span><button class="btn" onclick="exportCSV('paiements')">⬇ Excel</button><button class="btn p" onclick="editPaiement()">+ Encaissement</button></div>
+  <div class="card">${tbl([['Date'],['Facture'],['Client'],['Mode'],['Montant','n']], L.map(p => { const f = get('factures', p.factureId) || {}; return `<tr class="click" onclick="editPaiement('${p.id}')"><td>${dfr(p.date)}</td><td>${esc(f.num || '?')}</td><td>${esc(cli(f.clientId).nom)}</td><td>${esc(p.mode)}${p.ref ? '<br><span class="small muted">' + esc(p.ref) + '</span>' : ''}</td><td class="n b">${FCFA(p.montant)}</td></tr>`; }), 'Aucun encaissement.')}</div>`;
+};
+function editPaiement(id, fid){
+  const p = id ? get('paiements', id) : { date: today(), factureId: fid, mode: 'Virement' };
+  const ouvertes = DATA.factures.filter(f => f.statut !== 'annulee' && (etatF(f).reste > 0 || f.id === p.factureId));
+  if (!ouvertes.length) return toast('Aucune facture à encaisser');
+  const f0 = get('factures', p.factureId);
+  modal(`<h2>${id ? 'Modifier l\'encaissement' : 'Nouvel encaissement'}</h2><div class="f">
+    <div class="full"><label>Facture *</label><select id="p_f" onchange="const f=DATA.factures.find(x=>x.id===this.value);if(f&&!'${id}')$('#p_m').value=etatF(f).reste">${ouvertes.map(f => `<option value="${f.id}" ${f.id === p.factureId ? 'selected' : ''}>${esc(f.num)} — ${esc(cli(f.clientId).nom)} — reste ${FCFA(etatF(f).reste || 0)}</option>`).join('')}</select></div>
+    <div><label>Montant (F) *</label><input id="p_m" inputmode="numeric" value="${esc(p.montant ?? (f0 ? etatF(f0).reste : etatF(ouvertes[0]).reste))}"></div>
+    <div><label>Date</label><input id="p_d" type="date" value="${p.date}"></div>
+    <div><label>Mode</label><select id="p_mo">${opts(MODES, p.mode)}</select></div>
+    <div><label>Référence (n° chèque, transaction…)</label><input id="p_r" value="${esc(p.ref)}"></div></div>
+    <div class="act">${id && can() ? `<button class="btn d" onclick="if(confirm('Supprimer cet encaissement ?')){del('paiements','${id}','Suppression encaissement');closeModal();render()}">Supprimer</button>` : ''}<button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" onclick="savePaiement('${id || ''}')">Enregistrer</button></div>`);
+}
+function savePaiement(id){
+  const m = num(val('p_m')), fid = val('p_f'); if (m <= 0 || !fid) return toast('Montant invalide');
+  const f = get('factures', fid), deja = payeF(f) - (id ? num(get('paiements', id).montant) : 0);
+  if (deja + m > totaux(f).ttc + 1 && !confirm('Ce montant dépasse le reste à payer. Enregistrer quand même ?')) return;
+  const p = Object.assign(id ? get('paiements', id) : { id: uid('P') }, { factureId: fid, montant: m, date: val('p_d') || today(), mode: val('p_mo'), ref: val('p_r') });
+  put('paiements', p, 'Encaissement ' + FCFA(m) + ' sur ' + f.num); closeModal(); toast('Encaissement enregistré'); render();
+}
+
+/* ----- dépenses ----- */
+let DM = mois(today());
+VIEWS.depenses = () => {
+  const L = DATA.depenses.filter(d => !DM || d.date.startsWith(DM)).sort((a, b) => b.date.localeCompare(a.date));
+  const parCat = {}; L.forEach(d => parCat[d.cat] = (parCat[d.cat] || 0) + num(d.montant));
+  return `<div class="bar"><input type="month" value="${DM}" onchange="DM=this.value;render()"><button class="btn sm" onclick="DM='';render()">Tout</button><span class="grow"></span><button class="btn" onclick="exportCSV('depenses')">⬇ Excel</button><button class="btn p" onclick="editDepense()">+ Dépense</button></div>
+  <div class="grid g3" style="margin-bottom:12px"><div class="card kpi"><div class="l">Total ${DM ? moisLib(DM) : 'toutes périodes'}</div><div class="v">${FCFA(L.reduce((s, d) => s + num(d.montant), 0))}</div></div>
+  <div class="card" style="grid-column:span 2">${Object.entries(parCat).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div style="display:flex;justify-content:space-between" class="small"><span>${esc(k)}</span><b>${FCFA(v)}</b></div>`).join('') || '<span class="muted small">Aucune dépense.</span>'}</div></div>
+  <div class="card">${tbl([['Date'],['Catégorie'],['Description'],['Mode'],['Montant','n']], L.map(d => `<tr class="click" onclick="editDepense('${d.id}')"><td>${dfr(d.date)}</td><td>${esc(d.cat)}</td><td>${esc(d.desc)}${d.fournisseur ? '<br><span class="small muted">' + esc(d.fournisseur) + '</span>' : ''}</td><td>${esc(d.mode)}</td><td class="n b">${FCFA(d.montant)}</td></tr>`), 'Aucune dépense sur la période.')}</div>`;
+};
+function editDepense(id){
+  const d = id ? get('depenses', id) : { date: today(), mode: 'Espèces', cat: 'Divers' };
+  modal(`<h2>${id ? 'Modifier la dépense' : 'Nouvelle dépense'}</h2><div class="f">
+    <div><label>Montant (F) *</label><input id="d_m" inputmode="numeric" value="${esc(d.montant || '')}"></div>
+    <div><label>Date</label><input id="d_d" type="date" value="${d.date}"></div>
+    <div><label>Catégorie</label><select id="d_c">${opts(CATS_DEP, d.cat)}</select></div>
+    <div><label>Mode de paiement</label><select id="d_mo">${opts(MODES, d.mode)}</select></div>
+    <div class="full"><label>Description *</label><input id="d_ds" value="${esc(d.desc)}"></div>
+    <div><label>Fournisseur / bénéficiaire</label><input id="d_f" value="${esc(d.fournisseur)}"></div>
+    <div><label>Mission liée</label><select id="d_mi"><option value="">— Aucune —</option>${DATA.missions.map(m => `<option value="${m.id}" ${m.id === d.missionId ? 'selected' : ''}>${esc(m.titre)}</option>`).join('')}</select></div></div>
+    <div class="act">${id && can() ? `<button class="btn d" onclick="if(confirm('Supprimer cette dépense ?')){del('depenses','${id}','Suppression dépense');closeModal();render()}">Supprimer</button>` : ''}<button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" onclick="saveDepense('${id || ''}')">Enregistrer</button></div>`);
+}
+function saveDepense(id){
+  const m = num(val('d_m')), desc = val('d_ds'); if (m <= 0 || !desc) return toast('Montant et description obligatoires');
+  const d = Object.assign(id ? get('depenses', id) : { id: uid('X') }, { montant: m, date: val('d_d') || today(), cat: val('d_c'), mode: val('d_mo'), desc, fournisseur: val('d_f'), missionId: val('d_mi') });
+  put('depenses', d, 'Dépense ' + FCFA(m) + ' — ' + desc); closeModal(); toast('Dépense enregistrée'); render();
+}
+
+/* ----- trésorerie ----- */
+VIEWS.tresorerie = () => {
+  const T = tresorerie(), s = DATA.soldes;
+  const mouv = [...DATA.paiements.filter(p => p.date >= (s.date || '')).map(p => ({ d: p.date, l: 'Encaissement ' + ((get('factures', p.factureId) || {}).num || ''), m: num(p.montant), mo: p.mode })),
+    ...DATA.depenses.filter(d => d.date >= (s.date || '')).map(d => ({ d: d.date, l: d.cat + ' — ' + d.desc, m: -num(d.montant), mo: d.mode }))].sort((a, b) => b.d.localeCompare(a.d)).slice(0, 60);
+  return `<div class="grid g4" style="margin-bottom:12px"><div class="card kpi gold"><div class="l">Total disponible</div><div class="v">${FCFA(T.total)}</div></div>
+    <div class="card kpi"><div class="l">Banque</div><div class="v">${FCFA(T.banque)}</div><div class="s">Virements, chèques</div></div>
+    <div class="card kpi"><div class="l">Caisse</div><div class="v">${FCFA(T.caisse)}</div><div class="s">Espèces</div></div>
+    <div class="card kpi"><div class="l">Mobile Money / Wave</div><div class="v">${FCFA(T.mobile)}</div></div></div>
+  <div class="card" style="margin-bottom:12px"><h3>Soldes de départ</h3><p class="small muted">Saisissez ce qu'il y avait réellement en banque, en caisse et sur mobile à une date ; l'application calcule ensuite tout seule.</p>
+    <div class="f f4"><div><label>Date</label><input id="s_d" type="date" value="${s.date || today()}"></div><div><label>Banque</label><input id="s_b" inputmode="numeric" value="${num(s.banque)}"></div><div><label>Caisse</label><input id="s_c" inputmode="numeric" value="${num(s.caisse)}"></div><div><label>Mobile</label><input id="s_m" inputmode="numeric" value="${num(s.mobile)}"></div></div>
+    <div class="act">${can() ? `<button class="btn p" onclick="DATA.soldes={date:val('s_d'),banque:num(val('s_b')),caisse:num(val('s_c')),mobile:num(val('s_m'))};save('Soldes de départ modifiés');toast('Soldes enregistrés');render()">Enregistrer les soldes</button>` : '<span class="small muted">Réservé au gérant et à la cogérante.</span>'}</div></div>
+  <div class="card"><h3>Derniers mouvements</h3>${tbl([['Date'],['Libellé'],['Mode'],['Montant','n']], mouv.map(x => `<tr><td>${dfr(x.d)}</td><td>${esc(x.l)}</td><td>${esc(x.mo)}</td><td class="n b" style="color:${x.m < 0 ? 'var(--ko)' : 'var(--ok)'}">${x.m < 0 ? '−' : '+'} ${FCFA(Math.abs(x.m))}</td></tr>`), 'Aucun mouvement depuis la date de départ.')}</div>`;
+};
+
+/* ----- rapports ----- */
+let RA = today().slice(0, 4);
+VIEWS.rapports = () => {
+  const ms = Array.from({ length: 12 }, (_, i) => RA + '-' + String(i + 1).padStart(2, '0'));
+  const rows = ms.map(m => ({ m, ...periode(m) }));
+  const Y = periode(RA);
+  const parDom = {}; facturesActives().filter(f => f.date.startsWith(RA)).forEach(f => { const d = (get('missions', f.missionId) || {}).domaine || 'Non classé'; parDom[d] = (parDom[d] || 0) + totaux(f).base; });
+  const parCli = {}; facturesActives().filter(f => f.date.startsWith(RA)).forEach(f => parCli[f.clientId] = (parCli[f.clientId] || 0) + totaux(f).base);
+  const max = Math.max(1, ...rows.map(r => Math.max(r.facture, r.encaisse, r.depenses)));
+  return `<div class="bar"><select onchange="RA=this.value;render()">${[...new Set([today().slice(0,4), ...DATA.factures.map(f => f.date.slice(0,4)), ...DATA.depenses.map(d => d.date.slice(0,4))])].sort().reverse().map(y => `<option ${y === RA ? 'selected' : ''}>${y}</option>`).join('')}</select><span class="grow"></span><button class="btn" onclick="rapportMensuel()">📄 Rapport du mois</button></div>
+  <div class="grid g4" style="margin-bottom:12px"><div class="card kpi"><div class="l">Chiffre d'affaires ${RA} (HT)</div><div class="v">${FCFA(Y.factureHT)}</div></div><div class="card kpi"><div class="l">Encaissé</div><div class="v">${FCFA(Y.encaisse)}</div></div><div class="card kpi"><div class="l">Dépenses</div><div class="v">${FCFA(Y.depenses)}</div></div><div class="card kpi gold"><div class="l">Résultat de caisse (encaissé − dépenses)</div><div class="v">${FCFA(Y.encaisse - Y.depenses)}</div></div></div>
+  <div class="card" style="margin-bottom:12px"><h3>Mois par mois</h3><div class="small muted" style="margin-bottom:6px"><span style="color:var(--pri)">■</span> facturé · <span style="color:var(--gold)">■</span> encaissé · <span style="color:#d98b84">■</span> dépenses</div>
+    ${rows.map(r => `<div style="display:grid;grid-template-columns:70px minmax(0,1fr);gap:8px;align-items:center;margin:4px 0" class="small"><span>${MOIS_FR[+r.m.slice(5) - 1].slice(0, 4)}.</span><div>${[[r.facture, 'var(--pri)'], [r.encaisse, 'var(--gold)'], [r.depenses, '#d98b84']].map(([v, c]) => `<div style="height:6px;margin:1px 0;width:${Math.max(v ? 1 : 0, v / max * 100)}%;background:${c};border-radius:3px" title="${FCFA(v)}"></div>`).join('')}</div></div>`).join('')}
+    ${tbl([['Mois'],['Facturé','n'],['Encaissé','n'],['Dépenses','n'],['Solde','n']], rows.filter(r => r.facture || r.encaisse || r.depenses).map(r => `<tr><td>${moisLib(r.m)}</td><td class="n">${FCFA(r.facture)}</td><td class="n">${FCFA(r.encaisse)}</td><td class="n">${FCFA(r.depenses)}</td><td class="n b">${FCFA(r.encaisse - r.depenses)}</td></tr>`), 'Aucune activité sur l\'année.')}</div>
+  <div class="grid g2"><div class="card"><h3>Par domaine (HT)</h3>${Object.entries(parDom).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div class="small" style="display:flex;justify-content:space-between"><span>${esc(k)}</span><b>${FCFA(v)}</b></div>`).join('') || '<span class="muted small">—</span>'}</div>
+  <div class="card"><h3>Meilleurs clients (HT)</h3>${Object.entries(parCli).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k, v]) => `<div class="small" style="display:flex;justify-content:space-between"><span>${esc(cli(k).nom)}</span><b>${FCFA(v)}</b></div>`).join('') || '<span class="muted small">—</span>'}</div></div>
+  ${Y.tva ? `<div class="alert w" style="margin-top:12px">TVA facturée en ${RA} : ${FCFA(Y.tva)} (à reverser selon vos déclarations).</div>` : ''}`;
+};
+function resumeTexte(m){
+  m = m || mois(today());
+  const P = periode(m), T = tresorerie();
+  const imp = facturesActives().filter(f => etatF(f).reste > 0);
+  return `RAPPORT ${DATA.societe.sigle || 'IGC'} — ${moisLib(m).toUpperCase()} (édité le ${dfr(today())})
+Facturé : ${FCFA(P.facture)} (${P.nbFac} facture(s)) — Encaissé : ${FCFA(P.encaisse)} — Dépenses : ${FCFA(P.depenses)}
+Trésorerie : ${FCFA(T.total)} (banque ${FCFA(T.banque)}, caisse ${FCFA(T.caisse)}, mobile ${FCFA(T.mobile)})
+Reste à encaisser : ${FCFA(aRecevoir())}
+Factures non soldées :
+${imp.map(f => `- ${f.num} ${cli(f.clientId).nom} : ${FCFA(etatF(f).reste)} (${etatF(f).t}${f.echeance ? ', échéance ' + dfr(f.echeance) : ''})`).join('\n') || '- aucune'}
+Devis en attente :
+${DATA.devis.filter(d => d.statut === 'envoye').map(d => `- ${d.num} ${cli(d.clientId).nom} : ${d.objet} — ${FCFA(totaux(d).ttc)} (envoyé le ${dfr(d.date)})`).join('\n') || '- aucun'}
+Missions en cours :
+${DATA.missions.filter(x => x.statut === 'en_cours').map(x => `- ${x.titre} (${cli(x.clientId).nom}) : ${num(x.avancement)} %${x.fin ? ', fin ' + dfr(x.fin) : ''}`).join('\n') || '- aucune'}
+Dépenses du mois par catégorie :
+${Object.entries(DATA.depenses.filter(d => d.date.startsWith(m)).reduce((o, d) => (o[d.cat] = (o[d.cat] || 0) + num(d.montant), o), {})).map(([k, v]) => `- ${k} : ${FCFA(v)}`).join('\n') || '- aucune'}`;
+}
+function rapportMensuel(){
+  modal(`<h2>Rapport du mois</h2><div class="f"><div><label>Mois</label><input id="rm" type="month" value="${mois(today())}" onchange="$('#rmt').value=resumeTexte(this.value)"></div></div>
+  <textarea id="rmt" style="width:100%;min-height:300px;margin-top:10px;font:13px/1.4 ui-monospace,monospace;padding:10px;border:1px solid var(--line);border-radius:9px">${esc(resumeTexte())}</textarea>
+  <div class="act"><button class="btn" onclick="closeModal()">Fermer</button><button class="btn p" onclick="copier($('#rmt').value)">📋 Copier</button></div>`);
+}
+function copier(t){ (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast('Copié : collez-le dans Claude ou WhatsApp')).catch(() => { const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); document.execCommand('copy'); a.remove(); toast('Copié'); }); }
+
+/* ----- agents IA ----- */
+const AGENT_PROMPTS = [
+    ['Secrétariat', 'Agent secrétariat : à partir de la situation ci-dessus, fais-moi le point du jour (urgences, relances, décisions à prendre).'],
+    ['Comptable', 'Agent comptable : rédige un message de relance courtois pour chaque facture en retard, et une prévision de trésorerie sur 30 jours.'],
+    ['Commercial', 'Agent commercial : relance les devis en attente avec un message adapté à chaque client, et propose 5 prospects pour nos domaines.'],
+    ['Consultant', 'Agent consultant : pour la mission « … », prépare le plan détaillé du livrable et le calendrier.'],
+    ['Juridique', 'Agent juridique : rédige le contrat de prestation pour le client « … » (objet, durée, prix, paiement, confidentialité).'],
+    ['Communication', 'Agent communication : propose 3 publications LinkedIn/Facebook pour IGC cette semaine, sans citer de client confidentiel.'],
+  ];
+VIEWS.agents = () => `
+  <div class="card" style="margin-bottom:12px"><h3>🤖 Travailler avec vos agents IA</h3>
+  <p class="small">Vos 7 agents (secrétariat, commercial, consultant, communication, comptable, juridique, informatique) travaillent dans Claude. Donnez-leur la situation réelle du cabinet en un geste :</p>
+  <ol class="small"><li>Touchez <b>Copier la situation du cabinet</b>.</li><li>Ouvrez Claude (Projet IGC) et collez.</li><li>Ajoutez votre demande, par exemple : « Agent comptable : prépare les relances » ou « Agent commercial : propose 5 prospects ».</li></ol>
+  <div class="act" style="justify-content:flex-start"><button class="btn g" onclick="copier(resumeTexte())">📋 Copier la situation du cabinet</button><button class="btn" onclick="exportJSON()">⬇ Fichier complet pour les agents</button></div></div>
+  <div class="card"><h3>Demandes prêtes à copier</h3>${AGENT_PROMPTS.map(([t, p], i) => `<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)"><span class="small"><b>${t}</b><br>${esc(p)}</span><button class="btn sm" onclick="copier(AGENT_PROMPTS[${i}][1]+'\\n\\n'+resumeTexte())">Copier</button></div>`).join('')}</div>`;
+
+/* ----- paramètres ----- */
+VIEWS.parametres = () => {
+  const s = DATA.societe;
+  if (!can()) return `<div class="card"><p>Les paramètres sont réservés au gérant et à la cogérante.</p><h3>Changer mon code PIN</h3>${pinForm()}</div>`;
+  return `<div class="card" style="margin-bottom:12px"><h3>🏢 Informations du cabinet (imprimées sur devis et factures)</h3><div class="f">
+    <div><label>Raison sociale</label><input id="s_nom" value="${esc(s.nom)}"></div><div><label>Sigle</label><input id="s_sig" value="${esc(s.sigle)}"></div>
+    <div><label>Forme</label><input id="s_fo" value="${esc(s.forme)}"></div><div><label>Capital (F)</label><input id="s_ca" inputmode="numeric" value="${esc(s.capital)}"></div>
+    <div><label>RCCM</label><input id="s_rc" value="${esc(s.rccm)}"></div><div><label>N° compte contribuable</label><input id="s_cc" value="${esc(s.cc)}"></div>
+    <div class="full"><label>Adresse</label><input id="s_ad" value="${esc(s.adresse)}"></div>
+    <div><label>Téléphone</label><input id="s_te" value="${esc(s.tel)}"></div><div><label>E-mail</label><input id="s_em" value="${esc(s.email)}"></div>
+    <div><label>Banque</label><input id="s_ba" value="${esc(s.banque)}"></div><div><label>RIB / IBAN</label><input id="s_ri" value="${esc(s.rib)}"></div>
+    <div><label>Taux de TVA (%)</label><input id="s_tv" inputmode="decimal" value="${esc(s.tvaTaux)}"></div>
+    <div><label style="display:flex;gap:8px;align-items:center;margin-top:22px"><input id="s_td" type="checkbox" style="width:auto" ${s.tvaDefaut ? 'checked' : ''}> TVA cochée par défaut</label></div>
+    <div class="full"><label>Mentions en bas des factures (régime fiscal, conditions…)</label><textarea id="s_me">${esc(s.mentions)}</textarea></div></div>
+    <div class="act"><button class="btn p" onclick="saveSociete()">Enregistrer</button></div></div>
+  <div class="grid g2"><div class="card"><h3>🔐 Codes PIN</h3>${pinForm(true)}</div>
+  <div class="card"><h3>☁ Synchronisation</h3><p class="small">État : <span class="pill ${FBST.c}">${esc(FBST.t)}</span><br>Les données sont partagées entre tous les appareils connectés (Firebase, dossier « ${FB_PATH} »), et restent sur l'appareil sans internet.</p>
+    <h3 style="margin-top:14px">💾 Sauvegardes</h3><div class="act" style="justify-content:flex-start"><button class="btn" onclick="exportJSON()">⬇ Sauvegarder (fichier)</button><label class="btn">⬆ Restaurer<input type="file" accept=".json" style="display:none" onchange="importJSON(this.files[0])"></label></div>
+    <h3 style="margin-top:14px">🕘 Journal</h3><div class="small" style="max-height:220px;overflow:auto">${DATA.audit.slice(0, 60).map(a => `<div>${new Date(a.t).toLocaleString('fr-FR')} — ${esc(ROLES[a.u] ? ROLES[a.u].nom : a.u)} : ${esc(a.a)}</div>`).join('') || '<span class="muted">Vide.</span>'}</div></div></div>`;
+};
+function pinForm(all){
+  return `<div class="f"><div><label>Rôle</label><select id="pin_r">${Object.entries(ROLES).filter(([k]) => all || k === SESSION.role).map(([k, r]) => `<option value="${k}">${r.nom}${DATA._pins[k] ? '' : ' (code par défaut !)'}</option>`).join('')}</select></div>
+  <div><label>Nouveau code (4 à 8 chiffres)</label><input id="pin_n" inputmode="numeric" type="password"></div></div><div class="act"><button class="btn p" onclick="savePin()">Changer le code</button></div>`;
+}
+async function savePin(){
+  const r = val('pin_r'), p = val('pin_n'); if (!/^\d{4,8}$/.test(p)) return toast('4 à 8 chiffres');
+  DATA._pins[r] = await sha(r + ':' + p); save('Code PIN modifié (' + ROLES[r].nom + ')'); toast('Code changé'); render();
+}
+function saveSociete(){
+  Object.assign(DATA.societe, { nom: val('s_nom'), sigle: val('s_sig'), forme: val('s_fo'), capital: num(val('s_ca')), rccm: val('s_rc'), cc: val('s_cc'), adresse: val('s_ad'), tel: val('s_te'), email: val('s_em'), banque: val('s_ba'), rib: val('s_ri'), tvaTaux: num(val('s_tv')) || 18, tvaDefaut: $('#s_td').checked, mentions: val('s_me') });
+  save('Informations du cabinet modifiées'); toast('Enregistré'); render();
+}
+
+/* ----- aide ----- */
+VIEWS.aide = () => `<div class="card"><h3>Mode d'emploi en 6 gestes</h3><ol>
+  <li><b>Paramètres</b> : remplissez une fois les informations du cabinet (RCCM, compte contribuable, banque). Changez les codes PIN.</li>
+  <li><b>Trésorerie</b> : saisissez ce qu'il y a aujourd'hui en banque, en caisse et sur mobile.</li>
+  <li><b>Clients</b> : ajoutez vos clients et prospects.</li>
+  <li><b>Devis</b> : créez le devis, imprimez-le en PDF, passez-le à « Envoyé ». Quand le client accepte : <b>→ Facturer</b> (la mission et la facture sont créées).</li>
+  <li><b>Factures</b> : à chaque paiement reçu, <b>+ Encaissement</b>. Les retards s'affichent en rouge ; <b>📲 Relancer</b> envoie un message WhatsApp prêt.</li>
+  <li><b>Dépenses</b> : notez chaque sortie d'argent. Le tableau de bord et les rapports se calculent seuls.</li></ol>
+  <p class="small muted">Codes de départ : Gérant 1234 · Cogérante 5678 · Assistant(e) 0000 — à changer dans Paramètres. L'assistant(e) ne peut ni supprimer ni modifier les paramètres. Les factures ne se suppriment pas : on les annule (numérotation continue).</p>
+  <p class="small muted">Agents IA : menu <b>Agents IA</b> → « Copier la situation du cabinet », puis collez dans Claude.</p></div>`;
+
+/* ----- impression devis / facture ----- */
+function printDoc(type, id){
+  const d = get(type === 'devis' ? 'devis' : 'factures', id); if (!d) return;
+  const s = DATA.societe, c = cli(d.clientId), t = totaux(d), isF = type === 'facture';
+  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>${esc(d.num)}</title><style>
+  @page{size:A4;margin:16mm}body{font:12.5px/1.45 Arial,Helvetica,sans-serif;color:#16202e;margin:0}
+  .hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #14213a;padding-bottom:12px}
+  .lg{display:flex;gap:10px;align-items:center}.lg .m{width:52px;height:52px;border-radius:10px;background:#c9962a;color:#14213a;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px}
+  h1{font-size:22px;margin:0;color:#14213a;letter-spacing:1px}.box{border:1px solid #d7dbe3;border-radius:8px;padding:10px 12px}
+  table{width:100%;border-collapse:collapse;margin-top:14px}th{background:#14213a;color:#fff;text-align:left;padding:7px 8px;font-size:11.5px}td{padding:7px 8px;border-bottom:1px solid #e3e6ec}.n{text-align:right;white-space:nowrap}
+  .tot{margin-left:auto;width:270px;margin-top:10px}.tot div{display:flex;justify-content:space-between;padding:3px 0}.tot .g{font-weight:800;font-size:15px;border-top:2px solid #14213a;padding-top:6px}
+  .ft{margin-top:26px;border-top:1px solid #d7dbe3;padding-top:8px;font-size:10.5px;color:#555;text-align:center}.sig{display:flex;justify-content:space-between;margin-top:34px}
+  </style></head><body>
+  <div class="hd"><div class="lg"><div class="m">${esc(s.sigle || 'IGC')}</div><div><b style="font-size:15px">${esc(s.nom)}</b><br>${esc(s.forme)} au capital de ${F(s.capital)} F CFA<br>${esc(s.adresse)}<br>${esc(s.tel)} ${s.email ? '· ' + esc(s.email) : ''}</div></div>
+    <div style="text-align:right"><h1>${isF ? 'FACTURE' : 'DEVIS'}</h1><b>N° ${esc(d.num)}</b><br>Date : ${dfr(d.date)}${isF && d.echeance ? '<br>Échéance : ' + dfr(d.echeance) : ''}${!isF ? '<br>Valable ' + (d.validite || 30) + ' jours' : ''}</div></div>
+  <div style="display:flex;gap:14px;margin-top:14px"><div class="box" style="flex:1"><span style="color:#667085;font-size:11px">OBJET</span><br><b>${esc(d.objet)}</b></div>
+    <div class="box" style="flex:1"><span style="color:#667085;font-size:11px">${isF ? 'FACTURÉ À' : 'CLIENT'}</span><br><b>${esc(c.nom)}</b>${c.contact ? '<br>À l\'attention de ' + esc(c.contact) : ''}${c.adresse ? '<br>' + esc(c.adresse) : ''}${c.cc ? '<br>CC : ' + esc(c.cc) : ''}</div></div>
+  <table><thead><tr><th>Désignation</th><th class="n">Qté</th><th class="n">Prix unitaire</th><th class="n">Montant</th></tr></thead><tbody>
+  ${d.lignes.map(l => `<tr><td>${esc(l.d)}</td><td class="n">${l.q}</td><td class="n">${F(l.pu)}</td><td class="n">${F(num(l.q) * num(l.pu))}</td></tr>`).join('')}</tbody></table>
+  <div class="tot"><div><span>Total HT</span><b>${F(t.ht)} F</b></div>${t.remise ? `<div><span>Remise</span><b>− ${F(t.remise)} F</b></div><div><span>Net HT</span><b>${F(t.base)} F</b></div>` : ''}${t.tva ? `<div><span>TVA ${s.tvaTaux} %</span><b>${F(t.tva)} F</b></div>` : ''}<div class="g"><span>Total ${t.tva ? 'TTC' : ''}</span><span>${F(t.ttc)} F CFA</span></div></div>
+  <p>Arrêté${isF ? 'e' : ''} ${isF ? 'la présente facture' : 'le présent devis'} à la somme de : <b>${enLettres(t.ttc)} francs CFA</b>${t.tva ? ' TTC' : ''}.</p>
+  ${d.notes ? `<p style="white-space:pre-wrap">${esc(d.notes)}</p>` : ''}
+  ${isF && (s.banque || s.rib) ? `<div class="box" style="margin-top:8px"><b>Règlement par virement</b> : ${esc(s.banque)} — ${esc(s.rib)}</div>` : ''}
+  <div class="sig"><div>${!isF ? 'Bon pour accord (client)<br>Date, cachet et signature' : ''}</div><div style="text-align:center">La Gérance<br><br><br>________________</div></div>
+  <div class="ft">${esc(s.nom)} — ${esc(s.forme)} au capital de ${F(s.capital)} F CFA${s.rccm ? ' — RCCM ' + esc(s.rccm) : ''}${s.cc ? ' — CC ' + esc(s.cc) : ''}${s.mentions ? '<br>' + esc(s.mentions) : ''}</div>
+  </body></html>`;
+  if (window.AndroidBridge && AndroidBridge.printHtml){ AndroidBridge.printHtml(html, d.num); return; }
+  const w = window.open('', '_blank');
+  if (!w){ toast('Autorisez les fenêtres pour imprimer'); return; }
+  w.document.write(html); w.document.close(); setTimeout(() => { w.focus(); w.print(); }, 400);
+}
+
+/* ----- exports ----- */
+function saveFile(name, mime, text){
+  if (window.AndroidBridge && AndroidBridge.saveFile){ AndroidBridge.saveFile(name, mime, btoa(unescape(encodeURIComponent(text)))); return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: mime })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+function exportCSV(kind){
+  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  let rows;
+  if (kind === 'factures') rows = [['Numéro','Date','Échéance','Client','Objet','HT','TVA','TTC','Encaissé','Reste','État'], ...DATA.factures.map(f => { const t = totaux(f), e = etatF(f); return [f.num, dfr(f.date), dfr(f.echeance), cli(f.clientId).nom, f.objet, t.base, t.tva, t.ttc, payeF(f), e.reste || 0, e.t]; })];
+  else if (kind === 'paiements') rows = [['Date','Facture','Client','Mode','Référence','Montant'], ...DATA.paiements.map(p => { const f = get('factures', p.factureId) || {}; return [dfr(p.date), f.num, cli(f.clientId).nom, p.mode, p.ref, p.montant]; })];
+  else rows = [['Date','Catégorie','Description','Fournisseur','Mode','Montant'], ...DATA.depenses.map(d => [dfr(d.date), d.cat, d.desc, d.fournisseur, d.mode, d.montant])];
+  saveFile(`IGC_${kind}_${today()}.csv`, 'text/csv', '﻿' + rows.map(r => r.map(q).join(';')).join('\r\n'));
+  toast('Fichier Excel prêt');
+}
+function exportJSON(){ saveFile(`IGC_sauvegarde_${today()}.json`, 'application/json', JSON.stringify(DATA, null, 1)); toast('Sauvegarde téléchargée'); }
+function importJSON(file){
+  if (!file) return;
+  const r = new FileReader();
+  r.onload = () => { try { const d = JSON.parse(r.result); if (!d.societe) throw 0; if (!confirm('Fusionner cette sauvegarde avec les données actuelles ?')) return; mergeData(d); save('Restauration d\'une sauvegarde'); toast('Sauvegarde restaurée'); render(); } catch(e){ toast('Fichier invalide'); } };
+  r.readAsText(file);
+}
+
+/* ---------- démarrage ---------- */
+render();
+fbInit();
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
