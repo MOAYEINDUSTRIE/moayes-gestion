@@ -88,7 +88,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  END — Dons des volontaires  ===================== */
-const VERSION = 'V1.3';
+const VERSION = 'V1.4';
 const ADMIN_EMAIL = 'moayepos@gmail.com';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -101,6 +101,7 @@ const PERM = {
   suppr:   ['admin','tresorier'],
   journal: ['admin','cac'],
   users:   ['admin'],
+  caisse:  ['admin','tresorier'],
   aide:    ['admin','tresorier','cac'],
 };
 const can = p => !!(ME && PERM[p].includes(ME.role));
@@ -140,7 +141,7 @@ function enLettres(n){
 
 /* ---------- état ---------- */
 let AUTH = null, ME = null, DB = null, LISTENERS = [];
-const S = { membres:{}, prive:{}, groupes:{}, dons:{}, journal:[], users:{}, ready:{} };
+const S = { membres:{}, prive:{}, groupes:{}, dons:{}, journal:[], users:{}, decs:{}, decPrive:{}, transferts:{}, treso:{}, ready:{} };
 let VIEW = 'tableau', ARG = null, ONLINE = true;
 const nomDe = code => { const p = S.prive[code]; return p ? [p.nom, p.prenoms].filter(Boolean).join(' ') : ''; };
 const libMembre = code => can('noms') && nomDe(code) ? `<span class="code">${esc(code)}</span> — ${esc(nomDe(code))}` : `<span class="code">${esc(code)}</span>`;
@@ -185,11 +186,15 @@ function listen(path, fn, q){
   const cb = r.on('value', s => { fn(s.val()); S.ready[path] = true; scheduleRender(); }, e => console.warn(path, e));
   LISTENERS.push(() => r.off('value', cb));
 }
-function stopListeners(){ LISTENERS.forEach(f => { try { f(); } catch(e){} }); LISTENERS = []; for (const k of ['membres','prive','groupes','dons','users']) S[k] = {}; S.journal = []; S.ready = {}; }
+function stopListeners(){ LISTENERS.forEach(f => { try { f(); } catch(e){} }); LISTENERS = []; for (const k of ['membres','prive','groupes','dons','users','decs','decPrive','transferts','treso']) S[k] = {}; S.journal = []; S.ready = {}; }
 function startListeners(){
   listen('membres', v => S.membres = v || {});
   listen('groupes', v => S.groupes = v || {});
   listen('dons', v => S.dons = v || {});
+  listen('decaissements', v => S.decs = v || {});
+  listen('transferts', v => S.transferts = v || {});
+  listen('tresorerie', v => S.treso = v || {});
+  if (can('noms')) listen('decPrive', v => S.decPrive = v || {});
   if (can('noms')) listen('prive', v => S.prive = v || {});
   if (can('journal')) listen('journal', v => S.journal = vals(v).sort((a, b) => b.t - a.t), r => r.orderByChild('t').limitToLast(1500));
   if (can('users')) listen('roles', v => S.users = v || {});
@@ -232,7 +237,7 @@ async function creerAdmin(){
 
 /* ---------- navigation ---------- */
 const MENU = () => [
-  ['Suivi', [['tableau','📊','Tableau de bord'],['dons','💝','Dons'],['rapports','📈','Rapports']]],
+  ['Suivi', [['tableau','📊','Tableau de bord'],['dons','💝','Dons'],['tresorerie','🏦','Caisse & trésorerie'],['decaissements','💸','Décaissements'],['rapports','📈','Rapports']]],
   ['Registre', [['membres','👥','Membres'],['groupes','🏘','Groupes']]],
   ['Contrôle', [...(can('journal') ? [['journal','🕘','Journal']] : []), ...(can('users') ? [['utilisateurs','🔐','Utilisateurs']] : []), ['compte','👤','Mon compte'], ...(can('aide') ? [['aide','❓','Mode d\'emploi']] : [])]],
 ];
@@ -304,6 +309,10 @@ VIEWS.tableau = () => {
     <div class="card kpi"><div class="l">Groupes contributeurs</div><div class="v">${G.length}</div><div class="s">sur ${Object.keys(S.groupes).length} groupe(s)</div></div>
     <div class="card kpi"><div class="l">Don moyen</div><div class="v">${FCFA(L.length ? tot / L.length : 0)}</div></div>
   </div>
+  <div class="grid g3" style="margin-bottom:12px">${(() => { const D = decsFiltres(), dt = D.reduce((s, x) => s + num(x.montant), 0), T = soldes(); return `
+    <div class="card kpi"><div class="l">Décaissé${FL.d1 || FL.d2 ? ' (période)' : ''}</div><div class="v" style="color:var(--ko)">${FCFA(dt)}</div><div class="s">${D.length} décaissement(s)</div></div>
+    <div class="card kpi"><div class="l">Dons − décaissements</div><div class="v">${FCFA(tot - dt)}</div></div>
+    <div class="card kpi dark" style="cursor:pointer" onclick="go('tresorerie')"><div class="l">Solde de trésorerie (aujourd'hui)</div><div class="v">${FCFA(T.total)}</div><div class="s">${Object.entries(COMPTES).filter(([k]) => T[k]).map(([k, n]) => n.split(' ')[0] + ' ' + F(T[k])).join(' · ') || 'Voir Caisse & trésorerie'}</div></div>`; })()}</div>
   <div class="card"><h3>Classement des groupes</h3>${tbl([['#'],['Groupe'],['Pays'],['Cotisants','n'],['Total','n'],['Part']], G.map((g, i) => `<tr class="click" onclick="go('groupe','${esc(g.id)}')"><td>${i + 1}</td><td><b>${esc(groupeDe(g.id).nom)}</b></td><td>${esc(groupeDe(g.id).pays || '')}</td><td class="n">${g.codes.size}</td><td class="n b">${FCFA(g.total)}</td><td><div class="hbar"><i style="width:${g.total / max * 100}%"></i></div><span class="small muted">${tot ? Math.round(g.total / tot * 100) : 0} %</span></td></tr>`), 'Aucun don sur la période.')}</div>
   <div class="card"><h3>Derniers dons</h3>${tbl([['Date'],['Reçu'],['Membre'],['Groupe'],['Montant','n']], L.sort((a, b) => (b.date + b.recu).localeCompare(a.date + a.recu)).slice(0, 10).map(d => `<tr class="click" onclick="ficheDon('${d.id}')"><td>${dfr(d.date)}</td><td>${esc(d.recu)}</td><td>${libMembre(d.code)}</td><td>${esc(groupeDe(d.groupe).nom)}</td><td class="n b">${FCFA(d.fcfa)}</td></tr>`), 'Aucun don.')}
   ${can('saisie') ? '<div class="act"><button class="btn g" onclick="editDon()">+ Nouveau don</button></div>' : ''}</div>`;
@@ -343,7 +352,8 @@ function editDon(id){
     <div><label>Devise</label><select id="d_dev" onchange="majTaux()">${opts(Object.entries(DEVISES).map(([k, v]) => [k, k + ' — ' + v[0]]), d.devise)}</select></div>
     <div><label>Taux (1 unité = … F CFA)</label><input id="d_tx" inputmode="decimal" value="${esc(d.taux ?? 1)}" oninput="majFcfa()"></div>
     <div><label>Montant en FCFA</label><input id="d_fcfa" readonly value="${esc(d.fcfa ? F(d.fcfa) : '')}"></div>
-    <div><label>Mode de paiement</label><select id="d_mode">${opts(MODES, d.mode)}</select></div>
+    <div><label>Mode de paiement</label><select id="d_mode" onchange="$('#d_cpt').value=compteParMode(this.value)">${opts(MODES, d.mode)}</select></div>
+    <div><label>Encaissé sur le compte</label><select id="d_cpt">${opts(Object.entries(COMPTES), compteDon(d))}</select></div>
     <div><label>Référence de la transaction</label><input id="d_ref" value="${esc(d.ref || '')}"></div>
     <div class="full"><label>Objet / campagne</label><input id="d_obj" list="camps" value="${esc(d.objet || '')}" placeholder="ex. Cotisation annuelle 2026"><datalist id="camps">${campagnes().map(c => `<option value="${esc(c)}">`).join('')}</datalist></div></div>
     <div class="act"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" id="d_ok" onclick="saveDon('${id || ''}')">Enregistrer</button></div>`);
@@ -356,7 +366,7 @@ function majGroupe(){ const m = S.membres[val('d_code')]; $('#d_grp').value = m 
 async function saveDon(id){
   const code = val('d_code'), m = S.membres[code], montant = num(val('d_mt')), taux = num(val('d_tx')), dev = val('d_dev');
   if (!m) return toast('Choisissez le membre'); if (montant <= 0) return toast('Montant invalide'); if (taux <= 0) return toast('Indiquez le taux de conversion');
-  const champs = { code, groupe: m.groupe || '', date: val('d_date') || today(), montant, devise: dev, taux, fcfa: Math.round(montant * taux), mode: val('d_mode'), ref: val('d_ref'), objet: val('d_obj') };
+  const champs = { code, groupe: m.groupe || '', date: val('d_date') || today(), montant, devise: dev, taux, fcfa: Math.round(montant * taux), mode: val('d_mode'), compte: val('d_cpt') || compteParMode(val('d_mode')), ref: val('d_ref'), objet: val('d_obj') };
   $('#d_ok').disabled = true;
   try {
     if (id){
@@ -380,6 +390,155 @@ async function confSuppr(id){
   const motif = val('s_m'); if (motif.length < 5) return toast('Motif obligatoire (5 caractères min.)');
   const avant = S.dons[id], apres = Object.assign({}, avant, { supprime: true, motif, supprPar: AUTH.uid, supprNom: ME.nom, supprLe: Date.now() });
   try { await ref('dons/' + id).set(apres); journal('Suppression d\'un don', 'don ' + avant.recu, avant, apres); closeModal(); toast('Don supprimé'); } catch(e){ toast('Refusé : ' + (e.code || e.message)); }
+}
+
+/* ----- caisse & trésorerie ----- */
+const COMPTES = { caisse:'Caisse (espèces)', banque:'Banque', wave:'Wave', orange:'Orange Money', mtn:'MTN Mobile Money', moov:'Moov Money' };
+const CAT_DEC = ['Fonctionnement','Activités et événements','Aide sociale','Transport et missions','Communication','Matériel et fournitures','Loyer et charges','Frais bancaires et de transfert','Honoraires et prestations','Autre'];
+function compteParMode(m){ return ({ 'Wave':'wave', 'Orange Money':'orange', 'MTN Mobile Money':'mtn', 'Moov Money':'moov', 'Virement bancaire':'banque', 'Chèque':'banque' })[m] || 'caisse'; }
+const compteDon = d => d.compte || compteParMode(d.mode);
+const decsActifs = () => vals(S.decs).filter(x => !x.supprime);
+const decsFiltres = () => decsActifs().filter(x => (!FL.d1 || x.date >= FL.d1) && (!FL.d2 || x.date <= FL.d2) && (!FL.camp || x.objet === FL.camp));
+const benefDe = id => (S.decPrive[id] || {}).beneficiaire || '';
+function mouvements(){
+  const t = S.treso || {}, deb = t.debut || '0000-00-00', L = [];
+  donsActifs().filter(d => d.date >= deb).forEach(d => L.push({ date: d.date, cpt: compteDon(d), m: num(d.fcfa), lib: 'Don ' + d.recu + ' — ' + d.code, ref: d.recu, type: 'don', id: d.id, t: d.cree || 0 }));
+  decsActifs().filter(x => x.date >= deb).forEach(x => L.push({ date: x.date, cpt: x.compte, m: -num(x.montant), lib: 'Décaissement ' + x.num + ' — ' + (x.categorie || '') + (x.objet ? ' — ' + x.objet : ''), ref: x.num, type: 'dec', id: x.id, t: x.cree || 0 }));
+  vals(S.transferts).filter(x => !x.supprime && x.date >= deb).forEach(x => { L.push({ date: x.date, cpt: x.de, m: -num(x.montant), lib: 'Transfert ' + x.num + ' vers ' + COMPTES[x.vers], ref: x.num, type: 'tr', id: x.id, t: x.cree || 0 }); L.push({ date: x.date, cpt: x.vers, m: num(x.montant), lib: 'Transfert ' + x.num + ' depuis ' + COMPTES[x.de], ref: x.num, type: 'tr', id: x.id, t: (x.cree || 0) + 1 }); });
+  return L.sort((a, b) => a.date.localeCompare(b.date) || a.t - b.t || a.ref.localeCompare(b.ref));
+}
+function soldes(){
+  const t = S.treso || {}, r = { total: 0 };
+  for (const k in COMPTES) r[k] = num((t.soldes || {})[k]);
+  mouvements().forEach(x => r[x.cpt] = (r[x.cpt] || 0) + x.m);
+  for (const k in COMPTES) r.total += r[k];
+  return r;
+}
+let TC = '';
+VIEWS.tresorerie = () => {
+  const T = soldes(), t = S.treso || {};
+  let L = mouvements(); if (TC) L = L.filter(x => x.cpt === TC);
+  const init = TC ? num((t.soldes || {})[TC]) : Object.keys(COMPTES).reduce((s, k) => s + num((t.soldes || {})[k]), 0);
+  let run = init; const rows = L.map(x => { run += x.m; return { ...x, run }; }).filter(x => (!FL.d1 || x.date >= FL.d1) && (!FL.d2 || x.date <= FL.d2)).reverse();
+  return `${!t.debut ? `<div class="alert w">Indiquez d'abord les <b>soldes de départ</b> de chaque compte (ce qu'il y avait réellement en caisse, en banque, sur Wave… à une date).${can('caisse') ? ' <a href="#" onclick="editSoldes();return false">Saisir les soldes de départ</a>' : ' Le trésorier général doit les saisir.'}</div>` : ''}
+  <div class="bar no-print">${can('caisse') ? '<button class="btn g" onclick="editDec()">+ Décaissement</button><button class="btn" onclick="editTransfert()">⇄ Transfert entre comptes</button><button class="btn" onclick="editSoldes()">⚙ Soldes de départ</button>' : ''}<span class="grow"></span><button class="btn" onclick="exportCaisse()">⬇ Excel</button><button class="btn" onclick="print()">🖨 Imprimer</button></div>
+  <div class="grid g4" style="margin-bottom:12px"><div class="card kpi dark" style="cursor:pointer" onclick="TC='';render()"><div class="l">Total trésorerie</div><div class="v">${FCFA(T.total)}</div><div class="s">${t.debut ? 'depuis le ' + dfr(t.debut) : 'soldes de départ non saisis'}</div></div>
+  ${Object.entries(COMPTES).map(([k, n]) => `<div class="card kpi" style="cursor:pointer;${TC === k ? 'outline:2px solid var(--gold)' : ''}" onclick="TC=TC==='${k}'?'':'${k}';render()"><div class="l">${n}</div><div class="v" style="${T[k] < 0 ? 'color:var(--ko)' : ''}">${FCFA(T[k])}</div></div>`).join('')}</div>
+  ${filtresHTML()}
+  <div class="card"><h3>Livre de ${TC ? esc(COMPTES[TC]) : 'trésorerie (tous comptes)'}</h3>${tbl([['Date'],['Compte'],['Libellé'],['Entrée','n'],['Sortie','n'],['Solde','n']], rows.slice(0, 400).map(x => `<tr class="click" onclick="${x.type === 'don' ? `ficheDon('${x.id}')` : x.type === 'dec' ? `ficheDec('${x.id}')` : `ficheTr('${x.id}')`}"><td>${dfr(x.date)}</td><td>${esc(COMPTES[x.cpt] || x.cpt)}</td><td>${esc(x.lib)}${x.type === 'dec' && can('noms') && benefDe(x.id) ? '<br><span class="small muted">' + esc(benefDe(x.id)) + '</span>' : ''}</td><td class="n" style="color:var(--ok)">${x.m > 0 ? F(x.m) : ''}</td><td class="n" style="color:var(--ko)">${x.m < 0 ? F(-x.m) : ''}</td><td class="n b">${F(x.run)}</td></tr>`), 'Aucun mouvement.')}
+  <p class="small muted">Solde de départ ${TC ? 'du compte' : 'total'} : ${FCFA(init)}${t.debut ? ' au ' + dfr(t.debut) : ''}. Les dons sont comptés sur le compte choisi à la saisie (Wave → Wave, espèces → Caisse…).</p></div>`;
+};
+function editSoldes(){
+  const t = S.treso || {}, so = t.soldes || {};
+  modal(`<h2>Soldes de départ</h2><p class="small">Ce qu'il y avait réellement sur chaque compte à la date indiquée. Seuls les dons et décaissements à partir de cette date sont comptés dans la trésorerie.</p><div class="f">
+    <div class="full"><label>Date des soldes</label><input id="t_deb" type="date" value="${t.debut || today()}"></div>
+    ${Object.entries(COMPTES).map(([k, n]) => `<div><label>${n} (F CFA)</label><input id="t_${k}" inputmode="numeric" value="${num(so[k]) || ''}"></div>`).join('')}</div>
+    <div class="act"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" onclick="saveSoldes()">Enregistrer</button></div>`);
+}
+async function saveSoldes(){
+  const avant = S.treso || null, apres = { debut: val('t_deb') || today(), soldes: Object.fromEntries(Object.keys(COMPTES).map(k => [k, num(val('t_' + k))])), u: Date.now(), par: ME.nom };
+  try { await ref('tresorerie').set(apres); journal('Soldes de départ de la trésorerie', 'trésorerie', avant, apres); closeModal(); toast('Soldes enregistrés'); } catch(e){ toast('Refusé : ' + (e.code || e.message)); }
+}
+/* ----- décaissements ----- */
+VIEWS.decaissements = () => {
+  let L = DSUP ? vals(S.decs).filter(x => x.supprime) : decsFiltres();
+  L = L.sort((a, b) => (b.date + b.num).localeCompare(a.date + a.num));
+  const tot = L.filter(x => !x.supprime).reduce((s, x) => s + num(x.montant), 0), pc = {};
+  L.filter(x => !x.supprime).forEach(x => pc[x.categorie || 'Autre'] = (pc[x.categorie || 'Autre'] || 0) + num(x.montant));
+  return `${filtresHTML()}<div class="bar"><label class="small"><input type="checkbox" ${DSUP ? 'checked' : ''} onchange="DSUP=this.checked;render()"> Décaissements supprimés</label><span class="grow"></span><button class="btn" onclick="exportDecs()">⬇ Excel</button>${can('caisse') ? '<button class="btn g" onclick="editDec()">+ Décaissement</button>' : ''}</div>
+  <div class="grid g2" style="margin-bottom:12px"><div class="card kpi dark"><div class="l">Total décaissé</div><div class="v">${FCFA(tot)}</div><div class="s">${L.length} pièce(s)</div></div><div class="card">${Object.entries(pc).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div class="small" style="display:flex;justify-content:space-between"><span>${esc(k)}</span><b>${FCFA(v)}</b></div>`).join('') || '<span class="small muted">Aucun décaissement.</span>'}</div></div>
+  <div class="card">${tbl([['Date'],['N°'],['Catégorie'],['Objet'], ...(can('noms') ? [['Bénéficiaire']] : []), ['Compte'],['Montant','n']], L.map(x => `<tr class="click ${x.supprime ? 'del' : ''}" onclick="ficheDec('${x.id}')"><td>${dfr(x.date)}</td><td>${esc(x.num)}</td><td>${esc(x.categorie)}</td><td>${esc(x.objet || '')}</td>${can('noms') ? `<td>${esc(benefDe(x.id))}</td>` : ''}<td>${esc(COMPTES[x.compte] || x.compte)}</td><td class="n b">${FCFA(x.montant)}</td></tr>`), 'Aucun décaissement.')}</div>`;
+};
+function ficheDec(id){
+  const x = S.decs[id]; if (!x) return; const p = S.decPrive[id] || {};
+  modal(`<h2>Décaissement ${esc(x.num)} ${x.supprime ? '<span class="tag r">Supprimé</span>' : ''}</h2>
+  <table>${[['Date', dfr(x.date)], ['Montant', '<b>' + FCFA(x.montant) + '</b>'], ['Payé depuis', esc(COMPTES[x.compte] || x.compte)], ['Catégorie', esc(x.categorie)], ['Objet', esc(x.objet || '')], ...(can('noms') ? [['Bénéficiaire', esc(p.beneficiaire || '') + (p.contact ? ' — ' + esc(p.contact) : '')]] : []), ['Pièce justificative', esc(x.piece || '—')], ['Saisi par', esc(x.saisiNom || '') + ' — ' + dtfr(x.cree)], ...(x.modifNom ? [['Dernière modification', esc(x.modifNom) + ' — ' + dtfr(x.modifie)]] : []), ...(x.supprime ? [['Supprimé par', esc(x.supprNom) + ' — ' + dtfr(x.supprLe)], ['Motif', esc(x.motif)]] : [])].map(([a, b]) => `<tr><td class="muted small">${a}</td><td>${b}</td></tr>`).join('')}</table>
+  <div class="act">${can('noms') ? `<button class="btn" onclick="bonDec('${id}')">🖨 Bon de décaissement</button>` : ''}${!x.supprime && can('caisse') ? `<button class="btn d" onclick="supprMvt('decaissements','${id}')">Supprimer</button><button class="btn p" onclick="editDec('${id}')">Modifier</button>` : ''}<button class="btn" onclick="closeModal()">Fermer</button></div>`);
+}
+function editDec(id){
+  const x = id ? S.decs[id] : { date: today(), compte: 'caisse', categorie: 'Fonctionnement' }, p = id ? (S.decPrive[id] || {}) : {}, T = soldes();
+  modal(`<h2>${id ? 'Modifier le décaissement ' + esc(x.num) : 'Nouveau décaissement'}</h2><div class="f">
+    <div><label>Montant (F CFA) *</label><input id="x_mt" inputmode="numeric" value="${esc(x.montant || '')}"></div>
+    <div><label>Date *</label><input id="x_date" type="date" value="${x.date}"></div>
+    <div><label>Payé depuis le compte *</label><select id="x_cpt">${opts(Object.entries(COMPTES).map(([k, n]) => [k, n + ' — solde ' + F(T[k])]), x.compte)}</select></div>
+    <div><label>Catégorie *</label><select id="x_cat">${opts(CAT_DEC, x.categorie)}</select></div>
+    <div class="full"><label>Objet *</label><input id="x_obj" list="camps" value="${esc(x.objet || '')}" placeholder="ex. Location de salle — séminaire de novembre"><datalist id="camps">${campagnes().map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
+    <div><label>Bénéficiaire</label><input id="x_ben" value="${esc(p.beneficiaire || '')}"></div><div><label>Contact du bénéficiaire</label><input id="x_con" value="${esc(p.contact || '')}"></div>
+    <div class="full"><label>Pièce justificative (n° facture, reçu, référence de transfert)</label><input id="x_piece" value="${esc(x.piece || '')}"></div></div>
+    <div class="act"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" id="x_ok" onclick="saveDec('${id || ''}')">Enregistrer</button></div>`);
+}
+async function saveDec(id){
+  const montant = Math.round(num(val('x_mt'))), objet = val('x_obj'), compte = val('x_cpt');
+  if (montant <= 0) return toast('Montant invalide'); if (!objet) return toast('Indiquez l\'objet');
+  const T = soldes(), dispo = T[compte] + (id && S.decs[id].compte === compte ? num(S.decs[id].montant) : 0);
+  if (montant > dispo && !confirm('Ce montant dépasse le solde de ' + COMPTES[compte] + ' (' + FCFA(dispo) + '). Enregistrer quand même ?')) return;
+  const champs = { montant, date: val('x_date') || today(), compte, categorie: val('x_cat'), objet, piece: val('x_piece') }, priv = { beneficiaire: val('x_ben'), contact: val('x_con') };
+  $('#x_ok').disabled = true;
+  try {
+    if (id){
+      const avant = { ...S.decs[id], ...(S.decPrive[id] || {}) }, apres = Object.assign({}, S.decs[id], champs, { modifie: Date.now(), modifPar: AUTH.uid, modifNom: ME.nom });
+      await ref('decPrive/' + id).set(priv); await ref('decaissements/' + id).set(apres); journal('Modification d\'un décaissement', 'décaissement ' + apres.num, avant, { ...apres, ...priv });
+    } else {
+      const n = await compteur('decaissement'), k = ref('decaissements').push().key;
+      const d = Object.assign({ id: k, num: 'DC-' + String(n).padStart(5, '0'), cree: Date.now(), saisiPar: AUTH.uid, saisiNom: ME.nom }, champs);
+      await ref('decPrive/' + k).set(priv); await ref('decaissements/' + k).set(d); journal('Décaissement', 'décaissement ' + d.num, null, { ...d, ...priv });
+      toast('Décaissement ' + d.num + ' : ' + FCFA(montant));
+    }
+    closeModal();
+  } catch(e){ $('#x_ok').disabled = false; toast('Refusé : ' + (e.code || e.message)); }
+}
+function editTransfert(){
+  const T = soldes();
+  modal(`<h2>Transfert entre comptes</h2><p class="small">Ex. retrait Wave vers la caisse, dépôt de la caisse en banque. Le total de la trésorerie ne change pas.</p><div class="f">
+    <div><label>Depuis *</label><select id="tr_de">${opts(Object.entries(COMPTES).map(([k, n]) => [k, n + ' — ' + F(T[k])]), 'wave')}</select></div>
+    <div><label>Vers *</label><select id="tr_vers">${opts(Object.entries(COMPTES).map(([k, n]) => [k, n]), 'caisse')}</select></div>
+    <div><label>Montant (F CFA) *</label><input id="tr_mt" inputmode="numeric"></div><div><label>Date</label><input id="tr_date" type="date" value="${today()}"></div>
+    <div class="full"><label>Objet / référence</label><input id="tr_obj" placeholder="ex. Retrait Wave pour dépenses du séminaire"></div></div>
+    <div class="small muted">Frais de retrait ou de transfert : enregistrez-les à part comme décaissement « Frais bancaires et de transfert ».</div>
+    <div class="act"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" id="tr_ok" onclick="saveTransfert()">Enregistrer</button></div>`);
+}
+async function saveTransfert(){
+  const de = val('tr_de'), vers = val('tr_vers'), montant = Math.round(num(val('tr_mt')));
+  if (de === vers) return toast('Choisissez deux comptes différents'); if (montant <= 0) return toast('Montant invalide');
+  $('#tr_ok').disabled = true;
+  try { const n = await compteur('transfert'), k = ref('transferts').push().key, t = { id: k, num: 'TR-' + String(n).padStart(5, '0'), de, vers, montant, date: val('tr_date') || today(), objet: val('tr_obj'), cree: Date.now(), saisiPar: AUTH.uid, saisiNom: ME.nom };
+    await ref('transferts/' + k).set(t); journal('Transfert entre comptes', t.num + ' : ' + COMPTES[de] + ' → ' + COMPTES[vers], null, t); closeModal(); toast('Transfert ' + t.num + ' enregistré'); }
+  catch(e){ $('#tr_ok').disabled = false; toast('Refusé : ' + (e.code || e.message)); }
+}
+function ficheTr(id){
+  const x = S.transferts[id]; if (!x) return;
+  modal(`<h2>Transfert ${esc(x.num)} ${x.supprime ? '<span class="tag r">Supprimé</span>' : ''}</h2><table>${[['Date', dfr(x.date)], ['De', esc(COMPTES[x.de])], ['Vers', esc(COMPTES[x.vers])], ['Montant', '<b>' + FCFA(x.montant) + '</b>'], ['Objet', esc(x.objet || '')], ['Saisi par', esc(x.saisiNom) + ' — ' + dtfr(x.cree)], ...(x.supprime ? [['Motif de suppression', esc(x.motif)]] : [])].map(([a, b]) => `<tr><td class="muted small">${a}</td><td>${b}</td></tr>`).join('')}</table>
+  <div class="act">${!x.supprime && can('caisse') ? `<button class="btn d" onclick="supprMvt('transferts','${id}')">Supprimer</button>` : ''}<button class="btn" onclick="closeModal()">Fermer</button></div>`);
+}
+function supprMvt(col, id){
+  const x = (col === 'decaissements' ? S.decs : S.transferts)[id];
+  modal(`<h2>Supprimer ${esc(x.num)}</h2><p class="small">Le mouvement sort des soldes mais reste visible (barré) et dans le journal.</p><div class="f"><div class="full"><label>Motif obligatoire *</label><textarea id="s_m"></textarea></div></div>
+  <div class="act"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn d" onclick="confSupprMvt('${col}','${id}')">Supprimer</button></div>`);
+}
+async function confSupprMvt(col, id){
+  const motif = val('s_m'); if (motif.length < 5) return toast('Motif obligatoire (5 caractères min.)');
+  const avant = (col === 'decaissements' ? S.decs : S.transferts)[id], apres = Object.assign({}, avant, { supprime: true, motif, supprPar: AUTH.uid, supprNom: ME.nom, supprLe: Date.now() });
+  try { await ref(col + '/' + id).set(apres); journal('Suppression ' + (col === 'decaissements' ? 'd\'un décaissement' : 'd\'un transfert'), avant.num, avant, apres); closeModal(); toast('Supprimé'); } catch(e){ toast('Refusé : ' + (e.code || e.message)); }
+}
+function bonDec(id){
+  const x = S.decs[id], p = S.decPrive[id] || {};
+  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Bon ${esc(x.num)}</title><style>@page{size:A5;margin:12mm}body{font:12.5px/1.5 Arial,sans-serif;color:#141c2e;margin:0}.hd{display:flex;gap:12px;align-items:center;border-bottom:3px solid #1b2a4a;padding-bottom:10px}.lg{width:50px;height:50px;border-radius:50%;background:#b8893a;color:#1b2a4a;display:flex;align-items:center;justify-content:center;font-weight:800}h1{font-size:17px;margin:14px 0 6px;color:#1b2a4a}table{width:100%;border-collapse:collapse}td{padding:6px 4px;border-bottom:1px solid #e1e4ec}td:first-child{color:#636b7e;width:40%}.big{font-size:17px;font-weight:800}.sig{display:flex;justify-content:space-between;margin-top:34px;text-align:center}${x.supprime ? '.wm{position:fixed;top:40%;left:10%;font-size:60px;color:rgba(180,35,24,.25);transform:rotate(-25deg)}' : ''}</style></head><body>${x.supprime ? '<div class="wm">ANNULÉ</div>' : ''}
+  <div class="hd"><div class="lg">END</div><div><b style="font-size:15px">École de Navigation Divine</b><br>Trésorerie</div></div><h1>BON DE DÉCAISSEMENT N° ${esc(x.num)}</h1><table>
+  <tr><td>Date</td><td>${dfr(x.date)}</td></tr><tr><td>Montant</td><td class="big">${FCFA(x.montant)}</td></tr><tr><td>En lettres</td><td>${enLettres(x.montant)} francs CFA</td></tr>
+  <tr><td>Bénéficiaire</td><td><b>${esc(p.beneficiaire || '')}</b>${p.contact ? ' — ' + esc(p.contact) : ''}</td></tr><tr><td>Objet</td><td>${esc(x.objet || '')}</td></tr><tr><td>Catégorie</td><td>${esc(x.categorie)}</td></tr>
+  <tr><td>Payé depuis</td><td>${esc(COMPTES[x.compte] || x.compte)}</td></tr><tr><td>Pièce justificative</td><td>${esc(x.piece || '')}</td></tr><tr><td>Établi par</td><td>${esc(x.saisiNom || '')}</td></tr></table>
+  <div class="sig"><div>Le bénéficiaire<br>(signature, « reçu »)</div><div>Le trésorier général<br><br><br>____________</div></div></body></html>`;
+  if (window.AndroidBridge && AndroidBridge.printHtml){ AndroidBridge.printHtml(html, x.num); return; }
+  const w = window.open('', '_blank'); if (!w) return toast('Autorisez les fenêtres pour imprimer');
+  w.document.write(html); w.document.close(); setTimeout(() => { w.focus(); w.print(); }, 400);
+}
+function exportDecs(){
+  const n = can('noms');
+  csv('decaissements', [['N°','Date','Catégorie','Objet', ...(n ? ['Bénéficiaire','Contact'] : []), 'Compte','Montant FCFA','Pièce','Saisi par','Supprimé','Motif'], ...vals(S.decs).sort((a, b) => a.date.localeCompare(b.date)).map(x => [x.num, dfr(x.date), x.categorie, x.objet, ...(n ? [benefDe(x.id), (S.decPrive[x.id] || {}).contact] : []), COMPTES[x.compte], x.montant, x.piece, x.saisiNom, x.supprime ? 'oui' : '', x.motif || ''])]);
+}
+function exportCaisse(){
+  const t = S.treso || {}; let run = Object.keys(COMPTES).reduce((s, k) => s + num((t.soldes || {})[k]), 0);
+  csv('tresorerie', [['Date','Compte','Libellé','Entrée','Sortie','Solde cumulé'], ['', '', 'Soldes de départ' + (t.debut ? ' au ' + dfr(t.debut) : ''), '', '', run], ...mouvements().map(x => { run += x.m; return [dfr(x.date), COMPTES[x.cpt], x.lib, x.m > 0 ? x.m : '', x.m < 0 ? -x.m : '', run]; })]);
 }
 
 /* ----- membres ----- */
@@ -567,7 +726,8 @@ VIEWS.rapports = () => {
     L.forEach(d => { const p = (S.membres[d.code] || {}).pays || '—'; parPays[p] = (parPays[p] || 0) + num(d.fcfa); parMode[d.mode] = (parMode[d.mode] || 0) + num(d.fcfa); parCamp[d.objet || '(sans objet)'] = (parCamp[d.objet || '(sans objet)'] || 0) + num(d.fcfa); parMois[d.date.slice(0, 7)] = (parMois[d.date.slice(0, 7)] || 0) + num(d.fcfa); });
     const bloc = (t, o, sortKey) => `<div class="card"><h3>${t}</h3>${Object.entries(o).sort(sortKey || ((a, b) => b[1] - a[1])).map(([k, v]) => `<div class="small" style="display:flex;justify-content:space-between;gap:8px;padding:3px 0"><span>${esc(k)}</span><b>${FCFA(v)}</b></div>`).join('') || '<span class="muted small">—</span>'}</div>`;
     body = `<div class="grid g4" style="margin-bottom:12px"><div class="card kpi dark"><div class="l">Total général</div><div class="v">${FCFA(tot)}</div></div><div class="card kpi"><div class="l">Dons</div><div class="v">${L.length}</div></div><div class="card kpi"><div class="l">Cotisants</div><div class="v">${new Set(L.map(d => d.code)).size}</div></div><div class="card kpi"><div class="l">Groupes</div><div class="v">${new Set(L.map(d => d.groupe)).size}</div></div></div>
-      <div class="grid g2">${bloc('Par pays', parPays)}${bloc('Par mois', parMois, (a, b) => a[0].localeCompare(b[0]))}${bloc('Par campagne', parCamp)}${bloc('Par mode de paiement', parMode)}</div>`;
+      <div class="grid g2">${bloc('Par pays', parPays)}${bloc('Par mois', parMois, (a, b) => a[0].localeCompare(b[0]))}${bloc('Par campagne', parCamp)}${bloc('Par mode de paiement', parMode)}</div>
+      ${(() => { const D = decsFiltres(), dt = D.reduce((s, x) => s + num(x.montant), 0), pc = {}; D.forEach(x => pc[x.categorie || 'Autre'] = (pc[x.categorie || 'Autre'] || 0) + num(x.montant)); return `<h3 style="margin-top:14px">Recettes et dépenses</h3><div class="grid g3" style="margin-bottom:12px"><div class="card kpi"><div class="l">Dons reçus</div><div class="v">${FCFA(tot)}</div></div><div class="card kpi"><div class="l">Décaissements</div><div class="v" style="color:var(--ko)">${FCFA(dt)}</div></div><div class="card kpi dark"><div class="l">Excédent de la période</div><div class="v">${FCFA(tot - dt)}</div></div></div><div class="grid g2">${bloc('Décaissements par catégorie', pc)}${bloc('Soldes des comptes (aujourd\'hui)', Object.fromEntries(Object.entries(COMPTES).map(([k, n]) => [n, soldes()[k]])), () => 0)}</div>`; })()}`;
   }
   return `${filtresHTML()}<div class="bar no-print">${tabs}<span class="grow"></span><button class="btn" onclick="exportRapport()">⬇ Excel</button><button class="btn" onclick="print()">🖨 Imprimer / PDF</button></div>
   <div class="card"><p class="small muted" style="margin-top:0">Rapport édité le ${dfr(today())} par ${esc(ME.nom)} (${esc(ROLES[ME.role])})${FL.d1 || FL.d2 ? ' — période ' + (dfr(FL.d1) || 'début') + ' → ' + (dfr(FL.d2) || 'aujourd\'hui') : ''}${FL.camp ? ' — campagne « ' + esc(FL.camp) + ' »' : ''}</p>${body}</div>`;
@@ -649,6 +809,7 @@ VIEWS.aide = () => !can('aide') ? '<div class="empty">Accès réservé.</div>' :
   <li><b>Groupes</b> : créez d'abord les groupes (nom, pays ou zone).</li>
   <li><b>Membres</b> : créez chaque volontaire ; son code donateur (D-0001…) est attribué automatiquement et n'est jamais réutilisé.</li>
   <li><b>Dons</b> : « + Nouveau don », choisissez le membre (le groupe se remplit tout seul), le montant et la devise ; le montant en FCFA est calculé avec le taux. Le reçu (R-00001…) est numéroté automatiquement.</li>
+  <li><b>Caisse & trésorerie</b> (trésorier général) : saisir une fois les soldes de départ de chaque compte (caisse, banque, Wave, Orange Money…), puis « + Décaissement » pour chaque sortie d'argent (motif, bénéficiaire, pièce justificative, bon imprimable) et « ⇄ Transfert » pour un retrait ou un dépôt entre comptes. Les dons entrent sur le compte choisi à la saisie.</li>
   <li><b>Tableau de bord et Rapports</b> : totaux par groupe, par membre, total général, classement ; filtres par période, pays, groupe et campagne ; export Excel et impression PDF.</li></ol>
   <h3>Qui voit quoi</h3><table>${[['Administrateur','Tout ; crée les comptes et attribue les rôles ; journal ; export'],['Trésorier général','Noms, contacts, codes, montants ; membres et groupes ; saisit, corrige et supprime les dons (motif obligatoire) ; reçus et rapports'],['Trésorière adjointe','Noms, contacts, codes, montants ; saisit les dons et corrige ses propres saisies ; ne supprime pas'],['Commissaire aux comptes','Tout, y compris le journal, en consultation seulement ; export'],['Grand Maître','Codes, groupes, montants et totaux ; jamais les noms ni les contacts (ni à l\'écran, ni dans les exports)']].map(([a, b]) => `<tr><td><b>${a}</b></td><td class="small">${b}</td></tr>`).join('')}</table>
   <p class="small muted">Ces droits sont appliqués par le serveur (règles de sécurité Firebase), pas seulement par l'écran : un compte Grand Maître ne reçoit jamais les noms, même en examinant le code de l'application.</p></div>`;
