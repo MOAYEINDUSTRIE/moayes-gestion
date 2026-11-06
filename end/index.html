@@ -88,7 +88,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  END — Dons des volontaires  ===================== */
-const VERSION = 'V1.0';
+const VERSION = 'V1.1';
 const ADMIN_EMAIL = 'moayepos@gmail.com';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -507,7 +507,7 @@ VIEWS.utilisateurs = () => {
   if (!can('users')) return '<div class="empty">Accès réservé.</div>';
   const L = Object.entries(S.users).sort((a, b) => (a[1].nom || '').localeCompare(b[1].nom || ''));
   return `<div class="bar"><span class="grow small muted">Chaque responsable a son propre compte (e-mail + mot de passe). Un compte désactivé ne voit plus rien.</span><button class="btn g" onclick="nouvelUtilisateur()">+ Nouveau compte</button></div>
-  <div class="card">${tbl([['Nom'],['E-mail'],['Rôle'],['État'],['']], L.map(([uid, u]) => `<tr><td><b>${esc(u.nom)}</b></td><td class="small">${esc(u.email)}</td><td>${uid === AUTH.uid ? esc(ROLES[u.role]) : `<select onchange="changeRole('${uid}',this.value)">${opts(Object.entries(ROLES), u.role)}</select>`}</td><td><span class="tag ${u.actif ? 'g' : 'r'}">${u.actif ? 'Actif' : 'Désactivé'}</span></td><td class="n">${uid === AUTH.uid ? '<span class="small muted">vous</span>' : `<button class="btn sm ${u.actif ? 'd' : ''}" onclick="toggleActif('${uid}')">${u.actif ? 'Désactiver' : 'Réactiver'}</button>`}</td></tr>`), 'Aucun compte.')}</div>`;
+  <div class="card">${tbl([['Nom'],['E-mail'],['Rôle'],['État'],['']], L.map(([uid, u]) => `<tr><td><b>${esc(u.nom)}</b></td><td class="small">${esc(u.email)}</td><td>${uid === AUTH.uid ? esc(ROLES[u.role]) : `<select onchange="changeRole('${uid}',this.value)">${opts(Object.entries(ROLES), u.role)}</select>`}</td><td><span class="tag ${u.actif ? 'g' : 'r'}">${u.actif ? 'Actif' : 'Désactivé'}</span></td><td class="n">${uid === AUTH.uid ? '<span class="small muted">vous</span>' : `<button class="btn sm" onclick="resetMdp('${uid}')" title="Envoyer un lien pour choisir un nouveau mot de passe">🔑 Mot de passe</button> <button class="btn sm ${u.actif ? 'd' : ''}" onclick="toggleActif('${uid}')">${u.actif ? 'Désactiver' : 'Réactiver'}</button>`}</td></tr>`), 'Aucun compte.')}</div>`;
 };
 function nouvelUtilisateur(){
   modal(`<h2>Nouveau compte</h2><div class="f"><div><label>Nom affiché *</label><input id="u_nom"></div><div><label>Rôle *</label><select id="u_role">${opts(Object.entries(ROLES).filter(([k]) => k !== 'admin'), 'tresorier')}</select></div>
@@ -526,7 +526,7 @@ async function creerUtilisateur(){
     await ref('roles/' + cr.user.uid).set(u);
     await sec.auth().signOut();
     journal('Création d\'un compte', nom + ' (' + ROLES[role] + ')', null, u);
-    closeModal(); toast('Compte créé pour ' + nom);
+    closeModal(); identifiants(nom, role, email, pw);
   } catch(e){ $('#u_ok').disabled = false; toast(authErr(e)); }
 }
 async function changeRole(uid, role){
@@ -537,6 +537,19 @@ async function toggleActif(uid){
   const avant = S.users[uid], apres = { ...avant, actif: !avant.actif };
   if (!confirm((apres.actif ? 'Réactiver' : 'Désactiver') + ' le compte de ' + avant.nom + ' ?')) return;
   try { await ref('roles/' + uid).set(apres); journal(apres.actif ? 'Réactivation d\'un compte' : 'Désactivation d\'un compte', avant.nom, { actif: avant.actif }, { actif: apres.actif }); } catch(e){ toast('Refusé : ' + (e.code || e.message)); }
+}
+
+function identifiants(nom, role, email, pw){
+  const msg = `Bonjour ${nom},\n\nVotre accès à l'application END — Dons des volontaires (${ROLES[role]}) :\n\nLien : https://moayeindustrie.github.io/moayes-gestion/end/\nApplication Android : https://github.com/MOAYEINDUSTRIE/moayes-gestion/releases/download/apk-end/END-Dons.apk\nE-mail : ${email}\nMot de passe provisoire : ${pw}\n\nChangez-le dès votre première connexion (menu « Mon compte »). Ne le communiquez à personne.`;
+  window._idmsg = msg;
+  modal(`<h2>✅ Compte créé</h2><div class="alert w">Notez ou envoyez ces identifiants <b>maintenant</b> : le mot de passe ne sera plus affiché ensuite.</div>
+  <table><tr><td class="muted small">Nom</td><td><b>${esc(nom)}</b> — ${esc(ROLES[role])}</td></tr><tr><td class="muted small">E-mail</td><td class="code">${esc(email)}</td></tr><tr><td class="muted small">Mot de passe provisoire</td><td class="code" style="font-size:18px">${esc(pw)}</td></tr></table>
+  <div class="act"><button class="btn" onclick="navigator.clipboard&&navigator.clipboard.writeText(window._idmsg).then(()=>toast('Copié'))">📋 Copier le message</button><button class="btn g" onclick="window.open('https://wa.me/?text='+encodeURIComponent(window._idmsg),'_blank')">📲 Envoyer par WhatsApp</button><button class="btn p" onclick="closeModal()">Terminé</button></div>`);
+}
+async function resetMdp(uid){
+  const u = S.users[uid]; if (!u) return;
+  if (!confirm('Envoyer à ' + u.email + ' un e-mail pour choisir un nouveau mot de passe ?')) return;
+  try { await firebase.auth().sendPasswordResetEmail(u.email); journal('Réinitialisation du mot de passe demandée', u.nom, null, null); toast('E-mail envoyé à ' + u.email + ' (vérifier aussi les spams)'); } catch(e){ toast(authErr(e)); }
 }
 
 /* ----- mon compte ----- */
