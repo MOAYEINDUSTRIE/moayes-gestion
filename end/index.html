@@ -88,7 +88,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  END — Dons des volontaires  ===================== */
-const VERSION = 'V1.1';
+const VERSION = 'V1.2';
 const ADMIN_EMAIL = 'moayepos@gmail.com';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -101,6 +101,7 @@ const PERM = {
   suppr:   ['admin','tresorier'],
   journal: ['admin','cac'],
   users:   ['admin'],
+  aide:    ['admin','tresorier','cac'],
 };
 const can = p => !!(ME && PERM[p].includes(ME.role));
 const DEVISES = { XOF:['Franc CFA (BCEAO)',1], XAF:['Franc CFA (BEAC)',1], EUR:['Euro',655.957], USD:['Dollar américain',0], GBP:['Livre sterling',0], CAD:['Dollar canadien',0], CHF:['Franc suisse',0], GHS:['Cedi ghanéen',0], NGN:['Naira nigérian',0], GNF:['Franc guinéen',0], MAD:['Dirham marocain',0], AUTRE:['Autre devise',0] };
@@ -233,7 +234,7 @@ async function creerAdmin(){
 const MENU = () => [
   ['Suivi', [['tableau','📊','Tableau de bord'],['dons','💝','Dons'],['rapports','📈','Rapports']]],
   ['Registre', [['membres','👥','Membres'],['groupes','🏘','Groupes']]],
-  ['Contrôle', [...(can('journal') ? [['journal','🕘','Journal']] : []), ...(can('users') ? [['utilisateurs','🔐','Utilisateurs']] : []), ['compte','👤','Mon compte'],['aide','❓','Mode d\'emploi']]],
+  ['Contrôle', [...(can('journal') ? [['journal','🕘','Journal']] : []), ...(can('users') ? [['utilisateurs','🔐','Utilisateurs']] : []), ['compte','👤','Mon compte'], ...(can('aide') ? [['aide','❓','Mode d\'emploi']] : [])]],
 ];
 const TABS = [['tableau','📊','Accueil'],['dons','💝','Dons'],['membres','👥','Membres'],['rapports','📈','Rapports'],['__menu','☰','Menu']];
 function go(v, a){ VIEW = v; ARG = a ?? null; const s = $('.side'); if (s) s.classList.remove('open'); render(); scrollTo(0, 0); }
@@ -563,7 +564,7 @@ async function changerMdp(){
 }
 
 /* ----- aide ----- */
-VIEWS.aide = () => `<div class="card"><h3>Mode d'emploi</h3><ol>
+VIEWS.aide = () => !can('aide') ? '<div class="empty">Accès réservé.</div>' : `<div class="card"><h3>Mode d'emploi</h3><ol>
   <li><b>Groupes</b> : créez d'abord les groupes (nom, pays ou zone).</li>
   <li><b>Membres</b> : créez chaque volontaire ; son code donateur (D-0001…) est attribué automatiquement et n'est jamais réutilisé.</li>
   <li><b>Dons</b> : « + Nouveau don », choisissez le membre (le groupe se remplit tout seul), le montant et la devise ; le montant en FCFA est calculé avec le taux. Le reçu (R-00001…) est numéroté automatiquement.</li>
