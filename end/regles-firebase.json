@@ -1,0 +1,64 @@
+{
+  "rules": {
+    "moayes": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "moayes_v2": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "end": {
+      "roles": {
+        ".read": "(auth != null && root.child('end/roles/'+auth.uid+'/actif').val() === true && (root.child('end/roles/'+auth.uid+'/role').val() === 'admin'))",
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "(auth != null && root.child('end/roles/'+auth.uid+'/actif').val() === true && (root.child('end/roles/'+auth.uid+'/role').val() === 'admin')) || (auth != null && auth.uid === $uid && !data.exists() && auth.token.email === 'moayepos@gmail.com' && newData.child('role').val() === 'admin')",
+          ".validate": "newData.hasChildren(['role','nom','actif']) && newData.child('role').isString() && newData.child('actif').isBoolean()"
+        }
+      },
+      "membres": {
+        ".read": "(auth != null && root.child('end/roles/'+auth.uid+'/actif').val() === true && (root.child('end/roles/'+auth.uid+'/role').val() === 'admin' || root.child('end/roles/'+auth.uid+'/role').val() === 'tresorier' || root.child('end/roles/'+auth.uid+'/role').val() === 'adjointe' || root.child('end/roles/'+auth.uid+'/role').val() === 'cac' || root.child('end/roles/'+auth.uid+'/role').val() === 'gm'))",
+        "$code": {
+          ".write": "(auth != null && root.child('end/roles/'+auth.uid+'/actif').val() === true && (root.child('end/roles/'+auth.uid+'/role').val() === 'admin' || root.child('end/roles/'+auth.uid+'/role').val() === 'tresorier')) && newData.exists()"
+        }
+      },
+      "prive": {
+        ".read": "(auth != null && root.child('end/roles/'+auth.uid+'/actif').val() === true && (root.child('end/roles/'+auth.uid+'/role').val() === 'admin' || root.child('end/roles/'+auth.uid+'/role').val() === 'tresorier' || root.child('end/roles/'+auth.uid+'/role').val() === 'adjointe' || root.child('end/roles/'+auth.uid+'/role').val() === 'cac'))",
+        "$code": {
+          ".write": "(auth != null && root.child('end/roles/'+auth.uid+'/actif').val() === true && (root.child('end/roles/'+auth.uid+'/role').val() === 'admin' || root.child('end/roles/'+auth.uid+'/role').val() === 'tresorier')) && newData.exists()"
+        }
+      },
+      "groupes": {
+        ".read": "(auth != null && root.child('end/roles/'+auth.uid+'/actif').val() === true && (root.child('end/roles/'+auth.uid+'/role').val() === 'admin' || root.child('end/roles/'+auth.uid+'/role').val() === 'tresorier' || root.child('end/roles/'+auth.uid+'/role').val() === 'adjointe' || root.child('end/roles/'+auth.uid+'/role').val() === 'cac' || root.child('end/roles/'+auth.uid+'/role').val() === 'gm'))",
+        "$id": {
+          ".write": "(auth != null && root.child('end/roles/'+auth.uid+'/actif').val() === true && (root.child('end/roles/'+auth.uid+'/role').val() === 'admin' || root.child('end/roles/'+auth.uid+'/role').val() === 'tresorier')) && newData.exists()"
+        }
+      },
+      "dons": {
+        ".read": "(auth != null && root.child('end/roles/'+auth.uid+'/actif').val() === true && (root.child('end/roles/'+auth.uid+'/role').val() === 'admin' || root.child('end/roles/'+auth.uid+'/role').val() === 'tresorier' || root.child('end/roles/'+auth.uid+'/role').val() === 'adjointe' || root.child('end/roles/'+auth.uid+'/role').val() === 'cac' || root.child('end/roles/'+auth.uid+'/role').val() === 'gm'))",
+        "$id": {
+          ".write": "newData.exists() && ((auth != null && root.child('end/roles/'+auth.uid+'/actif').val() === true && (root.child('end/roles/'+auth.uid+'/role').val() === 'admin' || root.child('end/roles/'+auth.uid+'/role').val() === 'tresorier')) || ((auth != null && root.child('end/roles/'+auth.uid+'/actif').val() === true && (root.child('end/roles/'+auth.uid+'/role').val() === 'adjointe')) && newData.child('supprime').val() !== true && newData.child('saisiPar').val() === auth.uid && (!data.exists() || data.child('saisiPar').val() === auth.uid)))",
+          ".validate": "newData.hasChildren(['recu','date','code','montant','devise','taux','fcfa','saisiPar']) && newData.child('fcfa').isNumber() && (newData.child('supprime').val() !== true || newData.child('motif').val().length >= 5)"
+        }
+      },
+      "journal": {
+        ".read": "(auth != null && root.child('end/roles/'+auth.uid+'/actif').val() === true && (root.child('end/roles/'+auth.uid+'/role').val() === 'admin' || root.child('end/roles/'+auth.uid+'/role').val() === 'cac'))",
+        ".indexOn": [
+          "t"
+        ],
+        "$id": {
+          ".write": "(auth != null && root.child('end/roles/'+auth.uid+'/actif').val() === true && (root.child('end/roles/'+auth.uid+'/role').val() === 'admin' || root.child('end/roles/'+auth.uid+'/role').val() === 'tresorier' || root.child('end/roles/'+auth.uid+'/role').val() === 'adjointe' || root.child('end/roles/'+auth.uid+'/role').val() === 'cac' || root.child('end/roles/'+auth.uid+'/role').val() === 'gm')) && !data.exists() && newData.exists()",
+          ".validate": "newData.child('uid').val() === auth.uid"
+        }
+      },
+      "compteurs": {
+        ".read": "(auth != null && root.child('end/roles/'+auth.uid+'/actif').val() === true && (root.child('end/roles/'+auth.uid+'/role').val() === 'admin' || root.child('end/roles/'+auth.uid+'/role').val() === 'tresorier' || root.child('end/roles/'+auth.uid+'/role').val() === 'adjointe'))",
+        "$c": {
+          ".write": "(auth != null && root.child('end/roles/'+auth.uid+'/actif').val() === true && (root.child('end/roles/'+auth.uid+'/role').val() === 'admin' || root.child('end/roles/'+auth.uid+'/role').val() === 'tresorier' || root.child('end/roles/'+auth.uid+'/role').val() === 'adjointe'))",
+          ".validate": "newData.isNumber() && (!data.exists() || newData.val() === data.val() + 1)"
+        }
+      }
+    }
+  }
+}
