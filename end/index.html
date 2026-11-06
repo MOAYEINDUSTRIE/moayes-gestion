@@ -88,7 +88,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  END — Dons des volontaires  ===================== */
-const VERSION = 'V1.4';
+const VERSION = 'V1.5';
 const ADMIN_EMAIL = 'moayepos@gmail.com';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -146,7 +146,8 @@ let VIEW = 'tableau', ARG = null, ONLINE = true;
 const nomDe = code => { const p = S.prive[code]; return p ? [p.nom, p.prenoms].filter(Boolean).join(' ') : ''; };
 const libMembre = code => can('noms') && nomDe(code) ? `<span class="code">${esc(code)}</span> — ${esc(nomDe(code))}` : `<span class="code">${esc(code)}</span>`;
 const txtMembre = code => can('noms') && nomDe(code) ? `${code} — ${nomDe(code)}` : code;
-const groupeDe = id => S.groupes[id] || { nom:'(sans groupe)' };
+const groupeDe = id => S.groupes[id] || { nom:'Hors groupe' };
+const grpOk = g => !FL.groupe || (FL.groupe === '-' ? !S.groupes[g] : g === FL.groupe);
 const donsActifs = () => vals(S.dons).filter(d => !d.supprime);
 const ref = p => DB.ref(ROOT + (p ? '/' + p : ''));
 
@@ -276,12 +277,12 @@ const FL = { d1:'', d2:'', pays:'', groupe:'', camp:'' };
 function filtresHTML(){
   return `<div class="bar no-print"><input type="date" value="${FL.d1}" onchange="FL.d1=this.value;render()" title="Du"><input type="date" value="${FL.d2}" onchange="FL.d2=this.value;render()" title="Au">
   <select onchange="FL.pays=this.value;render()"><option value="">Tous pays</option>${opts(pays(), FL.pays)}</select>
-  <select onchange="FL.groupe=this.value;render()"><option value="">Tous groupes</option>${opts(groupesTries().map(([k, g]) => [k, g.nom]), FL.groupe)}</select>
+  <select onchange="FL.groupe=this.value;render()"><option value="">Tous groupes</option>${opts([...groupesTries().map(([k, g]) => [k, g.nom]), ['-', 'Hors groupe']], FL.groupe)}</select>
   <select onchange="FL.camp=this.value;render()"><option value="">Toutes campagnes</option>${opts(campagnes(), FL.camp)}</select>
   ${FL.d1 || FL.d2 || FL.pays || FL.groupe || FL.camp ? `<button class="btn sm" onclick="Object.assign(FL,{d1:'',d2:'',pays:'',groupe:'',camp:''});render()">Effacer</button>` : ''}</div>`;
 }
 function donsFiltres(){
-  return donsActifs().filter(d => (!FL.d1 || d.date >= FL.d1) && (!FL.d2 || d.date <= FL.d2) && (!FL.groupe || d.groupe === FL.groupe) && (!FL.camp || d.objet === FL.camp)
+  return donsActifs().filter(d => (!FL.d1 || d.date >= FL.d1) && (!FL.d2 || d.date <= FL.d2) && grpOk(d.groupe) && (!FL.camp || d.objet === FL.camp)
     && (!FL.pays || ((S.membres[d.code] || {}).pays || groupeDe(d.groupe).pays) === FL.pays));
 }
 function parGroupe(L){
@@ -313,7 +314,7 @@ VIEWS.tableau = () => {
     <div class="card kpi"><div class="l">Décaissé${FL.d1 || FL.d2 ? ' (période)' : ''}</div><div class="v" style="color:var(--ko)">${FCFA(dt)}</div><div class="s">${D.length} décaissement(s)</div></div>
     <div class="card kpi"><div class="l">Dons − décaissements</div><div class="v">${FCFA(tot - dt)}</div></div>
     <div class="card kpi dark" style="cursor:pointer" onclick="go('tresorerie')"><div class="l">Solde de trésorerie (aujourd'hui)</div><div class="v">${FCFA(T.total)}</div><div class="s">${Object.entries(COMPTES).filter(([k]) => T[k]).map(([k, n]) => n.split(' ')[0] + ' ' + F(T[k])).join(' · ') || 'Voir Caisse & trésorerie'}</div></div>`; })()}</div>
-  <div class="card"><h3>Classement des groupes</h3>${tbl([['#'],['Groupe'],['Pays'],['Cotisants','n'],['Total','n'],['Part']], G.map((g, i) => `<tr class="click" onclick="go('groupe','${esc(g.id)}')"><td>${i + 1}</td><td><b>${esc(groupeDe(g.id).nom)}</b></td><td>${esc(groupeDe(g.id).pays || '')}</td><td class="n">${g.codes.size}</td><td class="n b">${FCFA(g.total)}</td><td><div class="hbar"><i style="width:${g.total / max * 100}%"></i></div><span class="small muted">${tot ? Math.round(g.total / tot * 100) : 0} %</span></td></tr>`), 'Aucun don sur la période.')}</div>
+  <div class="card"><h3>Classement des groupes</h3>${tbl([['#'],['Groupe'],['Pays'],['Cotisants','n'],['Total','n'],['Part']], G.map((g, i) => `<tr class="click" onclick="go('groupe','${esc(g.id || '-')}')"><td>${i + 1}</td><td><b>${esc(groupeDe(g.id).nom)}</b></td><td>${esc(groupeDe(g.id).pays || '')}</td><td class="n">${g.codes.size}</td><td class="n b">${FCFA(g.total)}</td><td><div class="hbar"><i style="width:${g.total / max * 100}%"></i></div><span class="small muted">${tot ? Math.round(g.total / tot * 100) : 0} %</span></td></tr>`), 'Aucun don sur la période.')}</div>
   <div class="card"><h3>Derniers dons</h3>${tbl([['Date'],['Reçu'],['Membre'],['Groupe'],['Montant','n']], L.sort((a, b) => (b.date + b.recu).localeCompare(a.date + a.recu)).slice(0, 10).map(d => `<tr class="click" onclick="ficheDon('${d.id}')"><td>${dfr(d.date)}</td><td>${esc(d.recu)}</td><td>${libMembre(d.code)}</td><td>${esc(groupeDe(d.groupe).nom)}</td><td class="n b">${FCFA(d.fcfa)}</td></tr>`), 'Aucun don.')}
   ${can('saisie') ? '<div class="act"><button class="btn g" onclick="editDon()">+ Nouveau don</button></div>' : ''}</div>`;
 };
@@ -355,7 +356,7 @@ function editDon(id){
     <div><label>Mode de paiement</label><select id="d_mode" onchange="$('#d_cpt').value=compteParMode(this.value)">${opts(MODES, d.mode)}</select></div>
     <div><label>Encaissé sur le compte</label><select id="d_cpt">${opts(Object.entries(COMPTES), compteDon(d))}</select></div>
     <div><label>Référence de la transaction</label><input id="d_ref" value="${esc(d.ref || '')}"></div>
-    <div class="full"><label>Objet / campagne</label><input id="d_obj" list="camps" value="${esc(d.objet || '')}" placeholder="ex. Cotisation annuelle 2026"><datalist id="camps">${campagnes().map(c => `<option value="${esc(c)}">`).join('')}</datalist></div></div>
+    <div class="full"><label>Objet / campagne</label><input id="d_obj" list="camps" value="${esc(d.objet || '')}" placeholder="ex. Achat de livres, Cotisation 2026"><datalist id="camps">${[...new Set(['Achat de livres', 'Cotisation', 'Don', ...campagnes()])].map(c => `<option value="${esc(c)}">`).join('')}</datalist></div></div>
     <div class="act"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" id="d_ok" onclick="saveDon('${id || ''}')">Enregistrer</button></div>`);
   if (!id) majTaux(); else majFcfa();
 }
@@ -546,11 +547,11 @@ let MQ = '';
 VIEWS.membres = () => {
   const q = MQ.toLowerCase(), P = parMembre(donsActifs());
   const tot = Object.fromEntries(P.map(x => [x.code, x]));
-  const L = vals(S.membres).filter(m => (!FL.groupe || m.groupe === FL.groupe) && (!FL.pays || m.pays === FL.pays))
+  const L = vals(S.membres).filter(m => grpOk(m.groupe) && (!FL.pays || m.pays === FL.pays))
     .filter(m => !q || (m.code + ' ' + (m.pays || '') + ' ' + groupeDe(m.groupe).nom + ' ' + (can('noms') ? nomDe(m.code) + ' ' + ((S.prive[m.code] || {}).tel || '') + ' ' + ((S.prive[m.code] || {}).ident || '') + ' ' + ((S.prive[m.code] || {}).email || '') : '')).toLowerCase().includes(q))
     .sort((a, b) => a.code.localeCompare(b.code));
   return `<div class="bar"><input class="grow" placeholder="🔍 Code${can('noms') ? ', nom, téléphone' : ''}, pays, groupe" value="${esc(MQ)}" oninput="MQ=this.value;clearTimeout(window._mq);window._mq=setTimeout(()=>{render();const i=document.querySelector('.bar .grow');i.focus();i.setSelectionRange(i.value.length,i.value.length)},300)">
-    <select onchange="FL.groupe=this.value;render()"><option value="">Tous groupes</option>${opts(groupesTries().map(([k, g]) => [k, g.nom]), FL.groupe)}</select>
+    <select onchange="FL.groupe=this.value;render()"><option value="">Tous groupes</option>${opts([...groupesTries().map(([k, g]) => [k, g.nom]), ['-', 'Hors groupe']], FL.groupe)}</select>
     <select onchange="FL.pays=this.value;render()"><option value="">Tous pays</option>${opts(pays(), FL.pays)}</select>
     ${can('membres') ? '<label class="btn">⬆ Importer Excel<input type="file" accept=".xlsx,.xls,.csv,.json" multiple style="display:none" onchange="importerFichiers(Array.from(this.files));this.value=\'\'"></label><button class="btn g" onclick="editMembre()">+ Nouveau membre</button>' : ''}</div>
   <div class="card"><div class="small muted" style="margin-bottom:6px">${L.length} membre(s)</div>${tbl([['Code'], ...(can('noms') ? [['Nom']] : []), ['Pays'], ['Groupe'], ['Statut'], ['Dons','n'], ['Total','n']], L.map(m => `<tr class="click" onclick="go('membre','${esc(m.code)}')"><td class="code">${esc(m.code)}</td>${can('noms') ? `<td>${esc(nomDe(m.code))}</td>` : ''}<td>${esc(m.pays || '')}</td><td>${esc(groupeDe(m.groupe).nom)}</td><td><span class="tag ${m.statut === 'inactif' ? '' : 'g'}">${m.statut === 'inactif' ? 'Inactif' : 'Actif'}</span></td><td class="n">${tot[m.code] ? tot[m.code].nb : 0}</td><td class="n b">${FCFA(tot[m.code] ? tot[m.code].total : 0)}</td></tr>`), 'Aucun membre.')}</div>`;
@@ -564,12 +565,11 @@ VIEWS.membre = code => {
   <div class="card"><h3>Dons</h3>${tbl([['Date'],['Reçu'],['Origine','n'],['FCFA','n'],['Mode'],['Objet']], D.map(d => `<tr class="click ${d.supprime ? 'del' : ''}" onclick="ficheDon('${d.id}')"><td>${dfr(d.date)}</td><td>${esc(d.recu)}</td><td class="n">${F2(d.montant)} ${esc(d.devise)}</td><td class="n b">${FCFA(d.fcfa)}</td><td>${esc(d.mode)}</td><td>${esc(d.objet || '')}</td></tr>`), 'Aucun don.')}</div>`;
 };
 function editMembre(code){
-  if (!Object.keys(S.groupes).length) return toast('Créez d\'abord un groupe');
   const m = code ? S.membres[code] : { statut: 'actif', adhesion: today() }, p = code ? (S.prive[code] || {}) : {};
   modal(`<h2>${code ? 'Membre ' + esc(code) : 'Nouveau membre'}</h2>${code ? '' : '<p class="small muted">Le code donateur (D-0001, D-0002…) est attribué automatiquement et ne sera jamais réutilisé.</p>'}<div class="f">
     <div><label>Nom *</label><input id="m_nom" value="${esc(p.nom)}"></div><div><label>Prénoms</label><input id="m_pre" value="${esc(p.prenoms)}"></div>
-    <div><label>Pays *</label><input id="m_pays" list="paysl" value="${esc(m.pays)}"><datalist id="paysl">${pays().map(x => `<option value="${esc(x)}">`).join('')}</datalist></div>
-    <div><label>Groupe *</label><select id="m_grp"><option value="">— Choisir —</option>${opts(groupesTries().map(([k, g]) => [k, g.nom + (g.pays ? ' (' + g.pays + ')' : '')]), m.groupe)}</select></div>
+    <div><label>Pays</label><input id="m_pays" list="paysl" value="${esc(m.pays)}"><datalist id="paysl">${pays().map(x => `<option value="${esc(x)}">`).join('')}</datalist></div>
+    <div><label>Groupe</label><select id="m_grp"><option value="">— Hors groupe (ne fait partie d'aucun groupe) —</option>${opts(groupesTries().map(([k, g]) => [k, g.nom + (g.pays ? ' (' + g.pays + ')' : '')]), m.groupe)}</select></div>
     <div><label>Ville</label><input id="m_ville" value="${esc(p.ville)}"></div><div><label>Identifiant END (registre)</label><input id="m_ident" value="${esc(p.ident)}" placeholder="ex. END-2026-008"></div>
     <div><label>Téléphone / WhatsApp</label><input id="m_tel" inputmode="tel" value="${esc(p.tel)}"></div><div><label>E-mail</label><input id="m_mail" type="email" value="${esc(p.email)}"></div>
     <div><label>Date d'adhésion</label><input id="m_adh" type="date" value="${m.adhesion || ''}"></div>
@@ -577,7 +577,7 @@ function editMembre(code){
     <div class="act"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" id="m_ok" onclick="saveMembre('${esc(code || '')}')">Enregistrer</button></div>`);
 }
 async function saveMembre(code){
-  const nom = val('m_nom'), paysV = val('m_pays'), groupe = val('m_grp'); if (!nom || !paysV || !groupe) return toast('Nom, pays et groupe obligatoires');
+  const nom = val('m_nom'), paysV = val('m_pays'), groupe = val('m_grp'); if (!nom) return toast('Le nom est obligatoire');
   const pub = { pays: paysV, groupe, adhesion: val('m_adh'), statut: val('m_st') }, priv = Object.assign({}, code ? (S.prive[code] || {}) : {}, { nom, prenoms: val('m_pre'), tel: val('m_tel'), email: val('m_mail'), ville: val('m_ville'), ident: val('m_ident') });
   $('#m_ok').disabled = true;
   try {
@@ -682,14 +682,15 @@ VIEWS.groupes = () => {
   const G = Object.fromEntries(parGroupe(donsActifs()).map(g => [g.id, g]));
   const nbM = id => vals(S.membres).filter(m => m.groupe === id && m.statut !== 'inactif').length;
   return `<div class="bar"><span class="grow"></span>${can('membres') ? '<button class="btn g" onclick="editGroupe()">+ Nouveau groupe</button>' : ''}</div>
-  <div class="card">${tbl([['Groupe'],['Pays / zone'],['Responsable'],['Membres actifs','n'],['Cotisants','n'],['Total','n']], groupesTries().map(([id, g]) => `<tr class="click" onclick="go('groupe','${esc(id)}')"><td><b>${esc(g.nom)}</b></td><td>${esc(g.pays || '')}</td><td>${g.responsable ? libMembre(g.responsable) : ''}</td><td class="n">${nbM(id)}</td><td class="n">${G[id] ? G[id].codes.size : 0}</td><td class="n b">${FCFA(G[id] ? G[id].total : 0)}</td></tr>`), 'Aucun groupe.')}</div>`;
+  <div class="card">${tbl([['Groupe'],['Pays / zone'],['Responsable'],['Membres actifs','n'],['Cotisants','n'],['Total','n']], groupesTries().map(([id, g]) => `<tr class="click" onclick="go('groupe','${esc(id)}')"><td><b>${esc(g.nom)}</b></td><td>${esc(g.pays || '')}</td><td>${g.responsable ? libMembre(g.responsable) : ''}</td><td class="n">${nbM(id)}</td><td class="n">${G[id] ? G[id].codes.size : 0}</td><td class="n b">${FCFA(G[id] ? G[id].total : 0)}</td></tr>`).concat((() => { const hm = vals(S.membres).filter(m => !S.groupes[m.groupe]), hd = donsActifs().filter(d => !S.groupes[d.groupe]); if (!hm.length && !hd.length) return []; return [`<tr class="click" onclick="go('groupe','-')"><td><b>Hors groupe</b> <span class="tag">sans groupe</span></td><td></td><td></td><td class="n">${hm.filter(m => m.statut !== 'inactif').length}</td><td class="n">${new Set(hd.map(d => d.code)).size}</td><td class="n b">${FCFA(hd.reduce((t, d) => t + num(d.fcfa), 0))}</td></tr>`]; })()), 'Aucun groupe.')}</div>`;
 };
 VIEWS.groupe = id => {
-  const g = S.groupes[id]; if (!g) return '<div class="empty">Groupe introuvable.</div>';
-  const L = donsFiltres().filter(d => d.groupe === id), P = parMembre(L), tot = L.reduce((s, d) => s + num(d.fcfa), 0);
-  const membres = vals(S.membres).filter(m => m.groupe === id).sort((a, b) => a.code.localeCompare(b.code));
+  const hors = !id || id === '-', dans = x => hors ? !S.groupes[x] : x === id;
+  const g = hors ? { nom: 'Hors groupe', pays: '' } : S.groupes[id]; if (!g) return '<div class="empty">Groupe introuvable.</div>';
+  const L = donsFiltres().filter(d => dans(d.groupe)), P = parMembre(L), tot = L.reduce((s, d) => s + num(d.fcfa), 0);
+  const membres = vals(S.membres).filter(m => dans(m.groupe)).sort((a, b) => a.code.localeCompare(b.code));
   const pm = Object.fromEntries(P.map(x => [x.code, x]));
-  return `<div class="bar no-print"><button class="btn sm" onclick="go('groupes')">← Groupes</button>${can('membres') ? `<button class="btn sm" onclick="editGroupe('${esc(id)}')">✏ Modifier</button>` : ''}<button class="btn sm" onclick="print()">🖨 Imprimer</button></div>${filtresHTML()}
+  return `<div class="bar no-print"><button class="btn sm" onclick="go('groupes')">← Groupes</button>${can('membres') && !hors ? `<button class="btn sm" onclick="editGroupe('${esc(id)}')">✏ Modifier</button>` : ''}<button class="btn sm" onclick="print()">🖨 Imprimer</button></div>${filtresHTML()}
   <div class="grid g3" style="margin-bottom:12px"><div class="card"><h3>${esc(g.nom)}</h3><div class="small">Pays / zone : ${esc(g.pays || '—')}<br>Responsable : ${g.responsable ? libMembre(g.responsable) : '—'}</div></div>
   <div class="card kpi dark"><div class="l">Total du groupe</div><div class="v">${FCFA(tot)}</div><div class="s">${L.length} don(s)</div></div><div class="card kpi"><div class="l">Cotisants</div><div class="v">${P.length} / ${membres.filter(m => m.statut !== 'inactif').length}</div><div class="s">membres actifs</div></div></div>
   <div class="card"><h3>Dons par membre</h3>${tbl([['Code'], ...(can('noms') ? [['Nom']] : []), ['Statut'], ['Dons','n'], ['Total','n']], membres.map(m => `<tr class="click" onclick="go('membre','${esc(m.code)}')"><td class="code">${esc(m.code)}</td>${can('noms') ? `<td>${esc(nomDe(m.code))}</td>` : ''}<td>${pm[m.code] ? '<span class="tag g">A donné</span>' : '<span class="tag">Aucun don</span>'}</td><td class="n">${pm[m.code] ? pm[m.code].nb : 0}</td><td class="n b">${FCFA(pm[m.code] ? pm[m.code].total : 0)}</td></tr>`), 'Aucun membre dans ce groupe.')}</div>`;
@@ -710,10 +711,14 @@ async function saveGroupe(id){
 }
 
 /* ----- rapports ----- */
-let RT = 'groupes';
+let RT = 'groupes', RO = null, RNP = false;
+const objetsListe = () => [...new Set(donsActifs().map(d => d.objet).filter(Boolean))].sort();
+const objetChoisi = () => { const L = objetsListe(); if (RO && L.includes(RO)) return RO; return L.find(o => /livre/i.test(o)) || L[0] || ''; };
+function payeursObjet(o){ const L = donsFiltres().filter(d => d.objet === o); return { L, P: parMembre(L), tot: L.reduce((t, d) => t + num(d.fcfa), 0) }; }
+const nonPayeurs = o => { const pay = new Set(payeursObjet(o).P.map(m => m.code)); return vals(S.membres).filter(m => m.statut !== 'inactif' && grpOk(m.groupe) && !pay.has(m.code)).sort((a, b) => a.code.localeCompare(b.code)); };
 VIEWS.rapports = () => {
   const L = donsFiltres(), tot = L.reduce((s, d) => s + num(d.fcfa), 0);
-  const tabs = [['groupes','Par groupe'],['membres','Par membre'],['general','Général']].map(([k, t]) => `<button class="btn sm ${RT === k ? 'p' : ''}" onclick="RT='${k}';render()">${t}</button>`).join('');
+  const tabs = [['groupes','Par groupe'],['membres','Par membre'],['objet','Par objet (ex. livres)'],['general','Général']].map(([k, t]) => `<button class="btn sm ${RT === k ? 'p' : ''}" onclick="RT='${k}';render()">${t}</button>`).join('');
   let body = '';
   if (RT === 'groupes'){
     const G = parGroupe(L);
@@ -721,6 +726,12 @@ VIEWS.rapports = () => {
   } else if (RT === 'membres'){
     const M = parMembre(L);
     body = tbl([['Code'], ...(can('noms') ? [['Nom']] : []), ['Groupe'], ['Dons','n'], ['Dernier don'], ['Total FCFA','n']], M.map(m => `<tr><td class="code">${esc(m.code)}</td>${can('noms') ? `<td>${esc(nomDe(m.code))}</td>` : ''}<td>${esc(groupeDe(m.groupe).nom)}</td><td class="n">${m.nb}</td><td>${dfr(m.dernier)}</td><td class="n b">${FCFA(m.total)}</td></tr>`), 'Aucun don.') + `<p class="b" style="text-align:right">Total général : ${FCFA(tot)}</p>`;
+  } else if (RT === 'objet'){
+    const o = objetChoisi(), { L: LO, P, tot: to } = payeursObjet(o), NP = RNP ? nonPayeurs(o) : [];
+    body = `<div class="bar no-print"><label class="small">Objet :</label><select onchange="RO=this.value;render()">${opts(objetsListe().map(x => [x, x]), o)}</select><label class="small"><input type="checkbox" ${RNP ? 'checked' : ''} onchange="RNP=this.checked;render()"> Afficher aussi ceux qui n'ont pas encore payé</label></div>`
+      + (o ? `<h3>Ont payé « ${esc(o)} » : ${P.length} personne(s) — ${FCFA(to)}</h3>` + tbl([['N°'],['Code'], ...(can('noms') ? [['Nom'],['Téléphone']] : []), ['Groupe'], ['Paiements','n'], ['Date'], ['Total FCFA','n']], P.map((m, i) => `<tr><td>${i + 1}</td><td class="code">${esc(m.code)}</td>${can('noms') ? `<td>${esc(nomDe(m.code))}</td><td>${esc((S.prive[m.code] || {}).tel || '')}</td>` : ''}<td>${esc(groupeDe(m.groupe).nom)}</td><td class="n">${m.nb}</td><td>${dfr(m.dernier)}</td><td class="n b">${FCFA(m.total)}</td></tr>`), 'Personne n\'a encore payé.')
+        + (RNP ? `<h3 style="margin-top:14px">N'ont pas encore payé : ${NP.length} membre(s) actif(s)</h3>` + tbl([['N°'],['Code'], ...(can('noms') ? [['Nom'],['Téléphone']] : []), ['Groupe']], NP.map((m, i) => `<tr><td>${i + 1}</td><td class="code">${esc(m.code)}</td>${can('noms') ? `<td>${esc(nomDe(m.code))}</td><td>${esc((S.prive[m.code] || {}).tel || '')}</td>` : ''}<td>${esc(groupeDe(m.groupe).nom)}</td></tr>`), 'Tout le monde a payé.') : '')
+        : '<div class="empty">Aucun paiement avec un objet. Pour les livres, saisissez un don avec l\'objet « Achat de livres ».</div>');
   } else {
     const parPays = {}, parMode = {}, parCamp = {}, parMois = {};
     L.forEach(d => { const p = (S.membres[d.code] || {}).pays || '—'; parPays[p] = (parPays[p] || 0) + num(d.fcfa); parMode[d.mode] = (parMode[d.mode] || 0) + num(d.fcfa); parCamp[d.objet || '(sans objet)'] = (parCamp[d.objet || '(sans objet)'] || 0) + num(d.fcfa); parMois[d.date.slice(0, 7)] = (parMois[d.date.slice(0, 7)] || 0) + num(d.fcfa); });
@@ -810,6 +821,8 @@ VIEWS.aide = () => !can('aide') ? '<div class="empty">Accès réservé.</div>' :
   <li><b>Membres</b> : créez chaque volontaire ; son code donateur (D-0001…) est attribué automatiquement et n'est jamais réutilisé.</li>
   <li><b>Dons</b> : « + Nouveau don », choisissez le membre (le groupe se remplit tout seul), le montant et la devise ; le montant en FCFA est calculé avec le taux. Le reçu (R-00001…) est numéroté automatiquement.</li>
   <li><b>Caisse & trésorerie</b> (trésorier général) : saisir une fois les soldes de départ de chaque compte (caisse, banque, Wave, Orange Money…), puis « + Décaissement » pour chaque sortie d'argent (motif, bénéficiaire, pièce justificative, bon imprimable) et « ⇄ Transfert » pour un retrait ou un dépôt entre comptes. Les dons entrent sur le compte choisi à la saisie.</li>
+  <li><b>Personnes hors groupe</b> : dans « + Nouveau membre », laissez le groupe sur « Hors groupe ». Seul le nom est obligatoire. Elles apparaissent dans Groupes sur la ligne « Hors groupe ».</li>
+  <li><b>Paiement des livres</b> : saisissez un don avec l'objet « Achat de livres ». La liste de ceux qui ont payé (et, si besoin, de ceux qui n'ont pas encore payé) est dans Rapports, onglet « Par objet », avec export Excel et impression.</li>
   <li><b>Tableau de bord et Rapports</b> : totaux par groupe, par membre, total général, classement ; filtres par période, pays, groupe et campagne ; export Excel et impression PDF.</li></ol>
   <h3>Qui voit quoi</h3><table>${[['Administrateur','Tout ; crée les comptes et attribue les rôles ; journal ; export'],['Trésorier général','Noms, contacts, codes, montants ; membres et groupes ; saisit, corrige et supprime les dons (motif obligatoire) ; reçus et rapports'],['Trésorière adjointe','Noms, contacts, codes, montants ; saisit les dons et corrige ses propres saisies ; ne supprime pas'],['Commissaire aux comptes','Tout, y compris le journal, en consultation seulement ; export'],['Grand Maître','Codes, groupes, montants et totaux ; jamais les noms ni les contacts (ni à l\'écran, ni dans les exports)']].map(([a, b]) => `<tr><td><b>${a}</b></td><td class="small">${b}</td></tr>`).join('')}</table>
   <p class="small muted">Ces droits sont appliqués par le serveur (règles de sécurité Firebase), pas seulement par l'écran : un compte Grand Maître ne reçoit jamais les noms, même en examinant le code de l'application.</p></div>`;
@@ -853,6 +866,7 @@ function exportDons(){
 }
 function exportRapport(){
   const n = can('noms'), L = donsFiltres();
+  if (RT === 'objet'){ const o = objetChoisi(), P = payeursObjet(o).P; csv('paiements_' + (o || 'objet').replace(/[^\w]+/g, '_'), [['Objet : ' + o], ['N°','Code', ...(n ? ['Nom','Téléphone'] : []), 'Groupe','Paiements','Date','Total FCFA'], ...P.map((m, i) => [i + 1, m.code, ...(n ? [nomDe(m.code), (S.prive[m.code] || {}).tel || ''] : []), groupeDe(m.groupe).nom, m.nb, dfr(m.dernier), m.total]), ...(RNP ? [[], ['N\'ont pas encore payé'], ...nonPayeurs(o).map((m, i) => [i + 1, m.code, ...(n ? [nomDe(m.code), (S.prive[m.code] || {}).tel || ''] : []), groupeDe(m.groupe).nom])] : [])]); return; }
   if (RT === 'membres') csv('rapport_membres', [['Code', ...N(n), 'Groupe','Nombre de dons','Dernier don','Total FCFA'], ...parMembre(L).map(m => [m.code, ...(n ? [nomDe(m.code)] : []), groupeDe(m.groupe).nom, m.nb, dfr(m.dernier), m.total])]);
   else csv('rapport_groupes', [['Rang','Groupe','Pays','Dons','Cotisants','Total FCFA'], ...parGroupe(L).map((g, i) => [i + 1, groupeDe(g.id).nom, groupeDe(g.id).pays, g.nb, g.codes.size, g.total])]);
 }
