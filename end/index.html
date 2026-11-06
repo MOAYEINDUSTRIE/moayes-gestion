@@ -7,6 +7,7 @@
 <meta name="description" content="École de Navigation Divine — gestion des dons des volontaires (administration)">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#1b2a4a">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -81,6 +82,62 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
  .menu-btn{display:inline-flex}
 }
 @media print{.side,.tabbar,.top .btn,.bar,.no-print{display:none!important}.main{padding:0}.card{break-inside:avoid}}
+/* ===== V1.6 — finition de l'interface ===== */
+:root{--bg:#f3f4f8;--line:#e6e8ef;--pri:#17254a;--pri2:#2a3f72;--gold:#c0913f;--gold2:#f7efe0;--blue:#2453b3;--blueb:#e8effc;--sh:0 1px 2px rgba(16,24,40,.04),0 2px 8px rgba(16,24,40,.05);--sh2:0 10px 30px rgba(16,24,40,.10)}
+html,body{font-family:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+.side{background:linear-gradient(180deg,#132042 0%,#1c2d57 100%)}
+.logo{background:linear-gradient(135deg,#d9ad5c,#b07f2c);color:#13203f;box-shadow:0 4px 14px rgba(192,145,63,.35)}
+.nav a{transition:background .15s,color .15s;margin:1px 0}
+.nav a.on{background:rgba(192,145,63,.18);color:#f3d9a8;font-weight:700;box-shadow:inset 3px 0 0 var(--gold)}
+.top h1{font-size:23px;font-weight:750;letter-spacing:-.3px}
+.card{border-radius:16px;border-color:var(--line);box-shadow:var(--sh);padding:16px}
+.card h3{font-size:15.5px;font-weight:700;letter-spacing:-.1px}
+.btn{border-radius:10px;padding:9px 14px;font-weight:550;box-shadow:0 1px 2px rgba(16,24,40,.05);transition:transform .08s,box-shadow .15s,background .15s}
+.btn:active{transform:translateY(1px)}
+.btn.p{background:linear-gradient(180deg,#22366a,#17254a)}.btn.p:hover{box-shadow:0 4px 12px rgba(23,37,74,.25)}
+.btn.g{background:linear-gradient(180deg,#cfa152,#b88634);border-color:#b88634}.btn.g:hover{box-shadow:0 4px 14px rgba(192,145,63,.35)}
+.bar input,.bar select,.f input,.f select,.f textarea,.srch{border-radius:10px;border:1px solid var(--line);background:#fff;padding:10px 12px;transition:border-color .15s,box-shadow .15s}
+.bar input:focus,.bar select:focus,.f input:focus,.f select:focus,.f textarea:focus,.srch:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(192,145,63,.18)}
+.srch{width:100%;min-width:0}
+th{background:#f7f8fb}thead th:first-child{border-top-left-radius:10px}thead th:last-child{border-top-right-radius:10px}
+tr.click:hover td{background:#fbf7ef}
+.kpi .v{font-size:24px;letter-spacing:-.4px}
+.kpi.dark{background:radial-gradient(120% 140% at 100% 0%,#2f4680 0%,#17254a 60%);box-shadow:0 8px 24px rgba(23,37,74,.25)}
+.tag{font-weight:600}.tag.b{background:var(--blueb);color:var(--blue)}
+.modal{border-radius:18px;box-shadow:var(--sh2);padding:20px}
+.modal h2{font-size:20px;font-weight:750;letter-spacing:-.2px}
+.toast{border-radius:12px;box-shadow:var(--sh2)}
+.login .box{border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.lnk{color:var(--blue);cursor:pointer;text-decoration:underline}
+.hero{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;padding:20px 22px;border-radius:18px;margin-bottom:12px;color:#fff;background:radial-gradient(140% 160% at 100% 0%,#3a5394 0%,#1c2d57 45%,#132042 100%);box-shadow:0 10px 30px rgba(19,32,66,.25);position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;right:-40px;top:-40px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(192,145,63,.35),transparent 70%)}
+.hero>*{position:relative;z-index:1}
+.hero-l{font-size:13px;color:#c9d3ea;text-transform:uppercase;letter-spacing:1px;font-weight:600}
+.hero-v{font-size:32px;font-weight:800;letter-spacing:-.8px;margin:2px 0}
+.hero-s{font-size:13.5px;color:#dbe2f2}
+.stat{display:flex;gap:14px;align-items:flex-start}
+.stat .ic{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:22px;flex:none}
+.stat.sb .ic{background:var(--blueb)}.stat.sw .ic{background:var(--gold2)}
+.stat .grow0{flex:1;min-width:0}.stat .l{font-size:13px;color:var(--muted);font-weight:600}.stat .v{font-size:24px;font-weight:800;letter-spacing:-.4px;margin:2px 0}.stat .s{font-size:12.5px;color:var(--muted);margin-top:4px}
+.stat .hbar{margin-top:8px}.hbar.b i{background:var(--blue)}
+.seg{display:inline-flex;background:#eef0f5;border-radius:12px;padding:3px;gap:2px;flex-wrap:wrap;max-width:100%}
+.seg button{border:0;background:transparent;padding:7px 12px;border-radius:9px;cursor:pointer;font-weight:600;color:#475467;white-space:nowrap}
+.seg button.on{background:#fff;color:var(--pri);box-shadow:0 1px 3px rgba(16,24,40,.12)}
+.seg .cnt{display:inline-block;min-width:20px;padding:0 6px;border-radius:99px;background:rgba(23,37,74,.08);font-size:11.5px;margin-left:3px}
+.seg.big{display:grid;grid-template-columns:1fr 1fr;width:100%}.seg.big button{padding:12px;font-size:15px}
+.seg.big button.on{background:var(--pri);color:#fff}
+.lvbox{background:#fbf7ef;border:1px solid #efe1c4;border-radius:14px;padding:12px}
+.totline{display:flex;justify-content:space-between;padding:12px 8px 2px;border-top:2px solid var(--pri);margin-top:6px;font-size:15px}
+@media (max-width:760px){
+ .top h1{font-size:19px}
+ .tabbar{background:rgba(255,255,255,.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+ .tabbar a.on span{background:var(--gold2);border-radius:99px;padding:0 14px}
+ .hero{padding:16px}.hero-v{font-size:27px}.hero .btn{width:100%}
+ .seg:not(.big){display:flex;width:100%}.seg:not(.big) button{flex:1;padding:8px 6px;font-size:13px}
+ table.resp tr{border-radius:12px;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+ .card{padding:14px}
+}
+@media print{.hero{color:#000;background:none;box-shadow:none;border:1px solid #ccc}.hero-l,.hero-s{color:#333}.hero:after{display:none}.card{box-shadow:none}}
 </style>
 </head>
 <body>
@@ -88,7 +145,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  END — Dons des volontaires  ===================== */
-const VERSION = 'V1.5';
+const VERSION = 'V1.6';
 const ADMIN_EMAIL = 'moayepos@gmail.com';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -238,7 +295,7 @@ async function creerAdmin(){
 
 /* ---------- navigation ---------- */
 const MENU = () => [
-  ['Suivi', [['tableau','📊','Tableau de bord'],['dons','💝','Dons'],['tresorerie','🏦','Caisse & trésorerie'],['decaissements','💸','Décaissements'],['rapports','📈','Rapports']]],
+  ['Suivi', [['tableau','📊','Tableau de bord'],['dons','💝','Dons'],['livres','📚','Livres'],['tresorerie','🏦','Caisse & trésorerie'],['decaissements','💸','Décaissements'],['rapports','📈','Rapports']]],
   ['Registre', [['membres','👥','Membres'],['groupes','🏘','Groupes']]],
   ['Contrôle', [...(can('journal') ? [['journal','🕘','Journal']] : []), ...(can('users') ? [['utilisateurs','🔐','Utilisateurs']] : []), ['compte','👤','Mon compte'], ...(can('aide') ? [['aide','❓','Mode d\'emploi']] : [])]],
 ];
@@ -336,17 +393,20 @@ function ficheDon(id){
   const d = S.dons[id]; if (!d) return;
   const edit = can('suppr') || (ME.role === 'adjointe' && d.saisiPar === AUTH.uid);
   modal(`<h2>Don ${esc(d.recu)} ${d.supprime ? '<span class="tag r">Supprimé</span>' : ''}</h2>
-  <table>${[['Date', dfr(d.date)], ['Membre', libMembre(d.code)], ['Groupe', esc(groupeDe(d.groupe).nom)], ['Montant d\'origine', F2(d.montant) + ' ' + esc(d.devise)], ['Taux', d.devise === 'XOF' ? '—' : '1 ' + esc(d.devise) + ' = ' + F2(d.taux) + ' F'], ['Montant en FCFA', '<b>' + FCFA(d.fcfa) + '</b>'], ['Mode', esc(d.mode)], ['Référence', esc(d.ref || '')], ['Objet / campagne', esc(d.objet || '')], ['Saisi par', esc(d.saisiNom || '') + ' — ' + dtfr(d.cree)], ...(d.modifNom ? [['Dernière modification', esc(d.modifNom) + ' — ' + dtfr(d.modifie)]] : []), ...(d.supprime ? [['Supprimé par', esc(d.supprNom) + ' — ' + dtfr(d.supprLe)], ['Motif', esc(d.motif)]] : [])].map(([a, b]) => `<tr><td class="muted small">${a}</td><td>${b}</td></tr>`).join('')}</table>
+  <table>${[['Date', dfr(d.date)], ['Membre', libMembre(d.code)], ['Groupe', esc(groupeDe(d.groupe).nom)], ['Montant d\'origine', F2(d.montant) + ' ' + esc(d.devise)], ['Taux', d.devise === 'XOF' ? '—' : '1 ' + esc(d.devise) + ' = ' + F2(d.taux) + ' F'], ['Montant en FCFA', '<b>' + FCFA(d.fcfa) + '</b>'], ['Mode', esc(d.mode)], ['Référence', esc(d.ref || '')], ['Objet / campagne', esc(d.objet || '')], ...(estLivre(d) ? [['Livre', (LVFMT[d.livre] ? `<span class="tag ${LVFMT[d.livre][2]}">${LVFMT[d.livre][1]} ${LVFMT[d.livre][0]}</span>` : '<span class="tag w">Format non précisé</span>') + (d.titre ? ' ' + esc(d.titre) : '') + ' — ' + (d.qte || 1) + ' ex.']] : []), ['Saisi par', esc(d.saisiNom || '') + ' — ' + dtfr(d.cree)], ...(d.modifNom ? [['Dernière modification', esc(d.modifNom) + ' — ' + dtfr(d.modifie)]] : []), ...(d.supprime ? [['Supprimé par', esc(d.supprNom) + ' — ' + dtfr(d.supprLe)], ['Motif', esc(d.motif)]] : [])].map(([a, b]) => `<tr><td class="muted small">${a}</td><td>${b}</td></tr>`).join('')}</table>
   <div class="act">${can('noms') ? `<button class="btn" onclick="recu('${id}')">🖨 Reçu</button>` : ''}${!d.supprime && can('suppr') ? `<button class="btn d" onclick="supprDon('${id}')">Supprimer</button>` : ''}${!d.supprime && edit ? `<button class="btn p" onclick="editDon('${id}')">Modifier</button>` : ''}<button class="btn" onclick="closeModal()">Fermer</button></div>`);
 }
-function membresOptions(sel){
-  return vals(S.membres).sort((a, b) => a.code.localeCompare(b.code)).map(m => `<option value="${esc(m.code)}" ${m.code === sel ? 'selected' : ''}>${esc(txtMembre(m.code))}${m.statut === 'inactif' ? ' (inactif)' : ''}</option>`).join('');
+function membresOptions(sel, q){
+  q = normTxt(q || '');
+  return vals(S.membres).filter(m => !q || m.code === sel || normTxt(txtMembre(m.code) + ' ' + ((S.prive[m.code] || {}).tel || '') + ' ' + ((S.prive[m.code] || {}).ident || '')).includes(q)).sort((a, b) => a.code.localeCompare(b.code)).map(m => `<option value="${esc(m.code)}" ${m.code === sel ? 'selected' : ''}>${esc(txtMembre(m.code))}${m.statut === 'inactif' ? ' (inactif)' : ''}</option>`).join('');
 }
-function editDon(id){
+function editDon(id, preset){
   if (!vals(S.membres).length) return toast(can('membres') ? 'Créez d\'abord un membre' : 'Aucun membre enregistré');
-  const d = id ? S.dons[id] : { date: today(), devise: 'XOF', taux: 1, mode: 'Wave' };
-  modal(`<h2>${id ? 'Modifier le don ' + esc(d.recu) : 'Nouveau don'}</h2><div class="f">
-    <div class="full"><label>Membre (code) *</label><select id="d_code" onchange="majGroupe()"><option value="">— Choisir —</option>${membresOptions(d.code)}</select></div>
+  const d = id ? S.dons[id] : Object.assign({ date: today(), devise: 'XOF', taux: 1, mode: 'Wave' }, preset || {}), lv = estLivre(d);
+  modal(`<h2>${id ? (lv ? 'Modifier la vente ' : 'Modifier le don ') + esc(d.recu) : lv ? '📚 Nouvelle vente de livre' : 'Nouveau don'}</h2><div class="f">
+    <div class="full"><label>Acheteur / membre *</label><input id="d_q" class="srch" placeholder="🔍 Tapez un nom, un code ou un téléphone pour trouver la personne" oninput="filtreDonMembres()" autocomplete="off">
+      <select id="d_code" onchange="majGroupe()" style="margin-top:6px"><option value="">— Choisir —</option>${membresOptions(d.code)}</select>
+      ${can('membres') ? '<div class="small" style="margin-top:4px"><a class="lnk" onclick="closeModal();editMembre()">+ La personne n\'est pas dans la liste ? Créez-la d\'abord (même hors groupe)</a></div>' : ''}</div>
     <div><label>Groupe (automatique)</label><input id="d_grp" readonly value="${esc(d.code ? groupeDe((S.membres[d.code] || {}).groupe).nom : '')}"></div>
     <div><label>Date *</label><input id="d_date" type="date" value="${d.date}"></div>
     <div><label>Montant (devise d'origine) *</label><input id="d_mt" inputmode="decimal" value="${esc(d.montant ?? '')}" oninput="majFcfa()"></div>
@@ -356,18 +416,27 @@ function editDon(id){
     <div><label>Mode de paiement</label><select id="d_mode" onchange="$('#d_cpt').value=compteParMode(this.value)">${opts(MODES, d.mode)}</select></div>
     <div><label>Encaissé sur le compte</label><select id="d_cpt">${opts(Object.entries(COMPTES), compteDon(d))}</select></div>
     <div><label>Référence de la transaction</label><input id="d_ref" value="${esc(d.ref || '')}"></div>
-    <div class="full"><label>Objet / campagne</label><input id="d_obj" list="camps" value="${esc(d.objet || '')}" placeholder="ex. Achat de livres, Cotisation 2026"><datalist id="camps">${[...new Set(['Achat de livres', 'Cotisation', 'Don', ...campagnes()])].map(c => `<option value="${esc(c)}">`).join('')}</datalist></div></div>
+    <div class="full"><label>Objet / campagne</label><input id="d_obj" list="camps" oninput="majLivre()" onchange="majLivre()" value="${esc(d.objet || '')}" placeholder="ex. Achat de livres, Cotisation 2026"><datalist id="camps">${[...new Set(['Achat de livres', 'Cotisation', 'Don', ...campagnes()])].map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
+    <div class="full lvbox" id="d_lv" style="${lv ? '' : 'display:none'}"><label>Le livre a été acheté *</label>
+      <div class="seg big" id="d_lvf" data-v="${esc(d.livre || '')}">${Object.entries(LVFMT).map(([k, [t, i]]) => `<button type="button" class="${d.livre === k ? 'on' : ''}" onclick="choixFormat('${k}')">${i} ${t}</button>`).join('')}</div>
+      <div class="f" style="margin-top:10px"><div><label>Titre du livre</label><input id="d_tit" list="titres" value="${esc(d.titre || '')}" placeholder="ex. La navigation divine — tome 1"><datalist id="titres">${titresLivres().map(t => `<option value="${esc(t)}">`).join('')}</datalist></div>
+      <div><label>Nombre d'exemplaires</label><input id="d_qte" type="number" min="1" inputmode="numeric" value="${esc(d.qte || 1)}"></div></div></div></div>
     <div class="act"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" id="d_ok" onclick="saveDon('${id || ''}')">Enregistrer</button></div>`);
   if (!id) majTaux(); else majFcfa();
 }
 function dernierTaux(dev){ const L = vals(S.dons).filter(x => x.devise === dev && num(x.taux)).sort((a, b) => b.date.localeCompare(a.date)); return L.length ? num(L[0].taux) : DEVISES[dev][1]; }
 function majTaux(){ const dev = val('d_dev'); $('#d_tx').value = dernierTaux(dev) || ''; $('#d_tx').readOnly = dev === 'XOF' || dev === 'XAF'; majFcfa(); }
 function majFcfa(){ const v = num(val('d_mt')) * num(val('d_tx')); $('#d_fcfa').value = v ? F(v) : ''; }
+function filtreDonMembres(){ const s = $('#d_code'), cur = s.value; s.innerHTML = '<option value="">— Choisir —</option>' + membresOptions(cur, val('d_q')); if (!cur && s.options.length === 2){ s.selectedIndex = 1; majGroupe(); } }
+function majLivre(){ $('#d_lv').style.display = /livre/i.test(val('d_obj')) ? '' : 'none'; }
+function choixFormat(k){ const b = $('#d_lvf'); b.dataset.v = k; b.querySelectorAll('button').forEach((x, i) => x.classList.toggle('on', Object.keys(LVFMT)[i] === k)); }
 function majGroupe(){ const m = S.membres[val('d_code')]; $('#d_grp').value = m ? groupeDe(m.groupe).nom : ''; }
 async function saveDon(id){
   const code = val('d_code'), m = S.membres[code], montant = num(val('d_mt')), taux = num(val('d_tx')), dev = val('d_dev');
   if (!m) return toast('Choisissez le membre'); if (montant <= 0) return toast('Montant invalide'); if (taux <= 0) return toast('Indiquez le taux de conversion');
   const champs = { code, groupe: m.groupe || '', date: val('d_date') || today(), montant, devise: dev, taux, fcfa: Math.round(montant * taux), mode: val('d_mode'), compte: val('d_cpt') || compteParMode(val('d_mode')), ref: val('d_ref'), objet: val('d_obj') };
+  if (/livre/i.test(champs.objet)){ const f = $('#d_lvf').dataset.v; if (!LVFMT[f]) return toast('Indiquez si le livre a été acheté en ligne ou physiquement'); Object.assign(champs, { livre: f, titre: val('d_tit'), qte: Math.max(1, Math.round(num(val('d_qte')) || 1)) }); }
+  else Object.assign(champs, { livre: null, titre: null, qte: null });
   $('#d_ok').disabled = true;
   try {
     if (id){
@@ -391,6 +460,45 @@ async function confSuppr(id){
   const motif = val('s_m'); if (motif.length < 5) return toast('Motif obligatoire (5 caractères min.)');
   const avant = S.dons[id], apres = Object.assign({}, avant, { supprime: true, motif, supprPar: AUTH.uid, supprNom: ME.nom, supprLe: Date.now() });
   try { await ref('dons/' + id).set(apres); journal('Suppression d\'un don', 'don ' + avant.recu, avant, apres); closeModal(); toast('Don supprimé'); } catch(e){ toast('Refusé : ' + (e.code || e.message)); }
+}
+
+/* ----- livres (ventes en ligne / physiques) ----- */
+const LVFMT = { ligne: ['En ligne', '🌐', 'b'], physique: ['Physique', '📖', 'w'] };
+const estLivre = d => /livre/i.test(d.objet || '');
+const fmtLivre = d => LVFMT[d.livre] ? d.livre : 'np';
+const titresLivres = () => [...new Set(vals(S.dons).map(d => d.titre).filter(Boolean))].sort();
+let LVF = 'tous', LVQ = '';
+function ventesLivres(){
+  const all = donsFiltres().filter(estLivre), q = normTxt(LVQ);
+  const st = L => ({ L, mt: L.reduce((t, d) => t + num(d.fcfa), 0), ach: new Set(L.map(d => d.code)).size, ex: L.reduce((t, d) => t + (num(d.qte) || 1), 0) });
+  const parF = k => all.filter(d => fmtLivre(d) === k);
+  const L = (LVF === 'tous' ? all : parF(LVF)).filter(d => !q || normTxt(d.code + ' ' + (d.titre || '') + ' ' + d.recu + ' ' + groupeDe(d.groupe).nom + ' ' + (can('noms') ? nomDe(d.code) + ' ' + ((S.prive[d.code] || {}).tel || '') : '')).includes(q))
+    .sort((a, b) => (b.date + b.recu).localeCompare(a.date + a.recu));
+  return { T: st(all), On: st(parF('ligne')), Ph: st(parF('physique')), NP: st(parF('np')), V: st(L), all };
+}
+VIEWS.livres = () => {
+  const { T, On, Ph, NP, V, all } = ventesLivres(), n = can('noms');
+  const pct = x => T.mt ? Math.round(x.mt / T.mt * 100) : 0;
+  const parT = {}; all.forEach(d => { const k = d.titre || 'Titre non précisé', o = parT[k] || (parT[k] = { ligne: 0, physique: 0, np: 0, mt: 0 }); o[fmtLivre(d)] += num(d.qte) || 1; o.mt += num(d.fcfa); });
+  const seg = [['tous', 'Tous', T.L.length], ['ligne', '🌐 En ligne', On.L.length], ['physique', '📖 Physique', Ph.L.length], ...(NP.L.length ? [['np', '⚠ Non précisé', NP.L.length]] : [])];
+  return `${filtresHTML()}
+  <div class="hero no-print-bg"><div><div class="hero-l">Ventes de livres</div><div class="hero-v">${FCFA(T.mt)}</div><div class="hero-s">${T.ach} acheteur(s) · ${T.ex} livre(s) vendu(s) · ${T.L.length} paiement(s)</div></div>
+    ${can('saisie') ? `<button class="btn g no-print" onclick="editDon(null,{objet:'Achat de livres'})">+ Vente de livre</button>` : ''}</div>
+  <div class="grid g2" style="margin-bottom:12px">
+    <div class="card stat sb"><div class="ic">🌐</div><div class="grow0"><div class="l">Achetés en ligne</div><div class="v">${FCFA(On.mt)}</div><div class="s">${On.ach} acheteur(s) · ${On.ex} livre(s)</div><div class="hbar b"><i style="width:${pct(On)}%"></i></div><div class="s">${pct(On)} % du total</div></div></div>
+    <div class="card stat sw"><div class="ic">📖</div><div class="grow0"><div class="l">Achetés physiquement</div><div class="v">${FCFA(Ph.mt)}</div><div class="s">${Ph.ach} acheteur(s) · ${Ph.ex} livre(s)</div><div class="hbar"><i style="width:${pct(Ph)}%"></i></div><div class="s">${pct(Ph)} % du total</div></div></div></div>
+  ${NP.L.length ? `<div class="alert w no-print">⚠ ${NP.L.length} vente(s) enregistrée(s) sans préciser « en ligne » ou « physique ». Ouvrez l'onglet « Non précisé », touchez chaque ligne puis ✏ Modifier pour le préciser.</div>` : ''}
+  <div class="card"><div class="bar"><div class="seg no-print">${seg.map(([k, t, c]) => `<button class="${LVF === k ? 'on' : ''}" onclick="LVF='${k}';render()">${t} <span class="cnt">${c}</span></button>`).join('')}</div><span class="grow"></span>
+    <input class="srch no-print" style="flex:1;min-width:160px" placeholder="🔍 ${n ? 'Nom, téléphone, ' : ''}code, titre" value="${esc(LVQ)}" oninput="LVQ=this.value;clearTimeout(window._lq);window._lq=setTimeout(()=>{render();const i=document.querySelector('.card .srch');i.focus();i.setSelectionRange(i.value.length,i.value.length)},300)">
+    <button class="btn no-print" onclick="exportLivres()">⬇ Excel</button><button class="btn no-print" onclick="print()">🖨 Imprimer</button></div>
+    <h3>${({ tous: 'Tous les acheteurs', ligne: 'Acheteurs en ligne', physique: 'Acheteurs physiques', np: 'Format non précisé' })[LVF]} — ${V.ach} personne(s) · ${V.ex} livre(s) · ${FCFA(V.mt)}</h3>
+    ${tbl([['N°'],['Date'],['Reçu'],['Code'], ...(n ? [['Nom'],['Téléphone']] : []), ['Groupe'],['Format'],['Livre'],['Qté','n'],['Montant','n']], V.L.map((d, i) => `<tr class="click" onclick="ficheDon('${d.id}')"><td>${i + 1}</td><td>${dfr(d.date)}</td><td>${esc(d.recu)}</td><td class="code">${esc(d.code)}</td>${n ? `<td><b>${esc(nomDe(d.code))}</b></td><td>${esc((S.prive[d.code] || {}).tel || '')}</td>` : ''}<td>${esc(groupeDe(d.groupe).nom)}</td><td>${LVFMT[d.livre] ? `<span class="tag ${LVFMT[d.livre][2]}">${LVFMT[d.livre][1]} ${LVFMT[d.livre][0]}</span>` : '<span class="tag w">À préciser</span>'}</td><td>${esc(d.titre || '—')}</td><td class="n">${d.qte || 1}</td><td class="n b">${FCFA(d.fcfa)}</td></tr>`), 'Aucune vente de livre. Touchez « + Vente de livre » pour enregistrer la première.')}
+    ${V.L.length ? `<div class="totline"><span>Total</span><b>${FCFA(V.mt)}</b></div>` : ''}</div>
+  ${Object.keys(parT).length ? `<div class="card"><h3>Par livre</h3>${tbl([['Livre'],['🌐 En ligne','n'],['📖 Physique','n'], ...(NP.L.length ? [['Non précisé','n']] : []), ['Total ex.','n'],['Montant','n']], Object.entries(parT).sort((a, b) => b[1].mt - a[1].mt).map(([k, o]) => `<tr><td><b>${esc(k)}</b></td><td class="n">${o.ligne}</td><td class="n">${o.physique}</td>${NP.L.length ? `<td class="n">${o.np}</td>` : ''}<td class="n">${o.ligne + o.physique + o.np}</td><td class="n b">${FCFA(o.mt)}</td></tr>`))}</div>` : ''}`;
+};
+function exportLivres(){
+  const { V } = ventesLivres(), n = can('noms');
+  csv('livres_' + LVF, [['N°','Date','Reçu','Code', ...(n ? ['Nom','Téléphone'] : []), 'Groupe','Format','Livre','Quantité','Montant FCFA','Mode'], ...V.L.map((d, i) => [i + 1, dfr(d.date), d.recu, d.code, ...(n ? [nomDe(d.code), (S.prive[d.code] || {}).tel || ''] : []), groupeDe(d.groupe).nom, LVFMT[d.livre] ? LVFMT[d.livre][0] : 'Non précisé', d.titre || '', d.qte || 1, d.fcfa, d.mode]), [], ['', '', '', 'TOTAL', ...(n ? ['', ''] : []), '', '', '', V.ex, V.mt]]);
 }
 
 /* ----- caisse & trésorerie ----- */
@@ -822,7 +930,7 @@ VIEWS.aide = () => !can('aide') ? '<div class="empty">Accès réservé.</div>' :
   <li><b>Dons</b> : « + Nouveau don », choisissez le membre (le groupe se remplit tout seul), le montant et la devise ; le montant en FCFA est calculé avec le taux. Le reçu (R-00001…) est numéroté automatiquement.</li>
   <li><b>Caisse & trésorerie</b> (trésorier général) : saisir une fois les soldes de départ de chaque compte (caisse, banque, Wave, Orange Money…), puis « + Décaissement » pour chaque sortie d'argent (motif, bénéficiaire, pièce justificative, bon imprimable) et « ⇄ Transfert » pour un retrait ou un dépôt entre comptes. Les dons entrent sur le compte choisi à la saisie.</li>
   <li><b>Personnes hors groupe</b> : dans « + Nouveau membre », laissez le groupe sur « Hors groupe ». Seul le nom est obligatoire. Elles apparaissent dans Groupes sur la ligne « Hors groupe ».</li>
-  <li><b>Paiement des livres</b> : saisissez un don avec l'objet « Achat de livres ». La liste de ceux qui ont payé (et, si besoin, de ceux qui n'ont pas encore payé) est dans Rapports, onglet « Par objet », avec export Excel et impression.</li>
+  <li><b>Livres</b> : menu « 📚 Livres », bouton « + Vente de livre ». Choisissez l'acheteur (recherche par nom, code ou téléphone), le montant, puis « 🌐 En ligne » ou « 📖 Physique », le titre et le nombre d'exemplaires. La page Livres affiche le total, le total en ligne, le total physique, la liste de chaque catégorie et le détail par livre, avec export Excel et impression.</li>
   <li><b>Tableau de bord et Rapports</b> : totaux par groupe, par membre, total général, classement ; filtres par période, pays, groupe et campagne ; export Excel et impression PDF.</li></ol>
   <h3>Qui voit quoi</h3><table>${[['Administrateur','Tout ; crée les comptes et attribue les rôles ; journal ; export'],['Trésorier général','Noms, contacts, codes, montants ; membres et groupes ; saisit, corrige et supprime les dons (motif obligatoire) ; reçus et rapports'],['Trésorière adjointe','Noms, contacts, codes, montants ; saisit les dons et corrige ses propres saisies ; ne supprime pas'],['Commissaire aux comptes','Tout, y compris le journal, en consultation seulement ; export'],['Grand Maître','Codes, groupes, montants et totaux ; jamais les noms ni les contacts (ni à l\'écran, ni dans les exports)']].map(([a, b]) => `<tr><td><b>${a}</b></td><td class="small">${b}</td></tr>`).join('')}</table>
   <p class="small muted">Ces droits sont appliqués par le serveur (règles de sécurité Firebase), pas seulement par l'écran : un compte Grand Maître ne reçoit jamais les noms, même en examinant le code de l'application.</p></div>`;
