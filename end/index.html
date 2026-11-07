@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#1b2a4a">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/logo.svg" type="image/svg+xml"><link rel="icon" href="icons/icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -83,6 +83,8 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 }
 @media print{.side,.tabbar,.top .btn,.bar,.no-print{display:none!important}.main{padding:0}.card{break-inside:avoid}}
 /* ===== V1.6 — finition de l'interface ===== */
+img.logo{background:none;object-fit:contain;padding:0;box-shadow:0 4px 14px rgba(0,0,0,.25);border-radius:50%}
+.login img.logo{display:block;width:96px;height:96px}
 :root{--bg:#f3f4f8;--line:#e6e8ef;--pri:#17254a;--pri2:#2a3f72;--gold:#c0913f;--gold2:#f7efe0;--blue:#2453b3;--blueb:#e8effc;--sh:0 1px 2px rgba(16,24,40,.04),0 2px 8px rgba(16,24,40,.05);--sh2:0 10px 30px rgba(16,24,40,.10)}
 html,body{font-family:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
 .side{background:linear-gradient(180deg,#132042 0%,#1c2d57 100%)}
@@ -145,7 +147,7 @@ tr.click:hover td{background:#fbf7ef}
 <script>
 'use strict';
 /* =====================  END — Dons des volontaires  ===================== */
-const VERSION = 'V1.6';
+const VERSION = 'V1.6.1';
 const ADMIN_EMAIL = 'moayepos@gmail.com';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -261,7 +263,7 @@ let rT = null; function scheduleRender(){ clearTimeout(rT); rT = setTimeout(() =
 
 /* ---------- connexion ---------- */
 function renderLogin(msg){
-  $('#root').innerHTML = `<div class="login"><div class="box"><div class="logo">END</div>
+  $('#root').innerHTML = `<div class="login"><div class="box"><img class="logo" src="icons/logo.svg" alt="END">
     <h2 style="text-align:center;margin:0">École de Navigation Divine</h2><p class="muted small" style="text-align:center;margin:4px 0 14px">Dons des volontaires — accès réservé à l'administration</p>
     ${msg ? `<div class="alert r">${msg}</div>` : ''}
     <div class="f" style="grid-template-columns:1fr"><div><label>E-mail</label><input id="l_e" type="email" autocomplete="username"></div>
@@ -271,7 +273,7 @@ function renderLogin(msg){
     <p class="small muted" style="text-align:center">${VERSION}</p></div></div>`;
 }
 function renderBlocked(msg){
-  $('#root').innerHTML = `<div class="login"><div class="box"><div class="logo">END</div><div class="alert w">${msg}</div><p class="small muted">${esc(AUTH && AUTH.email)}</p><div class="act"><button class="btn" onclick="firebase.auth().signOut()">Se déconnecter</button><button class="btn p" onclick="location.reload()">Réessayer</button></div></div></div>`;
+  $('#root').innerHTML = `<div class="login"><div class="box"><img class="logo" src="icons/logo.svg" alt="END"><div class="alert w">${msg}</div><p class="small muted">${esc(AUTH && AUTH.email)}</p><div class="act"><button class="btn" onclick="firebase.auth().signOut()">Se déconnecter</button><button class="btn p" onclick="location.reload()">Réessayer</button></div></div></div>`;
 }
 const authErr = e => ({ 'auth/invalid-credential':'E-mail ou mot de passe incorrect.', 'auth/wrong-password':'Mot de passe incorrect.', 'auth/user-not-found':'Aucun compte avec cet e-mail.', 'auth/invalid-email':'E-mail invalide.', 'auth/too-many-requests':'Trop d\'essais. Patientez quelques minutes.', 'auth/network-request-failed':'Pas de connexion internet.', 'auth/email-already-in-use':'Cet e-mail a déjà un compte.', 'auth/weak-password':'Mot de passe trop court (8 caractères minimum).', 'auth/operation-not-allowed':'La connexion par e-mail n\'est pas activée dans Firebase (voir le guide, étape 1).', 'auth/requires-recent-login':'Par sécurité, reconnectez-vous puis recommencez.' }[e && e.code] || ('Erreur : ' + (e && (e.code || e.message))));
 async function login(){
@@ -308,7 +310,7 @@ function render(){
   const titre = (items.find(m => m[0] === VIEW) || [,,'Fiche'])[2];
   const body = (VIEWS[VIEW] || VIEWS.tableau)(ARG);
   $('#root').innerHTML = `<div class="app">
-    <aside class="side"><div class="brand"><div class="logo">END</div><div><b>Dons des volontaires</b><small>École de Navigation Divine</small></div></div>
+    <aside class="side"><div class="brand"><img class="logo" src="icons/logo.svg" alt="END"><div><b>Dons des volontaires</b><small>École de Navigation Divine</small></div></div>
       <nav class="nav">${MENU().map(([g, it]) => `<div class="grp">${g}</div>` + it.map(([k, i, t]) => `<a class="${VIEW === k ? 'on' : ''}" onclick="go('${k}')"><span>${i}</span>${t}</a>`).join('')).join('')}</nav>
       <div class="who"><b>${esc(ME.nom)}</b><br>${esc(ROLES[ME.role])}<br><a style="color:inherit;cursor:pointer;text-decoration:underline" onclick="firebase.auth().signOut()">Se déconnecter</a></div>
       <p class="small" style="opacity:.5;padding:0 10px">${VERSION}</p></aside>
