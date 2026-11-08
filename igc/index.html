@@ -114,6 +114,15 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 .porte{flex:0 1 118px;display:flex;gap:6px;align-items:center}.porte .dia{color:var(--gold);font-size:22px}.porte.ok .dia{color:var(--ok)}.porte .pt{flex:1;min-width:0}.porte .pt b{font-size:12.5px}.porte .small{font-size:11.5px;line-height:1.25;margin-top:3px}.porte .prog{margin-top:4px}
 @media (max-width:760px){.atlas-ban{min-height:150px;padding:12px}.atlas-t1{font-size:28px}.atlas-ban .btn{width:100%}
  .route{flex-direction:column}.ph{min-width:0}.porte{flex:none;padding-left:10px}}
+
+/* ===== V1.4 — base électorale ===== */
+.elr{padding:7px 0;border-bottom:1px solid var(--line)}.elr:last-child{border-bottom:0}
+.elr-h{display:flex;justify-content:space-between;gap:10px;align-items:baseline;font-size:14px}.elr-h>span:first-child{min-width:0;overflow-wrap:anywhere}.elr-h .b{white-space:nowrap;font-weight:700}
+.elb{height:8px;background:#eef0f5;border-radius:99px;margin-top:5px;overflow:hidden}.elb i{display:block;height:100%;border-radius:99px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+@media (max-width:760px){.elsegm button{flex:1 1 30%}}
+#diag .agchk label{display:flex;gap:8px;align-items:flex-start;text-align:left;justify-content:flex-start}#diag .agchk input{flex:none;width:auto;margin-top:3px}
+#elq{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff}
 </style>
 </head>
 <body>
@@ -121,7 +130,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  IGC Gestion  ===================== */
-const VERSION = 'V1.3';
+const VERSION = 'V1.4';
 const KEY = 'igc_gestion_v1';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -347,7 +356,7 @@ window.addEventListener('offline', () => setFb('', 'Hors ligne'));
 
 /* ---------- navigation ---------- */
 const MENU = [
-  ['Pilotage', [['tableau','📊','Tableau de bord'],['atlas','🧭','ATLAS IA — Commandement'],['agents','🤖','Agents IA']]],
+  ['Pilotage', [['tableau','📊','Tableau de bord'],['atlas','🧭','ATLAS IA — Commandement'],['elec','🗳️','Base électorale'],['agents','🤖','Agents IA']]],
   ['Commercial', [['clients','👥','Clients'],['devis','📝','Devis'],['missions','🎯','Missions']]],
   ['Finances', [['factures','🧾','Factures'],['paiements','💰','Encaissements'],['depenses','💸','Dépenses'],['tresorerie','🏦','Trésorerie'],['rapports','📈','Rapports']]],
   ['Système', [['parametres','⚙️','Paramètres'],['aide','❓','Mode d\'emploi']]],
@@ -360,7 +369,7 @@ window.__back = () => { if ($('.modal-bg')){ closeModal(); return true; } if (VI
 function render(){
   const root = $('#root');
   if (!SESSION){ root.innerHTML = loginHTML(); return; }
-  const titre = VIEW === 'ordre' ? 'Mission ATLAS IA' : (MENU.flatMap(g => g[1]).find(m => m[0] === VIEW) || [,,'Fiche'])[2];
+  const titre = VIEW === 'ordre' ? 'Mission ATLAS IA' : VIEW === 'circo' ? 'Fiche électorale' : (MENU.flatMap(g => g[1]).find(m => m[0] === VIEW) || [,,'Fiche'])[2];
   const body = (VIEWS[VIEW] || VIEWS.tableau)(ARG);
   root.innerHTML = `<div class="app">
     <aside class="side"><div class="brand"><div class="logo">IGC</div><div><b>IGC Gestion</b><small>Impact Global Consulting</small></div></div>
@@ -397,7 +406,7 @@ document.addEventListener('keydown', e => { if (SESSION || $('.modal-bg')) retur
 function logout(){ SESSION = null; sessionStorage.removeItem('igc_session'); render(); }
 
 /* liste compacte sur téléphone : ligne 1 = nom + montant, ligne 2 = détails */
-const TITRES_COL = ['Client','Mission','Nom','Objet','Libellé','Agent','Catégorie','N°','Numéro','Date'];
+const TITRES_COL = ['Client','Mission','Nom','Objet','Libellé','Agent','Catégorie','N°','Numéro','Date','Circonscription','Commune','Région','Territoire'];
 function lignesMobiles(root){
   root.querySelectorAll('table.resp').forEach(t => {
     const h = [...t.querySelectorAll('thead th')].map(x => x.textContent.trim());
@@ -953,6 +962,160 @@ function confirmerReprise(id){ const r = val('o_ret'); if (r.length < 5) return 
 function abandonOrdre(id){ if (!confirm('Abandonner cette mission ?')) return; majOrdre(id, o => { o.statut = 'abandonnee'; }, 'Mission abandonnée'); }
 
 /* ----- paramètres ----- */
+/* ---------- V1.4 — Base électorale (résultats officiels CEI) ---------- */
+const ELEC_URL = 'data/elections-2026-11-08.json';
+let ELEC = null, ELEC_ETAT = '', ELF = { e: 0, q: '' };
+const DIAG = {};
+function chargeElec(){
+  if (ELEC || ELEC_ETAT === 'charge') return; ELEC_ETAT = 'charge';
+  fetch(ELEC_URL).then(r => { if (!r.ok) throw 0; return r.json(); }).then(d => {
+    d.parT = {}; d.C.forEach(c => (d.parT[c[0]] = d.parT[c[0]] || []).push(c)); Object.values(d.parT).forEach(a => a.sort((x, y) => y[3] - x[3]));
+    d.inv = {}; Object.entries(d.K).forEach(([k, a]) => a.forEach(j => (d.inv[j] = d.inv[j] || []).push(+k)));
+    ELEC = d; ELEC_ETAT = ''; if (['elec','circo'].includes(VIEW)) render();
+  }).catch(() => { ELEC_ETAT = 'erreur'; if (['elec','circo'].includes(VIEW)) render(); });
+}
+/* T : [élection, niveau département, région, code, nom, bureaux, inscrits, votants, nuls, exprimés, blancs, contrôle] — C : [territoire, parti, candidat, voix, %, élu] */
+const elT = i => ELEC.T[i], elC = i => ELEC.parT[i] || [];
+const P1 = x => (Math.round(num(x) * 10) / 10).toLocaleString('fr-FR') + ' %';
+const elPart = t => t[6] ? t[7] / t[6] * 100 : 0;
+const elNorm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
+const elNom = t => (t[3] ? t[3] + ' · ' : '') + t[4];
+const elNiv = t => t[0] < 2 ? 'Circonscription' : t[0] === 2 ? 'Commune' : t[0] === 3 ? 'Région' : t[1] ? 'Département' : 'Région';
+const elVainq = i => { const cs = elC(i), w = cs.find(c => c[5]) || cs[0], s = cs.find(c => c !== w); return { w, s, ecart: w && s ? w[4] - s[4] : null }; };
+const elAlertes = i => { const t = elT(i), E = ELEC.E[t[0]]; const a = ELEC.A.filter(x => x[0] === E && x[2] === t[4]).map(x => x[3]); if (t[11] && t[11] !== 'OK' && !a.length) a.push(t[11]); return a; };
+const EL_PRES = e => e >= 4;
+function elAttente(){
+  chargeElec();
+  return ELEC_ETAT === 'erreur' ? `<div class="card"><div class="empty">La base électorale n'a pas pu être chargée. Connectez-vous à Internet une première fois : elle restera ensuite disponible hors ligne.<br><br><button class="btn" onclick="ELEC_ETAT='';render()">Réessayer</button></div></div>` : `<div class="card"><div class="empty">Chargement de la base électorale…</div></div>`;
+}
+VIEWS.elec = () => {
+  if (!ELEC) return elAttente();
+  const q = elNorm(ELF.q), e = ELF.e;
+  const tous = ELEC.T.map((t, i) => [t, i]).filter(([t]) => t[0] === e);
+  const L = tous.filter(([t]) => !q || elNorm(t[3] + ' ' + t[4] + ' ' + t[2]).includes(q))
+    .sort((a, b) => (a[0][1] - b[0][1]) || String(a[0][3]).localeCompare(String(b[0][3])) || a[0][4].localeCompare(b[0][4]));
+  const base = EL_PRES(e) ? tous.filter(([t]) => !t[1]) : tous;
+  const ins = base.reduce((s, [t]) => s + t[6], 0), vot = base.reduce((s, [t]) => s + t[7], 0);
+  const gains = {}; if (!EL_PRES(e)) base.forEach(([, i]) => { const w = elVainq(i).w; if (w) gains[w[1]] = (gains[w[1]] || 0) + 1; });
+  const serres = EL_PRES(e) ? 0 : base.filter(([, i]) => { const v = elVainq(i); return v.ecart !== null && v.ecart < 5; }).length;
+  return `<div class="alert">🗳️ Résultats officiels publiés par la CEI · ${ELEC.E.length} scrutins · extraction du ${dfr(ELEC.maj)}. Touchez une ligne pour ouvrir la fiche et le diagnostic.</div>
+  <div class="card" style="margin-bottom:12px"><div class="segm elsegm">${ELEC.E.map((n, k) => `<button class="${e === k ? 'on' : ''}" onclick="ELF.e=${k};render()">${esc(n.replace('Présidentielle', 'Présid.').replace('Législatives', 'Législ.'))}</button>`).join('')}</div>
+    <input id="elq" style="margin-top:10px;width:100%" placeholder="Rechercher : numéro (021), commune, région…" value="${esc(ELF.q)}" oninput="ELF.q=this.value;clearTimeout(window.__elq);window.__elq=setTimeout(()=>{render();const x=$('#elq');x.focus();x.setSelectionRange(x.value.length,x.value.length)},250)"></div>
+  <div class="grid g4" style="margin-bottom:12px">
+    <div class="card kpi"><div class="l">${EL_PRES(e) ? 'Régions et districts' : 'Territoires'}</div><div class="v">${base.length}</div><div class="s">${esc(ELEC.E[e])}</div></div>
+    <div class="card kpi"><div class="l">Inscrits</div><div class="v">${F(ins)}</div><div class="s">${F(vot)} votants</div></div>
+    <div class="card kpi"><div class="l">Participation</div><div class="v">${P1(ins ? vot / ins * 100 : 0)}</div><div class="s">moyenne pondérée</div></div>
+    <div class="card kpi gold"><div class="l">${EL_PRES(e) ? 'Niveau détaillé' : 'Victoires serrées'}</div><div class="v">${EL_PRES(e) ? tous.length - base.length : serres}</div><div class="s">${EL_PRES(e) ? 'départements, communes d\'Abidjan, pays' : 'écart de moins de 5 points'}</div></div></div>
+  ${Object.keys(gains).length ? `<div class="card" style="margin-bottom:12px"><h3>Territoires gagnés par parti</h3><div class="chips">${Object.entries(gains).sort((a, b) => b[1] - a[1]).map(([p, n]) => `<span class="tag b">${esc(p)} <b>${n}</b></span>`).join(' ')}</div></div>` : ''}
+  <div class="card">${tbl([[elNiv(tous[0] ? tous[0][0] : [e])], ['Inscrits','n'], ['Participation','n'], ['Vainqueur'], ['Écart','n']], L.slice(0, 400).map(([t, i]) => { const v = elVainq(i), al = elAlertes(i).length;
+      return `<tr class="click" onclick="go('circo',${i})"><td><b>${esc(elNom(t))}</b>${EL_PRES(e) ? ` <span class="tag">${t[1] ? 'Département' : 'Région'}</span>` : ''}${al ? ' <span class="tag w">à vérifier</span>' : ''}<div class="small muted">${esc(t[2])}</div></td><td class="n">${F(t[6])}</td><td class="n">${P1(elPart(t))}</td><td>${v.w ? `<b>${esc(v.w[1])}</b> ${P1(v.w[4])}` : '—'}</td><td class="n">${v.ecart === null ? '—' : (v.ecart < 5 ? '<span class="tag r">' + P1(v.ecart).replace(' %', ' pt') + '</span>' : P1(v.ecart).replace(' %', ' pt'))}</td></tr>`; }), 'Aucun territoire ne correspond à cette recherche.')}
+  ${L.length > 400 ? `<p class="small muted">400 premières lignes affichées sur ${L.length} : précisez la recherche.</p>` : ''}</div>
+  <p class="small muted" style="margin-top:10px">${esc(ELEC.src)}. Données publiques agrégées : aucune donnée personnelle d'électeur.</p>`;
+};
+function diagEtat(i){
+  if (!DIAG[i]){ const t = elT(i); DIAG[i] = { camp: 0, allies: [], part: Math.round(elPart(t) * 10) / 10, marge: 5, abst: 5, besoin: '' }; }
+  return DIAG[i];
+}
+function diagCalc(i){
+  const t = elT(i), cs = elC(i), d = diagEtat(i);
+  const nuls = t[7] ? t[8] / t[7] : 0;
+  const camp = d.camp >= 0 ? cs[d.camp] : null, allies = d.allies.map(k => cs[k]).filter(Boolean);
+  const adv = cs.filter((c, k) => k !== d.camp && !d.allies.includes(k)).sort((a, b) => b[4] - a[4])[0] || null;
+  const besoinAuto = Math.min(60, (adv ? adv[4] : 0) + num(d.marge));
+  const besoin = d.besoin !== '' ? num(d.besoin) : besoinAuto;
+  const votAtt = t[6] * num(d.part) / 100, exprAtt = votAtt * (1 - nuls);
+  const objectif = Math.round(exprAtt * besoin / 100);
+  const abst = Math.max(0, t[6] - t[7]);
+  const vCamp = camp ? camp[3] : 0, vAll = allies.reduce((s, c) => s + c[3], 0), vAbst = Math.round(abst * num(d.abst) / 100);
+  const reservoir = vCamp + vAll + vAbst, ratio = objectif ? reservoir / objectif * 100 : 0;
+  const verdict = ratio >= 120 ? ['Favorable', 'g', 'Gagner dépend surtout de la mobilisation de son propre camp.'] : ratio >= 90 ? ['Disputé', 'w', 'La victoire se joue dans les zones disputées et sur le terrain.'] : ['Difficile', 'r', 'Il faut une alliance, un fait nouveau ou une autre ambition (préparer l\'élection suivante).'];
+  return { t, cs, d, camp, allies, adv, nuls, besoinAuto, besoin, votAtt, exprAtt, objectif, abst, vCamp, vAll, vAbst, reservoir, ratio, verdict, manque: Math.max(0, objectif - reservoir) };
+}
+function diagRes(i){
+  const r = diagCalc(i);
+  return `<div class="grid g3" style="margin-top:10px">
+    <div class="card kpi"><div class="l">Objectif de voix</div><div class="v">${F(r.objectif)}</div><div class="s">${F(r.t[6])} inscrits × ${P1(r.d.part)} × ${P1((1 - r.nuls) * 100)} valides × ${P1(r.besoin)}</div></div>
+    <div class="card kpi"><div class="l">Réservoir de voix</div><div class="v">${F(r.reservoir)}</div><div class="s">camp ${F(r.vCamp)} + alliés ${F(r.vAll)} + abstentionnistes ${F(r.vAbst)}</div></div>
+    <div class="card kpi gold"><div class="l">Verdict</div><div class="v">${r.verdict[0]} · ${Math.round(r.ratio)} %</div><div class="s">réservoir ÷ objectif</div></div></div>
+  <div class="alert ${r.verdict[1]}"><b>${r.verdict[0]}.</b> ${r.verdict[2]} ${r.manque ? `Il manque environ <b>${F(r.manque)} voix</b> pour couvrir l'objectif.` : `Marge d'environ <b>${F(r.reservoir - r.objectif)} voix</b> au-dessus de l'objectif.`}${r.adv ? ` Principal adversaire : ${esc(r.adv[1])} (${P1(r.adv[4])}).` : ''}</div>
+  <p class="small muted">Seuils de la méthode ATLAS : favorable au-dessus de 120 %, disputé entre 90 et 120 %, difficile en dessous de 90 %. Les hypothèses (participation, marge, abstentionnistes mobilisables, alliés) sont à confirmer sur le terrain.</p>`;
+}
+function diagHTML(i){
+  const cs = elC(i), d = diagEtat(i), r = diagCalc(i);
+  if (!cs.length) return `<div class="empty">Pas de résultat chiffré pour ce territoire : diagnostic impossible.</div>`;
+  return `<div class="f">
+    <div class="full"><label>Camp du candidat accompagné</label><select onchange="diagEtat(${i}).camp=+this.value;diagEtat(${i}).allies=diagEtat(${i}).allies.filter(k=>k!==+this.value);$('#diag').innerHTML=diagHTML(${i})">${cs.map((c, k) => `<option value="${k}" ${d.camp === k ? 'selected' : ''}>${esc(c[1])} — ${esc(c[2])} (${P1(c[4])})</option>`).join('')}<option value="-1" ${d.camp === -1 ? 'selected' : ''}>Nouveau candidat (aucune voix passée)</option></select></div>
+    <div><label>Participation attendue (%)</label><input inputmode="decimal" value="${esc(d.part)}" oninput="diagEtat(${i}).part=num(this.value);$('#diagres').innerHTML=diagRes(${i})"></div>
+    <div><label>Marge de sécurité (points)</label><input inputmode="decimal" value="${esc(d.marge)}" oninput="diagEtat(${i}).marge=num(this.value);$('#diagres').innerHTML=diagRes(${i})"></div>
+    <div><label>Abstentionnistes mobilisables (%)</label><input inputmode="decimal" value="${esc(d.abst)}" oninput="diagEtat(${i}).abst=num(this.value);$('#diagres').innerHTML=diagRes(${i})"></div>
+    <div><label>Part nécessaire (%) — vide = calcul auto (${P1(r.besoinAuto)})</label><input inputmode="decimal" value="${esc(d.besoin)}" placeholder="${P1(r.besoinAuto)}" oninput="diagEtat(${i}).besoin=this.value.trim();$('#diagres').innerHTML=diagRes(${i})"></div>
+    ${cs.length > 1 ? `<div class="full"><label>Alliés possibles (leurs voix passées s'ajoutent au réservoir)</label><div class="agchk">${cs.map((c, k) => k === d.camp ? '' : `<label><input type="checkbox" ${d.allies.includes(k) ? 'checked' : ''} onchange="const a=diagEtat(${i}).allies;this.checked?a.push(${k}):a.splice(a.indexOf(${k}),1);$('#diag').innerHTML=diagHTML(${i})"> ${esc(c[1])} — ${esc(c[2])} (${F(c[3])} voix)</label>`).join('')}</div></div>` : ''}
+  </div><div id="diagres">${diagRes(i)}</div>`;
+}
+function elBarres(i){
+  const cs = elC(i), max = cs.length ? cs[0][4] : 1;
+  return cs.map(c => `<div class="elr"><div class="elr-h"><span><b>${esc(c[1])}</b> · ${esc(c[2])}${c[5] ? ' <span class="tag g">élu(e)</span>' : ''}</span><span class="b">${F(c[3])} · ${P1(c[4])}</span></div><div class="elb"><i style="width:${Math.max(1, c[4] / Math.max(max, 1) * 100)}%;background:${c[5] ? 'var(--gold)' : '#9aa6bd'}"></i></div></div>`).join('') || '<div class="empty">Aucun résultat chiffré publié pour ce territoire.</div>';
+}
+function elLies(i){
+  const t = elT(i); let L = [];
+  if (t[0] < 2){ L = (ELEC.K[i] || []).slice(); const autre = ELEC.T.findIndex(x => x[0] === (t[0] ? 0 : 1) && x[3] === t[3]); if (autre >= 0) L.unshift(autre); }
+  else { L = (ELEC.inv[i] || []).slice(); }
+  L = [...new Set(L)].sort((a, b) => elT(a)[0] - elT(b)[0]);
+  return L;
+}
+VIEWS.circo = a => {
+  if (!ELEC) return elAttente();
+  const i = +a, t = elT(i); if (!t) return VIEWS.elec();
+  const v = elVainq(i), al = elAlertes(i), lies = elLies(i), E = ELEC.E[t[0]];
+  const ecartVoix = v.w && v.s ? v.w[3] - v.s[3] : null;
+  return `<div class="bar no-print" style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" onclick="go('elec')">← Base électorale</button><span style="flex:1"></span><button class="btn sm" onclick="copierFiche(${i})">📋 Copier</button><button class="btn sm" onclick="imprimerFiche(${i})">🖨 Imprimer</button><button class="btn sm g" onclick="missionFiche(${i})">🧭 Mission ATLAS</button></div>
+  <div class="card" style="margin-bottom:12px"><div class="small muted">${esc(E)} · ${esc(elNiv(t))} · ${esc(t[2])}</div><h2 style="margin:4px 0 2px;font-size:19px">${esc(elNom(t))}</h2>
+    <div class="small muted">${t[5] ? F(t[5]) + ' bureaux de vote · ' : ''}Source : résultats officiels CEI${t[0] === 0 ? ' (provisoires)' : ''}</div>
+    ${al.map(x => `<div class="alert w">⚠️ À vérifier sur le procès-verbal : ${esc(x)}</div>`).join('')}</div>
+  <div class="grid g4" style="margin-bottom:12px">
+    <div class="card kpi"><div class="l">Inscrits</div><div class="v">${F(t[6])}</div><div class="s">${F(t[6] - t[7])} abstentionnistes</div></div>
+    <div class="card kpi"><div class="l">Votants</div><div class="v">${F(t[7])}</div><div class="s">participation ${P1(elPart(t))}</div></div>
+    <div class="card kpi"><div class="l">Suffrages exprimés</div><div class="v">${F(t[9])}</div><div class="s">${F(t[8])} nuls · ${F(t[10])} blancs</div></div>
+    <div class="card kpi gold"><div class="l">Écart 1er – 2e</div><div class="v">${ecartVoix === null ? '—' : F(ecartVoix) + ' voix'}</div><div class="s">${v.ecart === null ? '' : P1(v.ecart).replace(' %', ' point(s)')}</div></div></div>
+  <div class="card" style="margin-bottom:12px"><h3>Résultats</h3>${elBarres(i)}</div>
+  ${lies.length ? `<div class="card" style="margin-bottom:12px"><h3>${t[0] < 2 ? 'La même zone dans les autres scrutins' : 'Circonscriptions législatives liées'}</h3>${tbl([['Élection'], ['Territoire'], ['Participation','n'], ['Vainqueur'], ['Second']], lies.map(j => { const u = elT(j), w = elVainq(j); return `<tr class="click" onclick="go('circo',${j})"><td><b>${esc(ELEC.E[u[0]])}</b></td><td>${esc(elNom(u))}${EL_PRES(u[0]) ? ` <span class="tag">${u[1] ? 'Département' : 'Région'}</span>` : ''}</td><td class="n">${P1(elPart(u))}</td><td>${w.w ? esc(w.w[1]) + ' ' + P1(w.w[4]) : '—'}</td><td>${w.s ? esc(w.s[1]) + ' ' + P1(w.s[4]) : '—'}</td></tr>`; }))}<p class="small muted">Rapprochement par le nom des communes et de la région : un département ou une région couvre souvent plus large que la circonscription.</p></div>` : ''}
+  <div class="card"><h3>Diagnostic de gagnabilité (méthode ATLAS)</h3><div id="diag">${diagHTML(i)}</div></div>`;
+};
+function ficheTexte(i){
+  const t = elT(i), r = elC(i).length ? diagCalc(i) : null, v = elVainq(i);
+  const l = [`FICHE ${elNiv(t).toUpperCase()} — ${elNom(t)}`, `${ELEC.E[t[0]]} · ${t[2]} · source : résultats officiels CEI${t[0] === 0 ? ' (provisoires)' : ''}`, '',
+    `Inscrits ${F(t[6])} · votants ${F(t[7])} (participation ${P1(elPart(t))}) · exprimés ${F(t[9])} · nuls ${F(t[8])} · blancs ${F(t[10])}`, '', 'Résultats :',
+    ...elC(i).map(c => `- ${c[1]} — ${c[2]} : ${F(c[3])} voix (${P1(c[4])})${c[5] ? ' — ÉLU(E)' : ''}`)];
+  if (v.w && v.s) l.push(`Écart 1er – 2e : ${F(v.w[3] - v.s[3])} voix (${P1(v.ecart).replace(' %', ' point(s)')})`);
+  const lies = elLies(i); if (lies.length){ l.push('', 'Autres scrutins de la zone :'); lies.forEach(j => { const u = elT(j), w = elVainq(j); l.push(`- ${ELEC.E[u[0]]} · ${elNom(u)} : participation ${P1(elPart(u))}${w.w ? ' · ' + w.w[1] + ' ' + P1(w.w[4]) : ''}${w.s ? ' / ' + w.s[1] + ' ' + P1(w.s[4]) : ''}`); }); }
+  if (r){ l.push('', 'Diagnostic de gagnabilité (méthode ATLAS) :', `Camp : ${r.camp ? r.camp[1] + ' — ' + r.camp[2] : 'nouveau candidat'}${r.allies.length ? ' · alliés : ' + r.allies.map(c => c[1] + ' — ' + c[2]).join(', ') : ''}`,
+    `Hypothèses : participation ${P1(r.d.part)}, part nécessaire ${P1(r.besoin)}, abstentionnistes mobilisables ${P1(r.d.abst)}`,
+    `Objectif de voix : ${F(r.objectif)} · réservoir : ${F(r.reservoir)} (camp ${F(r.vCamp)} + alliés ${F(r.vAll)} + abstentionnistes ${F(r.vAbst)})`,
+    `Verdict : ${r.verdict[0].toUpperCase()} (${Math.round(r.ratio)} %) — ${r.verdict[2]}`); }
+  elAlertes(i).forEach(x => l.push('', 'À vérifier sur le procès-verbal : ' + x));
+  return l.join('\n');
+}
+function copierFiche(i){
+  const s = ficheTexte(i);
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(s).then(() => toast('Fiche copiée'), () => modal(`<h2>Fiche à copier</h2><textarea style="width:100%;min-height:300px">${esc(s)}</textarea><div class="act"><button class="btn" onclick="closeModal()">Fermer</button></div>`));
+  else modal(`<h2>Fiche à copier</h2><textarea style="width:100%;min-height:300px">${esc(s)}</textarea><div class="act"><button class="btn" onclick="closeModal()">Fermer</button></div>`);
+}
+function imprimerFiche(i){
+  const t = elT(i), titre = `Fiche ${elNiv(t)} ${t[3] ? t[3] + ' ' : ''}${t[4]}`.slice(0, 90);
+  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>${esc(titre)}</title><style>body{font:12.5px/1.5 Arial,sans-serif;color:#16202e;margin:24px}h1{font-size:18px;color:#14213a;margin:0 0 4px}pre{white-space:pre-wrap;font:12.5px/1.55 Arial,sans-serif}.ft{margin-top:18px;border-top:1px solid #ccc;padding-top:6px;font-size:10.5px;color:#667085}@page{size:A4;margin:14mm}</style></head><body>
+    <h1>Impact Global Consulting — ATLAS IA</h1><pre>${esc(ficheTexte(i))}</pre><div class="ft">Document confidentiel · ${esc(ELEC.src)} · édité le ${dfr(today())}</div></body></html>`;
+  if (window.AndroidBridge && AndroidBridge.printHtml){ AndroidBridge.printHtml(html, titre); return; }
+  const w = window.open('', '_blank'); if (!w){ toast('Autorisez les fenêtres pour imprimer'); return; }
+  w.document.write(html); w.document.close(); setTimeout(() => { w.focus(); w.print(); }, 400);
+}
+function missionFiche(i){
+  const k = MODELES_ATLAS.findIndex(m => m[0] === 'Stratégie de campagne électorale'), t = elT(i);
+  editOrdre(null, k >= 0 ? k : undefined);
+  const ti = $('#o_t'), c = $('#o_c');
+  if (ti) ti.value = `Stratégie électorale — ${elNom(t)}`.slice(0, 120);
+  if (c) c.value = (c.value ? c.value + '\n\n' : '') + 'Point de départ (base électorale IGC) :\n' + ficheTexte(i);
+}
+
 VIEWS.parametres = () => {
   const s = DATA.societe;
   if (!can()) return `<div class="card"><p>Les paramètres sont réservés au gérant et à la cogérante.</p><h3>Changer mon code PIN</h3>${pinForm()}</div>`;
