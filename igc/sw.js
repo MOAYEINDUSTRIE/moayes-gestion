@@ -1,5 +1,5 @@
 /* IGC Gestion — fonctionnement hors ligne (page d'abord demandée au réseau). */
-const CACHE = 'igc-shell-4';
+const CACHE = 'igc-shell-5';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './img/atlas-banniere.jpg'];
 const LIBS = ['www.gstatic.com'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
