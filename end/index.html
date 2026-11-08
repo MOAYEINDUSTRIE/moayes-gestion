@@ -167,7 +167,7 @@ tr.click:hover td{background:#fbf7ef}
 <script>
 'use strict';
 /* =====================  END — Dons des volontaires  ===================== */
-const VERSION = 'V1.8';
+const VERSION = 'V1.8.1';
 const ADMIN_EMAIL = 'moayepos@gmail.com';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -334,7 +334,7 @@ function render(){
       <nav class="nav">${MENU().map(([g, it]) => `<div class="grp">${g}</div>` + it.map(([k, i, t]) => `<a class="${VIEW === k ? 'on' : ''}" onclick="go('${k}')"><span>${i}</span>${t}</a>`).join('')).join('')}</nav>
       <div class="who"><b>${esc(ME.nom)}</b><br>${esc(ROLES[ME.role])}<br><a style="color:inherit;cursor:pointer;text-decoration:underline" onclick="firebase.auth().signOut()">Se déconnecter</a></div>
       <p class="small" style="opacity:.5;padding:0 10px">${VERSION}</p></aside>
-    <main class="main"><div class="top"><button class="btn sm menu-btn" onclick="$('.side').classList.add('open')">☰</button><h1>${esc(titre)}</h1><button class="btn sm no-print" style="margin-left:auto" onclick="imprimer()" title="Imprimer ou enregistrer en PDF">🖨 PDF</button><span id="netpill" class="pill ${ONLINE ? 'g' : 'w'}">● ${ONLINE ? 'En ligne' : 'Hors ligne'}</span></div>
+    <main class="main"><div class="top"><button class="btn sm menu-btn" onclick="$('.side').classList.add('open')">☰</button><h1>${esc(titre)}</h1><button class="btn sm no-print" style="margin-left:auto" onclick="imprimer()" title="Imprimer ou enregistrer en PDF">🖨 Imprimer</button><span id="netpill" class="pill ${ONLINE ? 'g' : 'w'}">● ${ONLINE ? 'En ligne' : 'Hors ligne'}</span></div>
       ${ME.role === 'gm' ? '<div class="alert" style="font-size:13px">Vue Grand Maître : codes, groupes, montants et totaux. Les noms et contacts ne sont jamais transmis à ce compte.</div>' : ''}${body}</main>
     <nav class="tabbar">${TABS.map(([k, i, t]) => `<a class="${VIEW === k ? 'on' : ''}" onclick="${k === '__menu' ? "$('.side').classList.add('open')" : `go('${k}')`}"><span>${i}</span>${t}</a>`).join('')}</nav></div>`;
   lignesMobiles(document);
@@ -669,7 +669,7 @@ function bonDec(id){
   <tr><td>Bénéficiaire</td><td><b>${esc(p.beneficiaire || '')}</b>${p.contact ? ' — ' + esc(p.contact) : ''}</td></tr><tr><td>Objet</td><td>${esc(x.objet || '')}</td></tr><tr><td>Catégorie</td><td>${esc(x.categorie)}</td></tr>
   <tr><td>Payé depuis</td><td>${esc(COMPTES[x.compte] || x.compte)}</td></tr><tr><td>Pièce justificative</td><td>${esc(x.piece || '')}</td></tr><tr><td>Établi par</td><td>${esc(x.saisiNom || '')}</td></tr></table>
   <div class="sig"><div>Le bénéficiaire<br>(signature, « reçu »)</div><div>Le trésorier général<br><br><br>____________</div></div></body></html>`;
-  ouvrirImpression(html, x.num);
+  ouvrirImpression(html, 'Bon de décaissement ' + x.num);
 }
 function exportDecs(){
   const n = can('noms');
@@ -981,20 +981,30 @@ function recu(id){
   <tr><td>Mode de paiement</td><td>${esc(d.mode)}${d.ref ? ' — réf. ' + esc(d.ref) : ''}</td></tr>${d.objet ? `<tr><td>Objet</td><td>${esc(d.objet)}</td></tr>` : ''}
   <tr><td>Enregistré par</td><td>${esc(d.saisiNom || '')}</td></tr></table>
   <div class="sig"><div>Le donateur</div><div style="text-align:center">La Trésorerie<br><br><br>____________</div></div></body></html>`;
-  ouvrirImpression(html, d.recu);
+  ouvrirImpression(html, 'Reçu ' + d.recu);
 }
 
 /* ----- exports (sans noms pour le Grand Maître) ----- */
 /* ----- impression / PDF commune (navigateur et APK) ----- */
+function nomFichier(t){ return String(t || 'END').replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim(); }
+function cssPortee(css){ // limite les règles d'impression à la zone #zi
+  return css.replace(/(^|})\s*([^{}@]+)\{/g, (m, b, sel) => b + sel.split(',').map(x => { x = x.trim(); return x === 'body' || x === '*' ? '#zi' + (x === '*' ? ' *' : '') : '#zi ' + x; }).join(',') + '{');
+}
 function ouvrirImpression(html, titre){
-  if (window.AndroidBridge && AndroidBridge.printHtml){ AndroidBridge.printHtml(html, titre || 'END'); return; }
-  const w = window.open('', '_blank');
-  if (!w){ // fenêtre bloquée : impression dans un cadre caché
-    const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'; document.body.appendChild(f);
-    f.contentDocument.open(); f.contentDocument.write(html); f.contentDocument.close();
-    setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 2000); }, 600); return;
-  }
-  w.document.open(); w.document.write(html); w.document.close(); setTimeout(() => { w.focus(); w.print(); }, 600);
+  titre = nomFichier(titre);
+  if (window.AndroidBridge && AndroidBridge.printHtml){ AndroidBridge.printHtml(html.replace(/<title>[^<]*<\/title>/, '<title>' + esc(titre) + '</title>'), titre); return; }
+  const d = new DOMParser().parseFromString(html, 'text/html');
+  const css = [...d.querySelectorAll('style')].map(x => x.textContent).join('\n');
+  const pages = (css.match(/@page\s*\{[^}]*\}/g) || []).join('');
+  let z = document.getElementById('zi'); if (z){ z.remove(); document.title = z.dataset.ancien || document.title; }
+  z = document.createElement('div'); z.id = 'zi';
+  z.innerHTML = `<style>${pages}@media screen{#zi{display:none}}@media print{body.impr>*:not(#zi){display:none!important}body.impr{background:#fff!important;margin:0;padding:0}#zi{display:block;width:100%;max-width:none}#zi th{text-transform:none;letter-spacing:0;font-size:10.5px}#zi .card,#zi .grid{width:auto;max-width:none}#zi table{display:table;width:100%}#zi thead{display:table-header-group}#zi tr{display:table-row}#zi td,#zi th{display:table-cell}}${cssPortee(css.replace(/@page\s*\{[^}]*\}/g, ''))}</style>` + d.body.innerHTML;
+  document.body.appendChild(z); document.body.classList.add('impr');
+  const ancien = document.title; z.dataset.ancien = ancien; document.title = titre;
+  let fait = false;
+  const fin = () => { if (fait) return; fait = true; window.removeEventListener('afterprint', fin); if (!z.isConnected) return; z.remove(); document.body.classList.remove('impr'); document.title = ancien; };
+  window.addEventListener('afterprint', fin);
+  setTimeout(() => { window.print(); setTimeout(fin, 1500); }, 300);
 }
 const CSS_IMPR = `@page{size:A4;margin:12mm}*{box-sizing:border-box}body{font:11.5px/1.45 Arial,Helvetica,sans-serif;color:#141c2e;margin:0}
 .ent{display:flex;align-items:center;gap:12px;border-bottom:3px solid #17254a;padding-bottom:8px;margin-bottom:10px}.ent img{width:54px;height:54px}.ent .t{font-size:16px;font-weight:700;color:#17254a}.ent .s{color:#555;font-size:11px}
@@ -1004,22 +1014,36 @@ table{width:100%;border-collapse:collapse;margin:4px 0 10px;page-break-inside:au
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.grid.g2{grid-template-columns:repeat(2,1fr)}.kpi .v,.hero-v,.stat .v{font-size:15px;font-weight:800}.kpi .l,.kpi .s,.hero-l,.hero-s,.stat .l,.stat .s,.small,.muted{color:#555!important;font-size:10.5px}
 .hero:after,.ic,.hbar,.seg,.no-print,.bar,button,input,select,.alert.w{display:none!important}.tag{border:1px solid #bbb;border-radius:8px;padding:0 5px;font-size:10px}.code{font-family:monospace}
 .pied{margin-top:14px;border-top:1px solid #c9ceda;padding-top:6px;color:#666;font-size:10px;display:flex;justify-content:space-between}a{color:inherit;text-decoration:none}.totline{display:flex;justify-content:space-between;border-top:2px solid #17254a;padding-top:4px;font-weight:700}`;
+function titreImpression(){
+  const page = (document.querySelector('main .top h1') || {}).textContent || 'END';
+  const grp = FL.groupe ? (FL.groupe === '-' ? 'Hors groupe' : groupeDe(FL.groupe).nom) : '';
+  let t;
+  if (VIEW === 'groupe') t = (!ARG || ARG === '-') ? 'Hors groupe' : groupeDe(ARG).nom;
+  else if (VIEW === 'rapports') t = RT === 'groupes' ? (grp || 'Rapport par groupe') : RT === 'membres' ? (grp ? 'Membres ' + grp : 'Rapport par membre') : RT === 'objet' ? 'Paiements ' + (objetChoisi() || '') + (grp ? ' ' + grp : '') : 'Rapport général' + (grp ? ' ' + grp : '');
+  else if (VIEW === 'livres') t = ({ tous: 'Livres - tous les acheteurs', ligne: 'Livres achetés en ligne', physique: 'Livres achetés physiquement', np: 'Livres format non précisé' })[LVF] + (grp ? ' ' + grp : '');
+  else t = page + (grp ? ' ' + grp : '');
+  if (VIEW !== 'groupe' && FL.pays) t += ' ' + FL.pays;
+  if (FL.camp && !(VIEW === 'rapports' && RT === 'objet')) t += ' ' + FL.camp;
+  if (FL.d1 || FL.d2) t += ' du ' + (FL.d1 ? dfr(FL.d1) : 'début') + ' au ' + (FL.d2 ? dfr(FL.d2) : dfr(today()));
+  return nomFichier(t.replace(/\s+/g, ' ').trim());
+}
 function imprimer(){
   const m = document.querySelector('main.main'); if (!m) return;
   const c = m.cloneNode(true);
   c.querySelectorAll('.no-print,.bar,.top,.tabbar,button,input,select,script,.toast').forEach(e => e.remove());
   c.querySelectorAll('[onclick]').forEach(e => e.removeAttribute('onclick'));
   c.querySelectorAll('td').forEach(td => td.classList.remove('m-t', 'm-a', 'm-d', 'm-no'));
+  c.querySelectorAll('table.resp').forEach(t => t.classList.remove('resp'));
   c.querySelectorAll('td,th').forEach(td => { if (td.textContent.trim().length <= 12) td.style.whiteSpace = 'nowrap'; });
   const large = Math.max(0, ...[...c.querySelectorAll('table')].map(t => (t.rows[0] || { cells: [] }).cells.length)) > 8;
-  const titre = (document.querySelector('main .top h1') || {}).textContent || 'END';
-  const f = [FL.d1 ? 'du ' + dfr(FL.d1) : '', FL.d2 ? 'au ' + dfr(FL.d2) : '', FL.pays ? 'pays : ' + FL.pays : '', FL.groupe ? 'groupe : ' + (FL.groupe === '-' ? 'Hors groupe' : groupeDe(FL.groupe).nom) : '', FL.camp ? 'objet : ' + FL.camp : ''].filter(Boolean).join(' · ');
+  const titre = titreImpression();
+  const f = '';
   const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>END — ${esc(titre)}</title><style>${CSS_IMPR}${large ? '@page{size:A4 landscape}' : ''}</style></head><body>
   <div class="ent"><img src="icons/logo.svg" alt=""><div><div class="t">École de Navigation Divine</div><div class="s">Dons des volontaires</div></div></div>
-  <h1>${esc(titre)}</h1>${f ? `<div class="small">Filtres : ${esc(f)}</div>` : ''}${c.innerHTML}
+  <h1>${esc(titre)}</h1>${c.innerHTML}
   <div class="pied"><span>Édité le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} par ${esc(ME.nom || '')} (${esc(ROLES[ME.role] || ME.role)})</span><span>END Dons ${VERSION}</span></div></body></html>`;
   journal('Impression', titre, null, null);
-  ouvrirImpression(html, 'END — ' + titre);
+  ouvrirImpression(html, titre);
 }
 
 function saveFile(name, mime, text){
