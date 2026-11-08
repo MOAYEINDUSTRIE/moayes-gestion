@@ -44,6 +44,15 @@ jobs:
           git add data-electorales/texte data-electorales/tables
           git commit -m "Données électorales CEI : texte et tableaux extraits" || echo "rien de nouveau"
           git push
+      - name: PDF bruts sur la branche donnees-cei
+        run: |
+          mkdir -p /tmp/p && cp data-electorales/pdf/*.pdf /tmp/p/
+          git fetch origin donnees-cei 2>/dev/null && git checkout donnees-cei 2>/dev/null || git checkout --orphan donnees-cei
+          git rm -rq --cached . 2>/dev/null || true
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp /tmp/p/*.pdf . && printf 'PDF officiels de la CEI (résultats publics).\n' > LISEZMOI.md
+          git add *.pdf LISEZMOI.md && git commit -qm "PDF CEI" || true
+          git push -f origin donnees-cei
       - uses: actions/upload-artifact@v4
         with:
           name: pdf-cei
