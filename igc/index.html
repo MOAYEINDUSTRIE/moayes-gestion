@@ -81,6 +81,27 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 }
 .menu-btn{display:none}
 @media print{.side,.tabbar,.top,.no-print{display:none!important}.main{padding:0}}
+
+/* ===== V1.1 — ATLAS IA ===== */
+.alert{text-align:left}
+.atlas-hero{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:radial-gradient(140% 160% at 100% 0%,#3a5394 0%,#1c2d57 45%,#132042 100%);color:#fff;border:0}
+.segm{display:inline-flex;background:#eef0f5;border-radius:11px;padding:3px;gap:2px;flex-wrap:wrap;max-width:100%}.segm button{border:0;background:transparent;padding:7px 11px;border-radius:8px;cursor:pointer;font-weight:600;color:#475467}.segm button.on{background:#fff;color:var(--pri);box-shadow:0 1px 3px rgba(16,24,40,.12)}
+.cnt{display:inline-block;min-width:18px;padding:0 6px;border-radius:99px;background:rgba(23,37,74,.08);font-size:11.5px;margin-left:3px}
+.agchk{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;background:#f7f8fa;border:1px solid var(--line);border-radius:10px;padding:10px}.agchk label{display:flex;gap:8px;align-items:center;color:var(--ink);font-size:14px;margin:0}
+.etapes{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}.etapes div{flex:1;min-width:90px;display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--muted);background:#f3f4f7;border-radius:9px;padding:6px 8px}
+.etapes span{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:#dfe3ea;font-size:11px;font-weight:700;flex:none}.etapes .ok{color:var(--ok);background:var(--okb)}.etapes .ok span{background:var(--ok);color:#fff}.etapes .cur{color:var(--pri);background:#fdf3df;font-weight:700}.etapes .cur span{background:var(--gold);color:var(--pri)}
+.tache{border-bottom:1px solid var(--line);padding:8px 0}.tache .tl{display:flex;gap:8px;align-items:center;margin-bottom:6px}.tache textarea,.big-ta{width:100%;min-height:60px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;font:inherit;resize:vertical}.big-ta{min-height:160px}
+@media (max-width:760px){
+ .agchk{grid-template-columns:minmax(0,1fr)}.segm{display:flex;width:100%}.segm button{flex:1;padding:8px 4px;font-size:13px}
+ table.resp tbody{display:block}
+ table.resp tr{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:12px;row-gap:2px;border:0;border-bottom:1px solid var(--line);border-radius:0;margin:0;padding:10px 4px;background:transparent}
+ table.resp tr::after{content:'';order:1;flex-basis:100%;height:0}
+ table.resp td{display:inline;border:0;padding:0;text-align:left;font-size:12.5px;color:var(--muted)}
+ table.resp td::before{content:none}table.resp td:empty{display:none}
+ table.resp td.m-t{order:0;flex:1 1 0;min-width:55%;font-size:15px;font-weight:600;color:var(--ink)}
+ table.resp td.m-a{order:1;flex:0 0 auto;font-size:14.5px;font-weight:800;color:var(--pri);white-space:nowrap;text-align:right}
+ table.resp td.m-d{order:2}table.resp td.m-d.n::before{content:attr(data-l) " ";font-weight:500}
+}
 </style>
 </head>
 <body>
@@ -88,12 +109,12 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  IGC Gestion  ===================== */
-const VERSION = 'V1.0';
+const VERSION = 'V1.1';
 const KEY = 'igc_gestion_v1';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
 const FB_PATH = 'moayes/igc_data';
-const COLS = ['clients','devis','missions','factures','paiements','depenses'];
+const COLS = ['clients','devis','missions','factures','paiements','depenses','ordres'];
 const ROLES = { gerant:{nom:'Gérant', all:true}, cogerant:{nom:'Cogérante', all:true}, assistant:{nom:'Assistant(e)', all:false} };
 const DOMAINES = ['Communication politique et électorale','Communication institutionnelle','Affaires publiques','Communication corporate','Consultance stratégique','Branding et digital','Événementiel','Applications et start-up','Formation','Autre'];
 const TYPES_CLI = ['Institution publique','Entreprise','Parti / candidat','ONG / association','Organisation internationale','Particulier','Autre'];
@@ -151,7 +172,7 @@ function enLettres(n){
 /* ---------- données ---------- */
 function blank(){
   return { societe:{ nom:'IMPACT GLOBAL CONSULTING', sigle:'IGC', forme:'SARL', capital:1000000, rccm:'', cc:'', adresse:'Abidjan, Côte d\'Ivoire', tel:'', email:'', banque:'', rib:'', tvaTaux:18, tvaDefaut:false, mentions:'' },
-    clients:[], devis:[], missions:[], factures:[], paiements:[], depenses:[],
+    clients:[], devis:[], missions:[], factures:[], paiements:[], depenses:[], ordres:[],
     soldes:{ caisse:0, banque:0, mobile:0, date:today() }, compteurs:{}, _del:{}, _pins:{}, audit:[], _lastSaved:0 };
 }
 let DATA = load();
@@ -314,7 +335,7 @@ window.addEventListener('offline', () => setFb('', 'Hors ligne'));
 
 /* ---------- navigation ---------- */
 const MENU = [
-  ['Pilotage', [['tableau','📊','Tableau de bord'],['agents','🤖','Agents IA']]],
+  ['Pilotage', [['tableau','📊','Tableau de bord'],['atlas','🧭','ATLAS IA — Commandement'],['agents','🤖','Agents IA']]],
   ['Commercial', [['clients','👥','Clients'],['devis','📝','Devis'],['missions','🎯','Missions']]],
   ['Finances', [['factures','🧾','Factures'],['paiements','💰','Encaissements'],['depenses','💸','Dépenses'],['tresorerie','🏦','Trésorerie'],['rapports','📈','Rapports']]],
   ['Système', [['parametres','⚙️','Paramètres'],['aide','❓','Mode d\'emploi']]],
@@ -327,7 +348,7 @@ window.__back = () => { if ($('.modal-bg')){ closeModal(); return true; } if (VI
 function render(){
   const root = $('#root');
   if (!SESSION){ root.innerHTML = loginHTML(); return; }
-  const titre = (MENU.flatMap(g => g[1]).find(m => m[0] === VIEW) || [,,'Fiche'])[2];
+  const titre = VIEW === 'ordre' ? 'Mission ATLAS IA' : (MENU.flatMap(g => g[1]).find(m => m[0] === VIEW) || [,,'Fiche'])[2];
   const body = (VIEWS[VIEW] || VIEWS.tableau)(ARG);
   root.innerHTML = `<div class="app">
     <aside class="side"><div class="brand"><div class="logo">IGC</div><div><b>IGC Gestion</b><small>Impact Global Consulting</small></div></div>
@@ -338,7 +359,7 @@ function render(){
       <span id="fbpill" class="pill ${FBST.c}" onclick="go('parametres')">☁ ${esc(FBST.t)}</span></div>${body}</main>
     <nav class="tabbar">${TABS.map(([k, i, t]) => `<a class="${VIEW === k ? 'on' : ''}" onclick="${k === '__menu' ? "$('.side').classList.add('open')" : `go('${k}')`}"><span>${i}</span>${t}</a>`).join('')}</nav>
   </div>`;
-  document.querySelectorAll('table.resp').forEach(t => { const h = [...t.querySelectorAll('thead th')].map(x => x.textContent); t.querySelectorAll('tbody tr').forEach(tr => [...tr.children].forEach((td, i) => td.setAttribute('data-l', h[i] || ''))); });
+  lignesMobiles(document);
 }
 document.addEventListener('click', e => { const s = $('.side.open'); if (s && !s.contains(e.target) && !e.target.closest('.menu-btn') && !e.target.closest('.tabbar')) s.classList.remove('open'); });
 
@@ -363,8 +384,18 @@ async function pinKey(k){
 document.addEventListener('keydown', e => { if (SESSION || $('.modal-bg')) return; if (/^\d$/.test(e.key)) pinKey(e.key); else if (e.key === 'Backspace') pinKey('⌫'); else if (e.key === 'Enter') pinKey('OK'); });
 function logout(){ SESSION = null; sessionStorage.removeItem('igc_session'); render(); }
 
+/* liste compacte sur téléphone : ligne 1 = nom + montant, ligne 2 = détails */
+const TITRES_COL = ['Client','Mission','Nom','Objet','Libellé','Agent','Catégorie','N°','Numéro','Date'];
+function lignesMobiles(root){
+  root.querySelectorAll('table.resp').forEach(t => {
+    const h = [...t.querySelectorAll('thead th')].map(x => x.textContent.trim());
+    let ti = -1; for (const n of TITRES_COL){ ti = h.findIndex(x => x.toLowerCase().startsWith(n.toLowerCase())); if (ti >= 0) break; } if (ti < 0) ti = 0;
+    let ai = -1; h.forEach((x, i) => { if (/montant|total|ttc|reste|solde|statut/i.test(x) && i !== ti) ai = i; });
+    t.querySelectorAll('tbody tr').forEach(tr => [...tr.children].forEach((td, i) => { td.setAttribute('data-l', h[i] || ''); td.classList.add(i === ti ? 'm-t' : i === ai ? 'm-a' : 'm-d'); }));
+  });
+}
 /* ---------- fenêtres ---------- */
-function modal(html){ closeModal(); const d = document.createElement('div'); d.className = 'modal-bg'; d.innerHTML = `<div class="modal">${html}</div>`; d.addEventListener('mousedown', e => { if (e.target === d) closeModal(); }); document.body.appendChild(d); const f = d.querySelector('input,select,textarea'); if (f && innerWidth > 760) f.focus(); }
+function modal(html){ closeModal(); const d = document.createElement('div'); d.className = 'modal-bg'; d.innerHTML = `<div class="modal">${html}</div>`; d.addEventListener('mousedown', e => { if (e.target === d) closeModal(); }); document.body.appendChild(d); lignesMobiles(d); const f = d.querySelector('input,select,textarea'); if (f && innerWidth > 760) f.focus(); }
 function closeModal(){ document.querySelectorAll('.modal-bg').forEach(x => x.remove()); }
 const val = id => { const e = document.getElementById(id); return e ? e.value.trim() : ''; };
 const opts = (arr, sel) => arr.map(x => `<option ${x === sel ? 'selected' : ''}>${esc(x)}</option>`).join('');
@@ -382,6 +413,8 @@ VIEWS.tableau = () => {
   const alerts = [];
   if (retard.length) alerts.push(`<div class="alert r">⚠ ${retard.length} facture(s) en retard : ${FCFA(retard.reduce((s, f) => s + etatF(f).reste, 0))} à relancer. <a href="#" onclick="go('factures','retard');return false">Voir</a></div>`);
   if (devisAtt.filter(d => d.date < addDays(today(), -10)).length) alerts.push(`<div class="alert w">📝 ${devisAtt.filter(d => d.date < addDays(today(), -10)).length} devis envoyé(s) depuis plus de 10 jours sans réponse : relancez.</div>`);
+  const atV = (DATA.ordres || []).filter(o => o.statut === 'a_valider').length;
+  if (atV) alerts.push(`<div class="alert w">🧭 ATLAS IA : ${atV} mission(s) attendent votre validation. <a href="#" onclick="ATF='a_valider';go('atlas');return false">Voir</a></div>`);
   if (T.total < 0) alerts.push(`<div class="alert r">🏦 Trésorerie négative : vérifiez les soldes de départ (Trésorerie).</div>`);
   if (!DATA.clients.length) alerts.push(`<div class="alert w">👋 Bienvenue. Commencez par <a href="#" onclick="go('parametres');return false">Paramètres</a> (informations du cabinet), puis ajoutez vos clients.</div>`);
   return `${alerts.join('')}
@@ -721,10 +754,168 @@ const AGENT_PROMPTS = [
   ];
 VIEWS.agents = () => `
   <div class="card" style="margin-bottom:12px"><h3>🤖 Travailler avec vos agents IA</h3>
-  <p class="small">Vos 7 agents (secrétariat, commercial, consultant, communication, comptable, juridique, informatique) travaillent dans Claude. Donnez-leur la situation réelle du cabinet en un geste :</p>
+  <p class="small">Vos agents forment désormais <b>ATLAS IA</b> (12 agents, dont Partenariats, Qualité et Auditeur). Pour une mission complète, utilisez le <a href="#" onclick="go('atlas');return false">poste de commandement ATLAS IA</a>. Pour une demande rapide, ils travaillent aussi directement dans Claude. Donnez-leur la situation réelle du cabinet en un geste :</p>
   <ol class="small"><li>Touchez <b>Copier la situation du cabinet</b>.</li><li>Ouvrez Claude (Projet IGC) et collez.</li><li>Ajoutez votre demande, par exemple : « Agent comptable : prépare les relances » ou « Agent commercial : propose 5 prospects ».</li></ol>
   <div class="act" style="justify-content:flex-start"><button class="btn g" onclick="copier(resumeTexte())">📋 Copier la situation du cabinet</button><button class="btn" onclick="exportJSON()">⬇ Fichier complet pour les agents</button></div></div>
   <div class="card"><h3>Demandes prêtes à copier</h3>${AGENT_PROMPTS.map(([t, p], i) => `<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)"><span class="small"><b>${t}</b><br>${esc(p)}</span><button class="btn sm" onclick="copier(AGENT_PROMPTS[${i}][1]+'\\n\\n'+resumeTexte())">Copier</button></div>`).join('')}</div>`;
+
+/* =====================  ATLAS IA — POSTE DE COMMANDEMENT  ===================== */
+const AGENTS_ATLAS = [
+  ['dg','Directeur général IA','Reçoit la mission, la découpe, répartit le travail et consolide le rapport final'],
+  ['ops','Opérations','Planning, suivi des tâches, relances, comptes rendus (ancien agent secrétariat)'],
+  ['rech','Recherche et veille','Études de marché, données, appels d\'offres, sources vérifiées'],
+  ['fin','Finances','Budgets, coûts, marges, scénarios, trésorerie, fiscalité (agent comptable)'],
+  ['jur','Juridique','Projets de contrats, conformité, risques — à faire vérifier par un professionnel'],
+  ['com','Commercial','Prospects, offres, argumentaires, relances'],
+  ['mkt','Marketing et communication','Marque, contenus, campagnes, réseaux sociaux'],
+  ['tech','Technique','Applications, automatisations, sites, outils numériques (agent informatique)'],
+  ['prod','Production','Rapports, études, présentations, livrables clients (agent consultant)'],
+  ['part','Partenariats','Partenaires, bailleurs, programmes d\'accompagnement, financements, investisseurs'],
+  ['qual','Qualité','Vérifie sources, calculs, cohérence et respect de la demande'],
+  ['audit','Auditeur général','Contrôle le travail des agents, détecte incohérences et risques, alerte le fondateur'],
+];
+const agentNom = k => (AGENTS_ATLAS.find(a => a[0] === k) || [k, k])[1];
+const POLES = ['Conseil et stratégie','Solutions numériques','Communication et marketing','Intelligence économique','Interne IGC'];
+const ST_ORDRE = { nouvelle:['Nouvelle',''], en_cours:['Travaux en cours','b'], controle:['Contrôle qualité','w'], a_valider:['À valider par Moaye','w'], validee:['Validée','g'], a_reprendre:['À reprendre','r'], abandonnee:['Abandonnée',''] };
+const ETAPES = [['Mission','nouvelle'],['Répartition','en_cours'],['Travaux','en_cours'],['Contrôle','controle'],['Validation','a_valider']];
+const MODELES_ATLAS = [
+  ['Étude de marché', 'Conseil et stratégie', ['dg','rech','com','fin','prod','qual'], 'Étudier le marché de … en … : taille, clients, concurrents, prix pratiqués, réglementation, opportunités. Livrable : étude de 8 à 12 pages avec sources et recommandations.'],
+  ['Réponse à un appel d\'offres', 'Conseil et stratégie', ['dg','rech','jur','fin','prod','qual','audit'], 'Préparer la réponse d\'IGC à l\'appel d\'offres « … » (lien : …). Livrables : analyse du dossier et des critères, offre technique, offre financière, liste des pièces administratives, calendrier jusqu\'à la date limite.'],
+  ['Plan de communication', 'Communication et marketing', ['dg','mkt','rech','fin','prod','qual'], 'Concevoir le plan de communication de … pour … : objectifs, cibles, messages, canaux, calendrier sur 3 mois, budget en FCFA, indicateurs.'],
+  ['Recherche de partenaires et financements', 'Intelligence économique', ['dg','part','rech','jur','qual'], 'Trouver des partenaires, programmes d\'accompagnement, concours et financements accessibles pour … en Côte d\'Ivoire et en Afrique de l\'Ouest : conditions, dates limites, liens officiels, prochaines actions.'],
+  ['Solution numérique pour un client', 'Solutions numériques', ['dg','tech','com','fin','jur','qual'], 'Proposer une application ou une automatisation pour … : besoin, fonctions, maquette des écrans, délai, prix, maintenance, contrat.'],
+  ['Point hebdomadaire du cabinet', 'Interne IGC', ['dg','ops','fin','com','audit'], 'Faire le point de la semaine d\'IGC à partir de la situation du cabinet : urgences, factures à relancer, devis à suivre, trésorerie, priorités de la semaine prochaine.'],
+];
+let ATF = 'actives';
+const ordres = () => DATA.ordres || [];
+function nextNumAT(){
+  const y = new Date().getFullYear(), k = 'AT' + y;
+  const used = ordres().map(o => o.num).filter(n => n && n.startsWith('AT-' + y)).map(n => +n.split('-').pop());
+  const n = Math.max(DATA.compteurs[k] || 0, ...used, 0) + 1; DATA.compteurs[k] = n;
+  return `AT-${y}-${String(n).padStart(3, '0')}`;
+}
+function histo(o, a){ o.historique = o.historique || []; o.historique.unshift({ t: now(), u: SESSION ? ROLES[SESSION.role].nom : '', a }); }
+const tagOrdre = o => { const s = ST_ORDRE[o.statut] || ['?', '']; return `<span class="tag ${s[1]}">${s[0]}</span>`; };
+function statsAtlas(){
+  const L = ordres(), fin = L.filter(o => ['validee'].includes(o.statut));
+  const reprises = L.reduce((s, o) => s + num(o.reprises), 0);
+  const cout = fin.reduce((s, o) => s + num(o.cout), 0);
+  return { recues: L.length, actives: L.filter(o => ['nouvelle','en_cours','controle','a_reprendre'].includes(o.statut)).length, aValider: L.filter(o => o.statut === 'a_valider').length,
+    validees: fin.length, tauxCorr: fin.length ? Math.round(reprises / fin.length * 100) : 0, coutMoy: fin.length ? cout / fin.length : 0, valeur: L.reduce((s, o) => s + num(o.valeur), 0) };
+}
+VIEWS.atlas = () => {
+  const S = statsAtlas(), L = ordres().slice().sort((a, b) => num(b.cree) - num(a.cree));
+  const F = { actives: o => ['nouvelle','en_cours','controle','a_reprendre'].includes(o.statut), a_valider: o => o.statut === 'a_valider', validees: o => o.statut === 'validee', toutes: () => true };
+  const V = L.filter(F[ATF]);
+  return `<div class="card atlas-hero" style="margin-bottom:12px"><div><div class="small" style="opacity:.8;letter-spacing:1px">ATLAS IA · pôle d'agents d'Impact Global Consulting</div>
+    <div style="font-size:19px;font-weight:800;margin:4px 0">Poste de commandement</div><div class="small" style="opacity:.85">Vous donnez la mission, le Directeur général IA répartit, les agents produisent, Qualité et Audit contrôlent, vous validez.</div></div>
+    <button class="btn g" onclick="editOrdre()">+ Nouvelle mission</button></div>
+  ${S.aValider ? `<div class="alert w">✋ ${S.aValider} mission(s) attendent votre validation. <a href="#" onclick="ATF='a_valider';render();return false">Voir</a></div>` : ''}
+  <div class="grid g4" style="margin-bottom:12px">
+    <div class="card kpi"><div class="l">Missions reçues</div><div class="v">${S.recues}</div><div class="s">${S.actives} en cours · ${S.aValider} à valider</div></div>
+    <div class="card kpi"><div class="l">Missions validées</div><div class="v">${S.validees}</div><div class="s">Taux de reprise : ${S.tauxCorr} %</div></div>
+    <div class="card kpi"><div class="l">Coût moyen par mission</div><div class="v">${FCFA(S.coutMoy)}</div><div class="s">abonnements et API estimés</div></div>
+    <div class="card kpi gold"><div class="l">Valeur commerciale liée</div><div class="v">${FCFA(S.valeur)}</div><div class="s">devis ou factures issus des missions</div></div></div>
+  <div class="card"><div class="bar"><div class="segm">${[['actives','En cours'],['a_valider','À valider'],['validees','Validées'],['toutes','Toutes']].map(([k, t]) => `<button class="${ATF === k ? 'on' : ''}" onclick="ATF='${k}';render()">${t} <span class="cnt">${L.filter(F[k]).length}</span></button>`).join('')}</div></div>
+  ${tbl([['N°'],['Mission'],['Pôle'],['Agents','n'],['Échéance'],['Statut']], V.map(o => `<tr class="click" onclick="go('ordre','${o.id}')"><td class="b">${esc(o.num)}</td><td><b>${esc(o.titre)}</b>${o.clientId ? `<div class="small muted">${esc(cli(o.clientId).nom)}</div>` : ''}</td><td>${esc(o.pole)}</td><td class="n">${(o.agents || []).length}</td><td>${o.echeance ? dfr(o.echeance) : '—'}${o.echeance && o.echeance < today() && !['validee','abandonnee'].includes(o.statut) ? ' <span class="tag r">retard</span>' : ''}</td><td>${tagOrdre(o)}</td></tr>`), 'Aucune mission ici. Touchez « + Nouvelle mission » ou partez d\'un modèle.')}</div>
+  <div class="card" style="margin-top:12px"><h3>Démarrer d'un modèle</h3><div class="grid g3">${MODELES_ATLAS.map((m, i) => `<button class="btn" style="white-space:normal;text-align:left;padding:10px" onclick="editOrdre(null,${i})"><b>${esc(m[0])}</b><br><span class="small muted">${esc(m[1])} · ${m[2].length} agents</span></button>`).join('')}</div></div>
+  <div class="card" style="margin-top:12px"><h3>L'équipe ATLAS IA (12 agents)</h3>${tbl([['Agent'],['Rôle']], AGENTS_ATLAS.map(a => `<tr><td><b>${esc(a[1])}</b></td><td class="small">${esc(a[2])}</td></tr>`))}</div>`;
+};
+function editOrdre(id, modele){
+  const o = id ? get('ordres', id) : (() => { const m = MODELES_ATLAS[modele]; return m ? { titre: m[0], pole: m[1], agents: m[2], consigne: m[3], priorite: 'Normale' } : { pole: POLES[0], agents: ['dg','qual'], priorite: 'Normale' }; })();
+  modal(`<h2>${id ? 'Modifier la mission ' + esc(o.num) : 'Nouvelle mission ATLAS IA'}</h2><div class="f">
+    <div class="full"><label>Titre de la mission *</label><input id="o_t" value="${esc(o.titre || '')}" placeholder="ex. Étude du marché de l'attiéké à Dakar"></div>
+    <div class="full"><label>Consigne détaillée (ce que vous attendez, livrable, contraintes) *</label><textarea id="o_c" style="min-height:120px">${esc(o.consigne || '')}</textarea></div>
+    <div><label>Pôle</label><select id="o_p">${opts(POLES, o.pole)}</select></div>
+    <div><label>Client (facultatif)</label><select id="o_cl">${cliOpts(o.clientId)}</select></div>
+    <div><label>Échéance</label><input id="o_e" type="date" value="${esc(o.echeance || '')}"></div>
+    <div><label>Priorité</label><select id="o_pr">${opts(['Haute','Normale','Basse'], o.priorite)}</select></div>
+    <div><label>Coût estimé (F)</label><input id="o_co" inputmode="numeric" value="${esc(o.cout || '')}" placeholder="abonnements / API"></div>
+    <div><label>Valeur commerciale liée (F)</label><input id="o_v" inputmode="numeric" value="${esc(o.valeur || '')}" placeholder="devis ou facture obtenu"></div>
+    <div class="full"><label>Agents mobilisés (le Directeur général, Qualité et l'Auditeur sont recommandés)</label><div class="agchk">${AGENTS_ATLAS.map(a => `<label><input type="checkbox" value="${a[0]}" ${(o.agents || []).includes(a[0]) ? 'checked' : ''}> ${esc(a[1])}</label>`).join('')}</div></div></div>
+    <div class="act"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" onclick="saveOrdre('${id || ''}')">Enregistrer</button></div>`);
+}
+function saveOrdre(id){
+  const titre = val('o_t'), consigne = val('o_c');
+  if (!titre || !consigne) return toast('Titre et consigne obligatoires');
+  const agents = [...document.querySelectorAll('.agchk input:checked')].map(x => x.value);
+  if (!agents.length) return toast('Choisissez au moins un agent');
+  const avant = id ? get('ordres', id) : null;
+  const o = Object.assign({}, avant || { id: uid('at'), num: nextNumAT(), statut: 'nouvelle', cree: now(), taches: [], reprises: 0 }, { titre, consigne, pole: val('o_p'), clientId: val('o_cl'), echeance: val('o_e'), priorite: val('o_pr'), cout: num(val('o_co')), valeur: num(val('o_v')), agents });
+  const t0 = o.taches || []; o.taches = agents.map(k => t0.find(t => t.agent === k) || { agent: k, statut: 'a_faire', resultat: '' });
+  histo(o, avant ? 'Mission modifiée' : 'Mission créée');
+  put('ordres', o, (avant ? 'Mission ATLAS modifiée ' : 'Mission ATLAS créée ') + o.num);
+  closeModal(); go('ordre', o.id);
+}
+function ordreTexte(o, avecSituation){
+  const ag = (o.agents || []).map(agentNom);
+  return `Tu es le DIRECTEUR GÉNÉRAL IA d'ATLAS IA, le pôle d'agents d'intelligence artificielle d'Impact Global Consulting (IGC, SARL de conseil et communication à Abidjan, Côte d'Ivoire), sous la supervision du fondateur Moaye (GOLI KOUAKOU). Utilise la compétence « equipe-agents-igc » si elle est disponible.
+
+MISSION ${o.num} — ${o.titre}
+Pôle : ${o.pole}${o.clientId ? ' · Client : ' + cli(o.clientId).nom : ''} · Priorité : ${o.priorite || 'Normale'}${o.echeance ? ' · Échéance : ' + dfr(o.echeance) : ''}
+
+CONSIGNE DU FONDATEUR
+${o.consigne}
+${o.retour ? '\nCORRECTIONS DEMANDÉES PAR LE FONDATEUR (à traiter en priorité)\n' + o.retour + '\n' : ''}
+AGENTS MOBILISÉS : ${ag.join(', ')}.
+
+MÉTHODE
+1. Découpe la mission en sous-tâches et attribue chacune à un agent ci-dessus.
+2. Réalise le travail de chaque agent, dans l'ordre logique ; fais les recherches web nécessaires et cite les sources (liens, dates).
+3. Agent Qualité : vérifie sources, calculs, cohérence et respect de la consigne ; corrige.
+4. Auditeur général : signale incohérences, risques, informations non vérifiées.
+5. Rends un livrable final complet (document Claude si utile).
+
+RÈGLES : n'invente aucun chiffre, contact, date ou appel d'offres ; distingue faits vérifiés et hypothèses ; aucune dépense, signature, envoi au client ou engagement sans la validation de Moaye ; documents juridiques à faire vérifier par un professionnel ; montants en FCFA.
+
+FORMAT DE RÉPONSE
+A. Résumé pour le fondateur (5 lignes).
+B. Travail de chaque agent (un titre par agent).
+C. Livrable final (ou lien du document).
+D. Contrôle qualité : note /10 et corrections faites.
+E. Alertes de l'auditeur.
+F. Décisions à prendre par Moaye.${avecSituation ? '\n\nSITUATION ACTUELLE DU CABINET\n' + resumeTexte() : ''}`;
+}
+VIEWS.ordre = id => {
+  const o = get('ordres', id); if (!o) return '<div class="empty">Mission introuvable.</div>';
+  const iEt = { nouvelle:0, en_cours:2, a_reprendre:2, controle:3, a_valider:4, validee:5, abandonnee:-1 }[o.statut] ?? 0;
+  const fait = (o.taches || []).filter(t => t.statut === 'fait').length, nT = (o.taches || []).length;
+  return `<div class="bar no-print"><button class="btn sm" onclick="go('atlas')">← Poste de commandement</button><span class="grow"></span><button class="btn sm" onclick="editOrdre('${o.id}')">✏ Modifier</button>${o.statut !== 'abandonnee' && o.statut !== 'validee' ? `<button class="btn sm d" onclick="abandonOrdre('${o.id}')">Abandonner</button>` : ''}</div>
+  <div class="card" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><div class="small muted">${esc(o.num)} · ${esc(o.pole)}${o.clientId ? ' · ' + esc(cli(o.clientId).nom) : ''}</div><h3 style="margin:4px 0;font-size:18px">${esc(o.titre)}</h3></div><div>${tagOrdre(o)} <span class="tag">${esc(o.priorite || 'Normale')}</span>${o.echeance ? ` <span class="tag ${o.echeance < today() && o.statut !== 'validee' ? 'r' : ''}">échéance ${dfr(o.echeance)}</span>` : ''}</div></div>
+    <div class="etapes">${ETAPES.map((e, i) => `<div class="${i < iEt ? 'ok' : i === iEt ? 'cur' : ''}"><span>${i + 1}</span>${e[0]}</div>`).join('')}</div>
+    <div class="small" style="white-space:pre-wrap;margin-top:10px">${esc(o.consigne)}</div>
+    ${o.retour ? `<div class="alert r" style="margin-top:10px"><b>À reprendre :</b> ${esc(o.retour)}</div>` : ''}</div>
+  <div class="card" style="margin-bottom:12px"><h3>1. Envoyer la mission aux agents</h3>
+    <p class="small muted">Copiez l'ordre de mission, ouvrez Claude dans le Projet IGC et collez : le Directeur général IA répartit le travail entre les agents et rend le rapport complet.</p>
+    <label class="small"><input type="checkbox" id="o_sit"> Joindre la situation du cabinet (clients, factures, trésorerie)</label>
+    <div class="act" style="justify-content:flex-start"><button class="btn g" onclick="envoyerOrdre('${o.id}')">📋 Copier l'ordre de mission</button><button class="btn" onclick="ouvrirClaude()">Ouvrir Claude ↗</button></div></div>
+  <div class="card" style="margin-bottom:12px"><h3>2. Travaux des agents — ${fait}/${nT} terminés</h3><div class="prog" style="margin-bottom:10px"><i style="width:${nT ? Math.round(fait / nT * 100) : 0}%"></i></div>
+    ${(o.taches || []).map((t, i) => `<div class="tache"><label class="tl"><input type="checkbox" ${t.statut === 'fait' ? 'checked' : ''} onchange="tacheFaite('${o.id}',${i},this.checked)"> <b>${esc(agentNom(t.agent))}</b></label>
+      <textarea placeholder="Résultat de l'agent (collez sa partie du rapport, ou un lien)" onchange="tacheResultat('${o.id}',${i},this.value)">${esc(t.resultat || '')}</textarea></div>`).join('')}</div>
+  <div class="card" style="margin-bottom:12px"><h3>3. Rapport final</h3><textarea id="o_rap" class="big-ta" placeholder="Collez ici le rapport final rendu par Claude (sections A à F), ou le lien du document.">${esc(o.rapport || '')}</textarea>
+    <div class="act" style="justify-content:flex-start"><button class="btn p" onclick="saveRapport('${o.id}')">Enregistrer le rapport → contrôle qualité</button>${o.rapport ? `<button class="btn" onclick="copier(get('ordres','${o.id}').rapport)">📋 Copier le rapport</button>` : ''}</div></div>
+  <div class="card" style="margin-bottom:12px"><h3>4. Contrôle qualité et audit</h3><div class="f">
+    <div><label>Note qualité /10</label><input id="o_qn" type="number" min="0" max="10" value="${esc(o.qualiteNote ?? '')}"></div><div><label>Contrôlé par</label><input id="o_qp" value="${esc(o.qualitePar || 'Agent Qualité + Auditeur')}"></div>
+    <div class="full"><label>Remarques (sources vérifiées, erreurs corrigées, alertes de l'auditeur)</label><textarea id="o_qr">${esc(o.qualiteRem || '')}</textarea></div></div>
+    <div class="act" style="justify-content:flex-start"><button class="btn p" onclick="saveQualite('${o.id}')">Contrôle terminé → validation</button></div></div>
+  <div class="card" style="margin-bottom:12px"><h3>5. Décision du fondateur</h3>
+    ${o.statut === 'validee' ? `<div class="alert g">✅ Validée le ${new Date(o.valideLe).toLocaleDateString('fr-FR')} par ${esc(o.validePar || '')}.</div>` : can() ? `<p class="small muted">Rien n'est envoyé au client ni engagé avant votre validation.</p><div class="act" style="justify-content:flex-start"><button class="btn g" onclick="validerOrdre('${o.id}')">✅ Valider la mission</button><button class="btn d" onclick="reprendreOrdre('${o.id}')">↩ À reprendre</button></div>` : '<p class="small muted">Seuls le gérant et la cogérante peuvent valider.</p>'}</div>
+  <div class="card"><h3>Historique</h3>${(o.historique || []).map(h => `<div class="small" style="padding:4px 0;border-bottom:1px solid var(--line)">${new Date(h.t).toLocaleString('fr-FR')} — <b>${esc(h.u)}</b> : ${esc(h.a)}</div>`).join('') || '<div class="small muted">—</div>'}</div>`;
+};
+function majOrdre(id, f, action, msg){ const o = JSON.parse(JSON.stringify(get('ordres', id))); f(o); histo(o, action); put('ordres', o, action + ' ' + o.num); if (msg) toast(msg); render(); }
+function envoyerOrdre(id){ const o = get('ordres', id); copier(ordreTexte(o, $('#o_sit') && $('#o_sit').checked)); if (o.statut === 'nouvelle' || o.statut === 'a_reprendre') majOrdre(id, x => { x.statut = 'en_cours'; }, 'Ordre de mission envoyé aux agents'); }
+function ouvrirClaude(){ const u = 'https://claude.ai/new'; if (window.AndroidBridge && AndroidBridge.openExternal) AndroidBridge.openExternal(u); else window.open(u, '_blank'); }
+function tacheFaite(id, i, v){ majOrdre(id, o => { o.taches[i].statut = v ? 'fait' : 'a_faire'; if (o.statut === 'nouvelle') o.statut = 'en_cours'; if (o.taches.every(t => t.statut === 'fait') && ['en_cours','a_reprendre'].includes(o.statut)) o.statut = 'controle'; }, (v ? 'Tâche terminée : ' : 'Tâche rouverte : ') + agentNom(get('ordres', id).taches[i].agent)); }
+function tacheResultat(id, i, v){ majOrdre(id, o => { o.taches[i].resultat = v; }, 'Résultat saisi : ' + agentNom(get('ordres', id).taches[i].agent)); }
+function saveRapport(id){ const r = val('o_rap'); if (!r) return toast('Collez d\'abord le rapport'); majOrdre(id, o => { o.rapport = r; if (!['validee'].includes(o.statut)) o.statut = 'controle'; o.taches.forEach(t => { if (!t.resultat) t.resultat = 'Voir rapport final'; t.statut = 'fait'; }); }, 'Rapport final enregistré', 'Rapport enregistré'); }
+function saveQualite(id){ const n = val('o_qn'); if (n === '') return toast('Donnez une note de 0 à 10'); majOrdre(id, o => { o.qualiteNote = Math.max(0, Math.min(10, num(n))); o.qualitePar = val('o_qp'); o.qualiteRem = val('o_qr'); if (o.statut !== 'validee') o.statut = 'a_valider'; }, 'Contrôle qualité : ' + n + '/10', 'Envoyée en validation'); }
+function validerOrdre(id){ if (!can()) return; majOrdre(id, o => { o.statut = 'validee'; o.valideLe = now(); o.validePar = ROLES[SESSION.role].nom; o.retour = ''; }, 'Mission validée par le fondateur', 'Mission validée'); }
+function reprendreOrdre(id){
+  modal(`<h2>À reprendre</h2><div class="f"><div class="full"><label>Ce qu'il faut corriger ou compléter *</label><textarea id="o_ret" style="min-height:110px"></textarea></div></div>
+  <div class="act"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn d" onclick="confirmerReprise('${id}')">Renvoyer aux agents</button></div>`);
+}
+function confirmerReprise(id){ const r = val('o_ret'); if (r.length < 5) return toast('Précisez la correction'); closeModal(); majOrdre(id, o => { o.statut = 'a_reprendre'; o.retour = r; o.reprises = num(o.reprises) + 1; }, 'Renvoyée aux agents : ' + r.slice(0, 60), 'Renvoyée : copiez de nouveau l\'ordre de mission'); }
+function abandonOrdre(id){ if (!confirm('Abandonner cette mission ?')) return; majOrdre(id, o => { o.statut = 'abandonnee'; }, 'Mission abandonnée'); }
 
 /* ----- paramètres ----- */
 VIEWS.parametres = () => {
@@ -761,6 +952,7 @@ function saveSociete(){
 
 /* ----- aide ----- */
 VIEWS.aide = () => `<div class="card"><h3>Mode d'emploi en 6 gestes</h3><ol>
+  <li><b>ATLAS IA — Commandement</b> : « + Nouvelle mission » (ou un modèle), choisissez les agents, touchez « Copier l'ordre de mission » et collez-le dans Claude (Projet IGC). Collez ensuite le rapport, faites le contrôle qualité, puis validez ou renvoyez « À reprendre ». Les indicateurs (missions, reprises, coût, valeur) se calculent seuls.</li>
   <li><b>Paramètres</b> : remplissez une fois les informations du cabinet (RCCM, compte contribuable, banque). Changez les codes PIN.</li>
   <li><b>Trésorerie</b> : saisissez ce qu'il y a aujourd'hui en banque, en caisse et sur mobile.</li>
   <li><b>Clients</b> : ajoutez vos clients et prospects.</li>
