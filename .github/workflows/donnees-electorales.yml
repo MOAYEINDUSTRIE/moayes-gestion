@@ -1,0 +1,50 @@
+name: Données électorales CEI (téléchargement et extraction)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['data-electorales/sources.txt']
+permissions:
+  contents: write
+jobs:
+  extraire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Outils
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils >/dev/null && pip install --quiet pdfplumber
+      - name: Télécharger et extraire
+        run: |
+          mkdir -p data-electorales/pdf data-electorales/texte data-electorales/tables
+          while read nom url; do
+            [ -z "$nom" ] && continue
+            echo "== $nom"
+            if curl -sSL --retry 3 -A "Mozilla/5.0" -o "data-electorales/pdf/$nom.pdf" "$url"; then
+              pdfinfo "data-electorales/pdf/$nom.pdf" | grep -E "Pages|Title" || echo "PDF illisible"
+              pdftotext -layout "data-electorales/pdf/$nom.pdf" "data-electorales/texte/$nom.txt" || true
+              python3 - "$nom" <<'PY'
+          import sys, json, pdfplumber
+          nom = sys.argv[1]; out = []
+          try:
+              with pdfplumber.open(f"data-electorales/pdf/{nom}.pdf") as pdf:
+                  for i, p in enumerate(pdf.pages):
+                      for t in p.extract_tables():
+                          out.append({"page": i + 1, "rows": t})
+          except Exception as e:
+              print("pdfplumber:", e)
+          json.dump(out, open(f"data-electorales/tables/{nom}.json", "w"), ensure_ascii=False)
+          print("tableaux:", len(out))
+          PY
+            else echo "ÉCHEC $url"; fi
+          done < data-electorales/sources.txt
+          ls -la data-electorales/pdf data-electorales/texte
+      - name: Enregistrer
+        run: |
+          git config user.name "Claude"; git config user.email "noreply@anthropic.com"
+          git add data-electorales/texte data-electorales/tables
+          git commit -m "Données électorales CEI : texte et tableaux extraits" || echo "rien de nouveau"
+          git push
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pdf-cei
+          path: data-electorales/pdf

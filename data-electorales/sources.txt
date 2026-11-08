@@ -1,0 +1,10 @@
+EDAN_2025_details https://www.cei.ci/wp-content/uploads/2025/12/EDAN_2025_RESULTAT_NATIONAL_DETAILS.pdf
+EDAN_2025_decision https://cei.ci/wp-content/uploads/2025/12/DECISION-N003-EDAN-2025.pdf
+EDAN_2025_candidatures https://www.cei.ci/wp-content/uploads/2025/11/01_EDAN-2025-LISTE-PROVISOIRE-CANDIDATURES-RETENUES.pdf
+EPR_2025_national https://cei.ci/wp-content/uploads/2025/10/EPR_2025_RESULTAT_NATIONAL.pdf
+MUN_2023 https://cei.ci/wp-content/uploads/2023/09/Municipales_2023.pdf
+REG_2023 https://cei.ci/wp-content/uploads/2023/09/Regionales_2023.pdf
+ELUS_2023_stat https://cei.ci/wp-content/uploads/2024/01/STAT_CAND_ELU_E_S_2023_V4.pdf
+LV_BV_2023 https://cei.ci/wp-content/uploads/2023/08/LED_2023_Repertoire_LV_BV.pdf
+EDAN_2021 https://www.cei.ci/wp-content/uploads/2024/03/EDAN_2021_NATIONAL_V3.pdf
+EPR_2020_departements https://www.cei.ci/wp-content/uploads/2024/03/EPR_2020_EXCEL_NATIONAL_PAR_DEPARTEMENT_V4.pdf
