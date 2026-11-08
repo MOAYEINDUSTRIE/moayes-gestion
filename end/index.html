@@ -167,7 +167,7 @@ tr.click:hover td{background:#fbf7ef}
 <script>
 'use strict';
 /* =====================  END — Dons des volontaires  ===================== */
-const VERSION = 'V1.7';
+const VERSION = 'V1.8';
 const ADMIN_EMAIL = 'moayepos@gmail.com';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -334,7 +334,7 @@ function render(){
       <nav class="nav">${MENU().map(([g, it]) => `<div class="grp">${g}</div>` + it.map(([k, i, t]) => `<a class="${VIEW === k ? 'on' : ''}" onclick="go('${k}')"><span>${i}</span>${t}</a>`).join('')).join('')}</nav>
       <div class="who"><b>${esc(ME.nom)}</b><br>${esc(ROLES[ME.role])}<br><a style="color:inherit;cursor:pointer;text-decoration:underline" onclick="firebase.auth().signOut()">Se déconnecter</a></div>
       <p class="small" style="opacity:.5;padding:0 10px">${VERSION}</p></aside>
-    <main class="main"><div class="top"><button class="btn sm menu-btn" onclick="$('.side').classList.add('open')">☰</button><h1>${esc(titre)}</h1><span id="netpill" class="pill ${ONLINE ? 'g' : 'w'}">● ${ONLINE ? 'En ligne' : 'Hors ligne'}</span></div>
+    <main class="main"><div class="top"><button class="btn sm menu-btn" onclick="$('.side').classList.add('open')">☰</button><h1>${esc(titre)}</h1><button class="btn sm no-print" style="margin-left:auto" onclick="imprimer()" title="Imprimer ou enregistrer en PDF">🖨 PDF</button><span id="netpill" class="pill ${ONLINE ? 'g' : 'w'}">● ${ONLINE ? 'En ligne' : 'Hors ligne'}</span></div>
       ${ME.role === 'gm' ? '<div class="alert" style="font-size:13px">Vue Grand Maître : codes, groupes, montants et totaux. Les noms et contacts ne sont jamais transmis à ce compte.</div>' : ''}${body}</main>
     <nav class="tabbar">${TABS.map(([k, i, t]) => `<a class="${VIEW === k ? 'on' : ''}" onclick="${k === '__menu' ? "$('.side').classList.add('open')" : `go('${k}')`}"><span>${i}</span>${t}</a>`).join('')}</nav></div>`;
   lignesMobiles(document);
@@ -522,7 +522,7 @@ VIEWS.livres = () => {
   ${NP.L.length ? `<div class="alert w no-print">⚠ ${NP.L.length} vente(s) enregistrée(s) sans préciser « en ligne » ou « physique ». Ouvrez l'onglet « Non précisé », touchez chaque ligne puis ✏ Modifier pour le préciser.</div>` : ''}
   <div class="card"><div class="bar"><div class="seg no-print">${seg.map(([k, t, c]) => `<button class="${LVF === k ? 'on' : ''}" onclick="LVF='${k}';render()">${t} <span class="cnt">${c}</span></button>`).join('')}</div><span class="grow"></span>
     <input class="srch no-print" style="flex:1;min-width:160px" placeholder="🔍 ${n ? 'Nom, téléphone, ' : ''}code, titre" value="${esc(LVQ)}" oninput="LVQ=this.value;clearTimeout(window._lq);window._lq=setTimeout(()=>{render();const i=document.querySelector('.card .srch');i.focus();i.setSelectionRange(i.value.length,i.value.length)},300)">
-    <button class="btn no-print" onclick="exportLivres()">⬇ Excel</button><button class="btn no-print" onclick="print()">🖨 Imprimer</button></div>
+    <button class="btn no-print" onclick="exportLivres()">⬇ Excel</button><button class="btn no-print" onclick="imprimer()">🖨 Imprimer / PDF</button></div>
     <h3>${({ tous: 'Tous les acheteurs', ligne: 'Acheteurs en ligne', physique: 'Acheteurs physiques', np: 'Format non précisé' })[LVF]} — ${V.ach} personne(s) · ${V.ex} livre(s) · ${FCFA(V.mt)}</h3>
     ${tbl([['N°'],['Date'],['Reçu'],['Code'], ...(n ? [['Nom'],['Téléphone']] : []), ['Groupe'],['Format'],['Livre'],['Qté','n'],['Montant','n']], V.L.map((d, i) => `<tr class="click" onclick="ficheDon('${d.id}')"><td>${i + 1}</td><td>${dfr(d.date)}</td><td>${esc(d.recu)}</td><td class="code">${esc(d.code)}</td>${n ? `<td><b>${esc(nomDe(d.code))}</b></td><td>${esc((S.prive[d.code] || {}).tel || '')}</td>` : ''}<td>${esc(groupeDe(d.groupe).nom)}</td><td>${LVFMT[d.livre] ? `<span class="tag ${LVFMT[d.livre][2]}">${LVFMT[d.livre][1]} ${LVFMT[d.livre][0]}</span>` : '<span class="tag w">À préciser</span>'}</td><td>${esc(d.titre || '—')}</td><td class="n">${d.qte || 1}</td><td class="n b">${FCFA(d.fcfa)}</td></tr>`), 'Aucune vente de livre. Touchez « + Vente de livre » pour enregistrer la première.')}
     ${V.L.length ? `<div class="totline"><span>Total</span><b>${FCFA(V.mt)}</b></div>` : ''}</div>
@@ -562,7 +562,7 @@ VIEWS.tresorerie = () => {
   const init = TC ? num((t.soldes || {})[TC]) : Object.keys(COMPTES).reduce((s, k) => s + num((t.soldes || {})[k]), 0);
   let run = init; const rows = L.map(x => { run += x.m; return { ...x, run }; }).filter(x => (!FL.d1 || x.date >= FL.d1) && (!FL.d2 || x.date <= FL.d2)).reverse();
   return `${!t.debut ? `<div class="alert w">Indiquez d'abord les <b>soldes de départ</b> de chaque compte (ce qu'il y avait réellement en caisse, en banque, sur Wave… à une date).${can('caisse') ? ' <a href="#" onclick="editSoldes();return false">Saisir les soldes de départ</a>' : ' Le trésorier général doit les saisir.'}</div>` : ''}
-  <div class="bar no-print">${can('caisse') ? '<button class="btn g" onclick="editDec()">+ Décaissement</button><button class="btn" onclick="editTransfert()">⇄ Transfert entre comptes</button><button class="btn" onclick="editSoldes()">⚙ Soldes de départ</button>' : ''}<span class="grow"></span><button class="btn" onclick="exportCaisse()">⬇ Excel</button><button class="btn" onclick="print()">🖨 Imprimer</button></div>
+  <div class="bar no-print">${can('caisse') ? '<button class="btn g" onclick="editDec()">+ Décaissement</button><button class="btn" onclick="editTransfert()">⇄ Transfert entre comptes</button><button class="btn" onclick="editSoldes()">⚙ Soldes de départ</button>' : ''}<span class="grow"></span><button class="btn" onclick="exportCaisse()">⬇ Excel</button><button class="btn" onclick="imprimer()">🖨 Imprimer / PDF</button></div>
   <div class="grid g4" style="margin-bottom:12px"><div class="card kpi dark" style="cursor:pointer" onclick="TC='';render()"><div class="l">Total trésorerie</div><div class="v">${FCFA(T.total)}</div><div class="s">${t.debut ? 'depuis le ' + dfr(t.debut) : 'soldes de départ non saisis'}</div></div>
   ${Object.entries(COMPTES).map(([k, n]) => `<div class="card kpi" style="cursor:pointer;${TC === k ? 'outline:2px solid var(--gold)' : ''}" onclick="TC=TC==='${k}'?'':'${k}';render()"><div class="l">${n}</div><div class="v" style="${T[k] < 0 ? 'color:var(--ko)' : ''}">${FCFA(T[k])}</div></div>`).join('')}</div>
   ${filtresHTML()}
@@ -663,15 +663,13 @@ async function confSupprMvt(col, id){
 }
 function bonDec(id){
   const x = S.decs[id], p = S.decPrive[id] || {};
-  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Bon ${esc(x.num)}</title><style>@page{size:A5;margin:12mm}body{font:12.5px/1.5 Arial,sans-serif;color:#141c2e;margin:0}.hd{display:flex;gap:12px;align-items:center;border-bottom:3px solid #1b2a4a;padding-bottom:10px}.lg{width:50px;height:50px;border-radius:50%;background:#b8893a;color:#1b2a4a;display:flex;align-items:center;justify-content:center;font-weight:800}h1{font-size:17px;margin:14px 0 6px;color:#1b2a4a}table{width:100%;border-collapse:collapse}td{padding:6px 4px;border-bottom:1px solid #e1e4ec}td:first-child{color:#636b7e;width:40%}.big{font-size:17px;font-weight:800}.sig{display:flex;justify-content:space-between;margin-top:34px;text-align:center}${x.supprime ? '.wm{position:fixed;top:40%;left:10%;font-size:60px;color:rgba(180,35,24,.25);transform:rotate(-25deg)}' : ''}</style></head><body>${x.supprime ? '<div class="wm">ANNULÉ</div>' : ''}
-  <div class="hd"><div class="lg">END</div><div><b style="font-size:15px">École de Navigation Divine</b><br>Trésorerie</div></div><h1>BON DE DÉCAISSEMENT N° ${esc(x.num)}</h1><table>
+  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Bon ${esc(x.num)}</title><style>@page{size:A5;margin:12mm}body{font:12.5px/1.5 Arial,sans-serif;color:#141c2e;margin:0}.hd{display:flex;gap:12px;align-items:center;border-bottom:3px solid #1b2a4a;padding-bottom:10px}.lg{width:56px;height:56px}h1{font-size:17px;margin:14px 0 6px;color:#1b2a4a}table{width:100%;border-collapse:collapse}td{padding:6px 4px;border-bottom:1px solid #e1e4ec}td:first-child{color:#636b7e;width:40%}.big{font-size:17px;font-weight:800}.sig{display:flex;justify-content:space-between;margin-top:34px;text-align:center}${x.supprime ? '.wm{position:fixed;top:40%;left:10%;font-size:60px;color:rgba(180,35,24,.25);transform:rotate(-25deg)}' : ''}</style></head><body>${x.supprime ? '<div class="wm">ANNULÉ</div>' : ''}
+  <div class="hd"><img class="lg" src="icons/logo.svg" alt="END"><div><b style="font-size:15px">École de Navigation Divine</b><br>Trésorerie</div></div><h1>BON DE DÉCAISSEMENT N° ${esc(x.num)}</h1><table>
   <tr><td>Date</td><td>${dfr(x.date)}</td></tr><tr><td>Montant</td><td class="big">${FCFA(x.montant)}</td></tr><tr><td>En lettres</td><td>${enLettres(x.montant)} francs CFA</td></tr>
   <tr><td>Bénéficiaire</td><td><b>${esc(p.beneficiaire || '')}</b>${p.contact ? ' — ' + esc(p.contact) : ''}</td></tr><tr><td>Objet</td><td>${esc(x.objet || '')}</td></tr><tr><td>Catégorie</td><td>${esc(x.categorie)}</td></tr>
   <tr><td>Payé depuis</td><td>${esc(COMPTES[x.compte] || x.compte)}</td></tr><tr><td>Pièce justificative</td><td>${esc(x.piece || '')}</td></tr><tr><td>Établi par</td><td>${esc(x.saisiNom || '')}</td></tr></table>
   <div class="sig"><div>Le bénéficiaire<br>(signature, « reçu »)</div><div>Le trésorier général<br><br><br>____________</div></div></body></html>`;
-  if (window.AndroidBridge && AndroidBridge.printHtml){ AndroidBridge.printHtml(html, x.num); return; }
-  const w = window.open('', '_blank'); if (!w) return toast('Autorisez les fenêtres pour imprimer');
-  w.document.write(html); w.document.close(); setTimeout(() => { w.focus(); w.print(); }, 400);
+  ouvrirImpression(html, x.num);
 }
 function exportDecs(){
   const n = can('noms');
@@ -830,7 +828,7 @@ VIEWS.groupe = id => {
   const L = donsFiltres().filter(d => dans(d.groupe)), P = parMembre(L), tot = L.reduce((s, d) => s + num(d.fcfa), 0);
   const membres = vals(S.membres).filter(m => dans(m.groupe)).sort((a, b) => a.code.localeCompare(b.code));
   const pm = Object.fromEntries(P.map(x => [x.code, x]));
-  return `<div class="bar no-print"><button class="btn sm" onclick="go('groupes')">← Groupes</button>${can('membres') && !hors ? `<button class="btn sm" onclick="editGroupe('${esc(id)}')">✏ Modifier</button>` : ''}<button class="btn sm" onclick="print()">🖨 Imprimer</button></div>${filtresHTML()}
+  return `<div class="bar no-print"><button class="btn sm" onclick="go('groupes')">← Groupes</button>${can('membres') && !hors ? `<button class="btn sm" onclick="editGroupe('${esc(id)}')">✏ Modifier</button>` : ''}<button class="btn sm" onclick="imprimer()">🖨 Imprimer / PDF</button></div>${filtresHTML()}
   <div class="grid g3" style="margin-bottom:12px"><div class="card"><h3>${esc(g.nom)}</h3><div class="small">Pays / zone : ${esc(g.pays || '—')}<br>Responsable : ${g.responsable ? libMembre(g.responsable) : '—'}</div></div>
   <div class="card kpi dark"><div class="l">Total du groupe</div><div class="v">${FCFA(tot)}</div><div class="s">${L.length} don(s)</div></div><div class="card kpi"><div class="l">Cotisants</div><div class="v">${P.length} / ${membres.filter(m => m.statut !== 'inactif').length}</div><div class="s">membres actifs</div></div></div>
   <div class="card"><h3>Dons par membre</h3>${tbl([['Code'], ...(can('noms') ? [['Nom']] : []), ['Statut'], ['Dons','n'], ['Total','n']], membres.map(m => `<tr class="click" onclick="go('membre','${esc(m.code)}')"><td class="code">${esc(m.code)}</td>${can('noms') ? `<td>${esc(nomDe(m.code))}</td>` : ''}<td>${pm[m.code] ? '<span class="tag g">A donné</span>' : '<span class="tag">Aucun don</span>'}</td><td class="n">${pm[m.code] ? pm[m.code].nb : 0}</td><td class="n b">${FCFA(pm[m.code] ? pm[m.code].total : 0)}</td></tr>`), 'Aucun membre dans ce groupe.')}</div>`;
@@ -880,7 +878,7 @@ VIEWS.rapports = () => {
       <div class="grid g2">${bloc('Par pays', parPays)}${bloc('Par mois', parMois, (a, b) => a[0].localeCompare(b[0]))}${bloc('Par campagne', parCamp)}${bloc('Par mode de paiement', parMode)}</div>
       ${(() => { const D = decsFiltres(), dt = D.reduce((s, x) => s + num(x.montant), 0), pc = {}; D.forEach(x => pc[x.categorie || 'Autre'] = (pc[x.categorie || 'Autre'] || 0) + num(x.montant)); return `<h3 style="margin-top:14px">Recettes et dépenses</h3><div class="grid g3" style="margin-bottom:12px"><div class="card kpi"><div class="l">Dons reçus</div><div class="v">${FCFA(tot)}</div></div><div class="card kpi"><div class="l">Décaissements</div><div class="v" style="color:var(--ko)">${FCFA(dt)}</div></div><div class="card kpi dark"><div class="l">Excédent de la période</div><div class="v">${FCFA(tot - dt)}</div></div></div><div class="grid g2">${bloc('Décaissements par catégorie', pc)}${bloc('Soldes des comptes (aujourd\'hui)', Object.fromEntries(Object.entries(COMPTES).map(([k, n]) => [n, soldes()[k]])), () => 0)}</div>`; })()}`;
   }
-  return `${filtresHTML()}<div class="bar no-print">${tabs}<span class="grow"></span><button class="btn" onclick="exportRapport()">⬇ Excel</button><button class="btn" onclick="print()">🖨 Imprimer / PDF</button></div>
+  return `${filtresHTML()}<div class="bar no-print">${tabs}<span class="grow"></span><button class="btn" onclick="exportRapport()">⬇ Excel</button><button class="btn" onclick="imprimer()">🖨 Imprimer / PDF</button></div>
   <div class="card"><p class="small muted" style="margin-top:0">Rapport édité le ${dfr(today())} par ${esc(ME.nom)} (${esc(ROLES[ME.role])})${FL.d1 || FL.d2 ? ' — période ' + (dfr(FL.d1) || 'début') + ' → ' + (dfr(FL.d2) || 'aujourd\'hui') : ''}${FL.camp ? ' — campagne « ' + esc(FL.camp) + ' »' : ''}</p>${body}</div>`;
 };
 
@@ -971,10 +969,10 @@ VIEWS.aide = () => !can('aide') ? '<div class="empty">Accès réservé.</div>' :
 function recu(id){
   const d = S.dons[id], m = S.membres[d.code] || {}, p = S.prive[d.code] || {};
   const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Reçu ${esc(d.recu)}</title><style>@page{size:A5;margin:12mm}body{font:12.5px/1.5 Arial,sans-serif;color:#141c2e;margin:0}
-  .hd{display:flex;gap:12px;align-items:center;border-bottom:3px solid #1b2a4a;padding-bottom:10px}.lg{width:50px;height:50px;border-radius:50%;background:#b8893a;color:#1b2a4a;display:flex;align-items:center;justify-content:center;font-weight:800}
+  .hd{display:flex;gap:12px;align-items:center;border-bottom:3px solid #1b2a4a;padding-bottom:10px}.lg{width:56px;height:56px}
   h1{font-size:18px;margin:14px 0 6px;color:#1b2a4a}table{width:100%;border-collapse:collapse}td{padding:6px 4px;border-bottom:1px solid #e1e4ec}td:first-child{color:#636b7e;width:42%}.big{font-size:17px;font-weight:800}.sig{display:flex;justify-content:space-between;margin-top:30px}
   ${d.supprime ? '.wm{position:fixed;top:40%;left:10%;font-size:60px;color:rgba(180,35,24,.25);transform:rotate(-25deg)}' : ''}</style></head><body>${d.supprime ? '<div class="wm">ANNULÉ</div>' : ''}
-  <div class="hd"><div class="lg">END</div><div><b style="font-size:15px">École de Navigation Divine</b><br>Dons des volontaires</div></div>
+  <div class="hd"><img class="lg" src="icons/logo.svg" alt="END"><div><b style="font-size:15px">École de Navigation Divine</b><br>Dons des volontaires</div></div>
   <h1>REÇU N° ${esc(d.recu)}</h1><table>
   <tr><td>Date du don</td><td>${dfr(d.date)}</td></tr><tr><td>Donateur</td><td><b>${esc([p.nom, p.prenoms].filter(Boolean).join(' '))}</b> (${esc(d.code)})</td></tr>
   <tr><td>Groupe</td><td>${esc(groupeDe(d.groupe).nom)}${m.pays ? ' — ' + esc(m.pays) : ''}</td></tr>
@@ -983,12 +981,47 @@ function recu(id){
   <tr><td>Mode de paiement</td><td>${esc(d.mode)}${d.ref ? ' — réf. ' + esc(d.ref) : ''}</td></tr>${d.objet ? `<tr><td>Objet</td><td>${esc(d.objet)}</td></tr>` : ''}
   <tr><td>Enregistré par</td><td>${esc(d.saisiNom || '')}</td></tr></table>
   <div class="sig"><div>Le donateur</div><div style="text-align:center">La Trésorerie<br><br><br>____________</div></div></body></html>`;
-  if (window.AndroidBridge && AndroidBridge.printHtml){ AndroidBridge.printHtml(html, d.recu); return; }
-  const w = window.open('', '_blank'); if (!w) return toast('Autorisez les fenêtres pour imprimer');
-  w.document.write(html); w.document.close(); setTimeout(() => { w.focus(); w.print(); }, 400);
+  ouvrirImpression(html, d.recu);
 }
 
 /* ----- exports (sans noms pour le Grand Maître) ----- */
+/* ----- impression / PDF commune (navigateur et APK) ----- */
+function ouvrirImpression(html, titre){
+  if (window.AndroidBridge && AndroidBridge.printHtml){ AndroidBridge.printHtml(html, titre || 'END'); return; }
+  const w = window.open('', '_blank');
+  if (!w){ // fenêtre bloquée : impression dans un cadre caché
+    const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'; document.body.appendChild(f);
+    f.contentDocument.open(); f.contentDocument.write(html); f.contentDocument.close();
+    setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 2000); }, 600); return;
+  }
+  w.document.open(); w.document.write(html); w.document.close(); setTimeout(() => { w.focus(); w.print(); }, 600);
+}
+const CSS_IMPR = `@page{size:A4;margin:12mm}*{box-sizing:border-box}body{font:11.5px/1.45 Arial,Helvetica,sans-serif;color:#141c2e;margin:0}
+.ent{display:flex;align-items:center;gap:12px;border-bottom:3px solid #17254a;padding-bottom:8px;margin-bottom:10px}.ent img{width:54px;height:54px}.ent .t{font-size:16px;font-weight:700;color:#17254a}.ent .s{color:#555;font-size:11px}
+h1{font-size:17px;margin:4px 0 10px;color:#17254a}h2,h3{font-size:13.5px;margin:12px 0 6px;color:#17254a}
+table{width:100%;border-collapse:collapse;margin:4px 0 10px;page-break-inside:auto}tr{page-break-inside:avoid}th,td{border:1px solid #c9ceda;padding:4px 6px;text-align:left;vertical-align:top}th{background:#eef0f5;font-weight:700}td.n,th.n{text-align:right;white-space:nowrap}.b{font-weight:700}
+.card,.kpi,.stat,.hero{border:1px solid #c9ceda;border-radius:6px;padding:8px 10px;margin:0 0 8px;background:#fff!important;color:#141c2e!important;box-shadow:none!important;break-inside:avoid}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.grid.g2{grid-template-columns:repeat(2,1fr)}.kpi .v,.hero-v,.stat .v{font-size:15px;font-weight:800}.kpi .l,.kpi .s,.hero-l,.hero-s,.stat .l,.stat .s,.small,.muted{color:#555!important;font-size:10.5px}
+.hero:after,.ic,.hbar,.seg,.no-print,.bar,button,input,select,.alert.w{display:none!important}.tag{border:1px solid #bbb;border-radius:8px;padding:0 5px;font-size:10px}.code{font-family:monospace}
+.pied{margin-top:14px;border-top:1px solid #c9ceda;padding-top:6px;color:#666;font-size:10px;display:flex;justify-content:space-between}a{color:inherit;text-decoration:none}.totline{display:flex;justify-content:space-between;border-top:2px solid #17254a;padding-top:4px;font-weight:700}`;
+function imprimer(){
+  const m = document.querySelector('main.main'); if (!m) return;
+  const c = m.cloneNode(true);
+  c.querySelectorAll('.no-print,.bar,.top,.tabbar,button,input,select,script,.toast').forEach(e => e.remove());
+  c.querySelectorAll('[onclick]').forEach(e => e.removeAttribute('onclick'));
+  c.querySelectorAll('td').forEach(td => td.classList.remove('m-t', 'm-a', 'm-d', 'm-no'));
+  c.querySelectorAll('td,th').forEach(td => { if (td.textContent.trim().length <= 12) td.style.whiteSpace = 'nowrap'; });
+  const large = Math.max(0, ...[...c.querySelectorAll('table')].map(t => (t.rows[0] || { cells: [] }).cells.length)) > 8;
+  const titre = (document.querySelector('main .top h1') || {}).textContent || 'END';
+  const f = [FL.d1 ? 'du ' + dfr(FL.d1) : '', FL.d2 ? 'au ' + dfr(FL.d2) : '', FL.pays ? 'pays : ' + FL.pays : '', FL.groupe ? 'groupe : ' + (FL.groupe === '-' ? 'Hors groupe' : groupeDe(FL.groupe).nom) : '', FL.camp ? 'objet : ' + FL.camp : ''].filter(Boolean).join(' · ');
+  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>END — ${esc(titre)}</title><style>${CSS_IMPR}${large ? '@page{size:A4 landscape}' : ''}</style></head><body>
+  <div class="ent"><img src="icons/logo.svg" alt=""><div><div class="t">École de Navigation Divine</div><div class="s">Dons des volontaires</div></div></div>
+  <h1>${esc(titre)}</h1>${f ? `<div class="small">Filtres : ${esc(f)}</div>` : ''}${c.innerHTML}
+  <div class="pied"><span>Édité le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} par ${esc(ME.nom || '')} (${esc(ROLES[ME.role] || ME.role)})</span><span>END Dons ${VERSION}</span></div></body></html>`;
+  journal('Impression', titre, null, null);
+  ouvrirImpression(html, 'END — ' + titre);
+}
+
 function saveFile(name, mime, text){
   if (window.AndroidBridge && AndroidBridge.saveFile){ AndroidBridge.saveFile(name, mime, btoa(unescape(encodeURIComponent(text)))); return; }
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: mime })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
