@@ -102,6 +102,18 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
  table.resp td.m-a{order:1;flex:0 0 auto;font-size:14.5px;font-weight:800;color:var(--pri);white-space:nowrap;text-align:right}
  table.resp td.m-d{order:2}table.resp td.m-d.n::before{content:attr(data-l) " ";font-weight:500}
 }
+
+/* ===== V1.2 — habillage ATLAS IA ===== */
+.atlas-ban{position:relative;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;min-height:170px;border-radius:14px;padding:16px 18px;margin-bottom:12px;color:#fff;overflow:hidden;background:linear-gradient(90deg,rgba(6,16,42,.92) 0%,rgba(6,16,42,.55) 45%,rgba(6,16,42,.15) 100%),url(img/atlas-banniere.jpg) right 30%/cover no-repeat;box-shadow:0 8px 24px rgba(19,32,66,.25)}
+.atlas-t1{font:900 34px/1 Arial,sans-serif;letter-spacing:.5px;background:linear-gradient(180deg,#ffe08a,#c8932f);-webkit-background-clip:text;background-clip:text;color:transparent}
+.atlas-t2{font-weight:700;font-size:14.5px;margin-top:6px;max-width:420px;text-shadow:0 1px 3px rgba(0,0,0,.6)}.atlas-t3{font-style:italic;font-size:12.5px;color:#f5c95a;margin-top:4px}
+.route{display:flex;flex-wrap:wrap;gap:6px;align-items:stretch;padding-bottom:4px}
+.ph{flex:1 1 96px;min-width:0;border:1px solid var(--line);border-radius:10px;padding:8px 9px;background:#fff;position:relative}.ph b{display:block;font-size:13.5px;margin:2px 0}.ph .pm{font-size:11.5px;font-weight:700;color:var(--muted)}
+.ph.fait{background:var(--okb);border-color:#9fd8b3}.ph.cur{border:2px solid var(--gold);background:#fdf7ea}
+.ph .ici{display:inline-block;margin-top:5px;font-size:11px;font-weight:800;color:var(--pri);background:var(--gold);border-radius:99px;padding:1px 8px}.ph .ok{display:inline-block;margin-top:5px;font-size:11px;font-weight:700;color:var(--ok)}
+.porte{flex:0 1 118px;display:flex;gap:6px;align-items:center}.porte .dia{color:var(--gold);font-size:22px}.porte.ok .dia{color:var(--ok)}.porte .pt{flex:1;min-width:0}.porte .pt b{font-size:12.5px}.porte .small{font-size:11.5px;line-height:1.25;margin-top:3px}.porte .prog{margin-top:4px}
+@media (max-width:760px){.atlas-ban{min-height:150px;padding:12px}.atlas-t1{font-size:28px}.atlas-ban .btn{width:100%}
+ .route{flex-direction:column}.ph{min-width:0}.porte{flex:none;padding-left:10px}}
 </style>
 </head>
 <body>
@@ -109,7 +121,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  IGC Gestion  ===================== */
-const VERSION = 'V1.1';
+const VERSION = 'V1.2';
 const KEY = 'igc_gestion_v1';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -803,12 +815,30 @@ function statsAtlas(){
   return { recues: L.length, actives: L.filter(o => ['nouvelle','en_cours','controle','a_reprendre'].includes(o.statut)).length, aValider: L.filter(o => o.statut === 'a_valider').length,
     validees: fin.length, tauxCorr: fin.length ? Math.round(reprises / fin.length * 100) : 0, coutMoy: fin.length ? cout / fin.length : 0, valeur: L.reduce((s, o) => s + num(o.valeur), 0) };
 }
+function portesAtlas(){
+  const vendues = ordres().filter(o => o.statut === 'validee' && num(o.valeur) > 0);
+  const valeur = vendues.reduce((t, o) => t + num(o.valeur), 0), cout = ordres().reduce((t, o) => t + num(o.cout), 0), marge = valeur - cout;
+  const d = new Date(), mois3 = [1, 2, 3].map(k => { const x = new Date(d.getFullYear(), d.getMonth() - k, 15); return x.toISOString().slice(0, 7); });
+  const couverts = mois3.filter(m => { const P = periode(m); return P.encaisse > 0 && P.encaisse >= P.depenses; }).length;
+  const A = { ok: vendues.length >= 3, v: Math.min(vendues.length, 3), max: 3, txt: `${vendues.length} mission(s) vendue(s) et validée(s) sur 3` };
+  const B = { ok: vendues.length >= 10 && marge > 0, v: Math.min(vendues.length, 10), max: 10, txt: `${vendues.length} mission(s) vendue(s) sur 10 · marge ${FCFA(marge)}` };
+  const C = { ok: couverts === 3, v: couverts, max: 3, txt: `${couverts} mois sur les 3 derniers où les encaissements couvrent les dépenses` };
+  const etape = !A.ok ? (ordres().length ? 1 : 0) : !B.ok ? 2 : !C.ok ? 3 : 4;
+  return { A, B, C, etape, vendues: vendues.length, marge };
+}
+const PHASES_ATLAS = [['Mois 1','Mise en route','Offres d\'entrée et prix, 3 missions d\'essai'],['Mois 2-3','Premières ventes','Missions payantes, coût réel mesuré'],['Mois 4-6','Les 4 pôles en vente','Grille de prix, réponses aux appels d\'offres'],['Mois 7-9','Premier marché africain','2 marchés étudiés, 1 partenaire, niveau 2'],['Mois 10-12','Consolidation','Procédures, offres internationales, niveau 3']];
+function feuilleRoute(){
+  const P = portesAtlas(), portes = { 1: ['A', P.A], 2: ['B', P.B], 3: ['C', P.C] };
+  const ph = i => { const fait = i < P.etape, cur = i === P.etape || (i === 0 && P.etape === 0); return `<div class="ph ${fait ? 'fait' : cur ? 'cur' : ''}"><div class="pm">${PHASES_ATLAS[i][0]}</div><b>${PHASES_ATLAS[i][1]}</b><div class="small">${PHASES_ATLAS[i][2]}</div>${cur ? '<span class="ici">Vous êtes ici</span>' : fait ? '<span class="ok">✓ Franchie</span>' : ''}</div>`; };
+  const porte = i => { const [n, g] = portes[i]; return `<div class="porte ${g.ok ? 'ok' : ''}"><div class="dia">◆</div><div class="pt"><b>Porte ${n}</b> ${g.ok ? '<span class="tag g">franchie</span>' : ''}<div class="prog"><i style="width:${Math.round(g.v / g.max * 100)}%"></i></div><div class="small">${g.txt}</div></div></div>`; };
+  return `<div class="card" style="margin-bottom:12px"><h3>📅 Feuille de route sur 12 mois — chaque étape s'ouvre quand la porte est franchie</h3><div class="route">${ph(0)}${ph(1)}${porte(1)}${ph(2)}${porte(2)}${ph(3)}${porte(3)}${ph(4)}</div>
+  <p class="small muted" style="margin-top:8px">Une mission compte comme « vendue » quand elle est validée et que sa valeur commerciale (devis ou facture obtenu) est renseignée.</p></div>`;
+}
 VIEWS.atlas = () => {
   const S = statsAtlas(), L = ordres().slice().sort((a, b) => num(b.cree) - num(a.cree));
   const F = { actives: o => ['nouvelle','en_cours','controle','a_reprendre'].includes(o.statut), a_valider: o => o.statut === 'a_valider', validees: o => o.statut === 'validee', toutes: () => true };
   const V = L.filter(F[ATF]);
-  return `<div class="card atlas-hero" style="margin-bottom:12px"><div><div class="small" style="opacity:.8;letter-spacing:1px">ATLAS IA · pôle d'agents d'Impact Global Consulting</div>
-    <div style="font-size:19px;font-weight:800;margin:4px 0">Poste de commandement</div><div class="small" style="opacity:.85">Vous donnez la mission, le Directeur général IA répartit, les agents produisent, Qualité et Audit contrôlent, vous validez.</div></div>
+  return `<div class="atlas-ban"><div class="atlas-ban-in"><div class="atlas-t1">ATLAS IA</div><div class="atlas-t2">Le pôle d'agents d'intelligence artificielle d'Impact Global Consulting</div><div class="atlas-t3">Innover · Collaborer · Réussir</div></div>
     <button class="btn g" onclick="editOrdre()">+ Nouvelle mission</button></div>
   ${S.aValider ? `<div class="alert w">✋ ${S.aValider} mission(s) attendent votre validation. <a href="#" onclick="ATF='a_valider';render();return false">Voir</a></div>` : ''}
   <div class="grid g4" style="margin-bottom:12px">
@@ -816,6 +846,7 @@ VIEWS.atlas = () => {
     <div class="card kpi"><div class="l">Missions validées</div><div class="v">${S.validees}</div><div class="s">Taux de reprise : ${S.tauxCorr} %</div></div>
     <div class="card kpi"><div class="l">Coût moyen par mission</div><div class="v">${FCFA(S.coutMoy)}</div><div class="s">abonnements et API estimés</div></div>
     <div class="card kpi gold"><div class="l">Valeur commerciale liée</div><div class="v">${FCFA(S.valeur)}</div><div class="s">devis ou factures issus des missions</div></div></div>
+  ${feuilleRoute()}
   <div class="card"><div class="bar"><div class="segm">${[['actives','En cours'],['a_valider','À valider'],['validees','Validées'],['toutes','Toutes']].map(([k, t]) => `<button class="${ATF === k ? 'on' : ''}" onclick="ATF='${k}';render()">${t} <span class="cnt">${L.filter(F[k]).length}</span></button>`).join('')}</div></div>
   ${tbl([['N°'],['Mission'],['Pôle'],['Agents','n'],['Échéance'],['Statut']], V.map(o => `<tr class="click" onclick="go('ordre','${o.id}')"><td class="b">${esc(o.num)}</td><td><b>${esc(o.titre)}</b>${o.clientId ? `<div class="small muted">${esc(cli(o.clientId).nom)}</div>` : ''}</td><td>${esc(o.pole)}</td><td class="n">${(o.agents || []).length}</td><td>${o.echeance ? dfr(o.echeance) : '—'}${o.echeance && o.echeance < today() && !['validee','abandonnee'].includes(o.statut) ? ' <span class="tag r">retard</span>' : ''}</td><td>${tagOrdre(o)}</td></tr>`), 'Aucune mission ici. Touchez « + Nouvelle mission » ou partez d\'un modèle.')}</div>
   <div class="card" style="margin-top:12px"><h3>Démarrer d'un modèle</h3><div class="grid g3">${MODELES_ATLAS.map((m, i) => `<button class="btn" style="white-space:normal;text-align:left;padding:10px" onclick="editOrdre(null,${i})"><b>${esc(m[0])}</b><br><span class="small muted">${esc(m[1])} · ${m[2].length} agents</span></button>`).join('')}</div></div>
