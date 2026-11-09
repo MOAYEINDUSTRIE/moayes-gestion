@@ -8,6 +8,7 @@ Rien n'est jamais supprimé : les pronostics perdants restent dans le registre.
   - `mise_unites` : 1 unité par pari (mise plate, aucune martingale).
   - `gain_perte_unites` : cote − 1 si gagné, −1 si perdu, 0 si remboursé.
   - `valeur_attendue` : proba_estimee × cote − 1.
+- `suivi_sites.csv` (séparateur `;`) : pronostics relevés sur les sites d'analyse et propre estimation de l'agent (site = « AGENT (propre analyse) »), réglés JUSTE / FAUX / ANNULÉ.
 - `journal/AAAA-MM-JJ.md` : rapport du jour (sélections, candidats rejetés et raisons, sources et heures de consultation).
 
 Aucun pari n'est placé et aucun argent n'est engagé par l'agent.
