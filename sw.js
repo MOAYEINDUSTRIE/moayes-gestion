@@ -1,7 +1,7 @@
 /* MOAYÉ'S Gestion Pro — fonctionnement hors ligne.
    La page est d'abord demandée au réseau (pour avoir toujours la dernière version),
    puis à la copie locale quand il n'y a pas de connexion. Les données passent par Firebase, jamais par ce cache. */
-const CACHE = 'moayes-v2-shell-5';
+const CACHE = 'moayes-v2-shell-6';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './logo.png'];
 const LIBS = ['www.gstatic.com', 'cdnjs.cloudflare.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });

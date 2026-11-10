@@ -64,7 +64,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 .login{min-height:100vh;display:grid;place-items:center;background:linear-gradient(160deg,#14213a,#24365c);padding:16px}
 .login .box{background:#fff;border-radius:16px;padding:24px;width:100%;max-width:360px;text-align:center}
 .pinpad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.pinpad button{padding:14px;font-size:19px;border-radius:12px;border:1px solid var(--line);background:#f7f8fa;cursor:pointer}
-.dots{font-size:28px;letter-spacing:10px;height:36px}
+.dots{font-size:28px;letter-spacing:10px;height:36px}.oeil-pin{border:0;background:transparent;cursor:pointer;width:40px;height:40px;color:#667085;display:flex;align-items:center;justify-content:center}.oeil-pin svg{width:22px;height:22px}
 .tabbar{display:none}
 .list-mob{display:none}
 @media (max-width:900px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -124,13 +124,37 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 #diag .agchk label{display:flex;gap:8px;align-items:flex-start;text-align:left;justify-content:flex-start}#diag .agchk input{flex:none;width:auto;margin-top:3px}
 #elq{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff}
 </style>
+<script>
+/* Œil : afficher / masquer les mots de passe et codes (tous les champs, y compris ceux créés plus tard) */
+(function(){
+  const css = document.createElement('style');
+  css.textContent = '.oeil-w{position:relative;display:block}.oeil-w>input{padding-right:46px!important}.oeil{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;border:0;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#667085;padding:0;margin:0;box-shadow:none}.oeil:hover{color:#1d2b4f}.oeil svg{width:22px;height:22px}@media print{.oeil{display:none}}';
+  document.head.appendChild(css);
+  const OUVERT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const FERME = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+  window.OEIL = { OUVERT, FERME };
+  function equiper(inp){
+    if (inp.dataset.oeil) return; inp.dataset.oeil = '1';
+    const w = document.createElement('span'); w.className = 'oeil-w';
+    const cs = getComputedStyle(inp); if (cs.display === 'inline-block' || cs.marginLeft === cs.marginRight && cs.marginLeft !== '0px') { w.style.width = inp.offsetWidth ? inp.offsetWidth + 'px' : ''; w.style.margin = '0 auto'; }
+    inp.parentNode.insertBefore(w, inp); w.appendChild(inp);
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'oeil'; b.tabIndex = -1;
+    b.setAttribute('aria-label', 'Afficher le mot de passe'); b.title = 'Afficher'; b.innerHTML = OUVERT;
+    b.addEventListener('mousedown', e => e.preventDefault());
+    b.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); const voir = inp.type === 'password'; inp.type = voir ? 'text' : 'password'; b.innerHTML = voir ? FERME : OUVERT; b.title = voir ? 'Masquer' : 'Afficher'; b.setAttribute('aria-label', voir ? 'Masquer le mot de passe' : 'Afficher le mot de passe'); inp.focus(); });
+    w.appendChild(b);
+  }
+  const scan = () => document.querySelectorAll('input[type=password]:not([data-oeil])').forEach(equiper);
+  new MutationObserver(scan).observe(document.documentElement, { childList: true, subtree: true }); scan();
+})();
+</script>
 </head>
 <body>
 <div id="root"></div>
 <script>
 'use strict';
 /* =====================  IGC Gestion  ===================== */
-const VERSION = 'V1.5';
+const VERSION = 'V1.6';
 const KEY = 'igc_gestion_v1';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -390,17 +414,19 @@ function loginHTML(){
   return `<div class="login"><div class="box"><div class="logo" style="margin:0 auto 10px;width:56px;height:56px;font-size:18px">IGC</div>
     <h2 style="margin:0">IGC Gestion</h2><p class="muted small" style="margin:4px 0 12px">Impact Global Consulting</p>
     <div class="f" style="grid-template-columns:1fr"><div><select id="role" onchange="PINROLE=this.value">${Object.entries(ROLES).map(([k, r]) => `<option value="${k}" ${k === PINROLE ? 'selected' : ''}>${r.nom}</option>`).join('')}</select></div></div>
-    <div class="dots" id="dots">${'•'.repeat(PIN.length) || '<span class="muted small">Code PIN</span>'}</div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:6px"><div class="dots" id="dots">${pinAff()}</div><button type="button" class="oeil-pin" title="Afficher le code" onclick="PINVOIR=!PINVOIR;$('#dots').innerHTML=pinAff();this.innerHTML=PINVOIR?OEIL.FERME:OEIL.OUVERT">${PINVOIR ? OEIL.FERME : OEIL.OUVERT}</button></div>
     <div class="pinpad">${[1,2,3,4,5,6,7,8,9,'⌫',0,'OK'].map(k => `<button onclick="pinKey('${k}')">${k}</button>`).join('')}</div>
     <p class="small muted" style="margin-top:12px">${VERSION}</p></div></div>`;
 }
+let PINVOIR = false;
+const pinAff = () => (PINVOIR ? esc(PIN) : '•'.repeat(PIN.length)) || '<span class="muted small">Code PIN</span>';
 async function pinKey(k){
   if (k === '⌫') PIN = PIN.slice(0, -1);
   else if (k === 'OK'){
     if (await checkPin(PINROLE, PIN)){ SESSION = { role: PINROLE, t: now() }; sessionStorage.setItem('igc_session', JSON.stringify(SESSION)); PIN = ''; const h = location.hash.slice(1); VIEW = VIEWS[h] ? h : 'tableau'; render(); if (!DATA._pins[PINROLE]) toast('Pensez à changer votre code PIN dans Paramètres'); return; }
     PIN = ''; toast('Code incorrect');
   } else if (PIN.length < 8) PIN += k;
-  $('#dots').innerHTML = '•'.repeat(PIN.length) || '<span class="muted small">Code PIN</span>';
+  $('#dots').innerHTML = pinAff();
 }
 document.addEventListener('keydown', e => { if (SESSION || $('.modal-bg')) return; if (/^\d$/.test(e.key)) pinKey(e.key); else if (e.key === 'Backspace') pinKey('⌫'); else if (e.key === 'Enter') pinKey('OK'); });
 function logout(){ SESSION = null; sessionStorage.removeItem('igc_session'); render(); }

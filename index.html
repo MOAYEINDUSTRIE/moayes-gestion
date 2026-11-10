@@ -187,6 +187,30 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-b
 .hide{display:none!important}
 @media print{.printhead{display:block;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:14px}.side,.bnav,.top .acts,.top .util,.btn,.sum{display:none!important}table.rc tr:first-child{display:table-row!important}.main{margin:0;padding:0}.card{box-shadow:none;break-inside:avoid}}
 </style>
+<script>
+/* Œil : afficher / masquer les mots de passe et codes (tous les champs, y compris ceux créés plus tard) */
+(function(){
+  const css = document.createElement('style');
+  css.textContent = '.oeil-w{position:relative;display:block}.oeil-w>input{padding-right:46px!important}.oeil{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;border:0;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#667085;padding:0;margin:0;box-shadow:none}.oeil:hover{color:#1d2b4f}.oeil svg{width:22px;height:22px}@media print{.oeil{display:none}}';
+  document.head.appendChild(css);
+  const OUVERT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const FERME = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+  window.OEIL = { OUVERT, FERME };
+  function equiper(inp){
+    if (inp.dataset.oeil) return; inp.dataset.oeil = '1';
+    const w = document.createElement('span'); w.className = 'oeil-w';
+    const cs = getComputedStyle(inp); if (cs.display === 'inline-block' || cs.marginLeft === cs.marginRight && cs.marginLeft !== '0px') { w.style.width = inp.offsetWidth ? inp.offsetWidth + 'px' : ''; w.style.margin = '0 auto'; }
+    inp.parentNode.insertBefore(w, inp); w.appendChild(inp);
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'oeil'; b.tabIndex = -1;
+    b.setAttribute('aria-label', 'Afficher le mot de passe'); b.title = 'Afficher'; b.innerHTML = OUVERT;
+    b.addEventListener('mousedown', e => e.preventDefault());
+    b.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); const voir = inp.type === 'password'; inp.type = voir ? 'text' : 'password'; b.innerHTML = voir ? FERME : OUVERT; b.title = voir ? 'Masquer' : 'Afficher'; b.setAttribute('aria-label', voir ? 'Masquer le mot de passe' : 'Afficher le mot de passe'); inp.focus(); });
+    w.appendChild(b);
+  }
+  const scan = () => document.querySelectorAll('input[type=password]:not([data-oeil])').forEach(equiper);
+  new MutationObserver(scan).observe(document.documentElement, { childList: true, subtree: true }); scan();
+})();
+</script>
 </head>
 <body>
 <div class="app">
@@ -210,7 +234,7 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-b
    charges, ajustements). Aucun solde saisi à la main.
    Format de données identique aux sauvegardes V30.
    ========================================================= */
-const VERSION = 'V2.10';
+const VERSION = 'V2.11';
 const LS_DATA = 'moayes_v2_data', LS_CFG = 'moayes_v2_cfg', LS_PIN = 'moayes_v2_pins', LS_TS = 'moayes_v2_ts';
 const FIREBASE_CONFIG = {
   apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
