@@ -154,7 +154,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  IGC Gestion  ===================== */
-const VERSION = 'V1.7';
+const VERSION = 'V1.8';
 const KEY = 'igc_gestion_v1';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -801,7 +801,7 @@ const AGENT_PROMPTS = [
   ];
 VIEWS.agents = () => `
   <div class="card" style="margin-bottom:12px"><h3>🤖 Travailler avec vos agents IA</h3>
-  <p class="small">Vos agents forment désormais <b>ATLAS IA</b> (13 agents, dont Stratégie politique et électorale, Partenariats, Qualité et Auditeur). Pour une mission complète, utilisez le <a href="#" onclick="go('atlas');return false">poste de commandement ATLAS IA</a>. Pour une demande rapide, ils travaillent aussi directement dans Claude. Donnez-leur la situation réelle du cabinet en un geste :</p>
+  <p class="small">Vos agents forment désormais <b>ATLAS IA</b> (14 agents, dont Stratégie politique et électorale, Réseautage électoral, Partenariats, Qualité et Auditeur). Pour une mission complète, utilisez le <a href="#" onclick="go('atlas');return false">poste de commandement ATLAS IA</a>. Pour une demande rapide, ils travaillent aussi directement dans Claude. Donnez-leur la situation réelle du cabinet en un geste :</p>
   <ol class="small"><li>Touchez <b>Copier la situation du cabinet</b>.</li><li>Ouvrez Claude (Projet IGC) et collez.</li><li>Ajoutez votre demande, par exemple : « Agent comptable : prépare les relances » ou « Agent commercial : propose 5 prospects ».</li></ol>
   <div class="act" style="justify-content:flex-start"><button class="btn g" onclick="copier(resumeTexte())">📋 Copier la situation du cabinet</button><button class="btn" onclick="exportJSON()">⬇ Fichier complet pour les agents</button></div></div>
   <div class="card"><h3>Demandes prêtes à copier</h3>${AGENT_PROMPTS.map(([t, p], i) => `<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)"><span class="small"><b>${t}</b><br>${esc(p)}</span><button class="btn sm" onclick="copier(AGENT_PROMPTS[${i}][1]+'\\n\\n'+resumeTexte())">Copier</button></div>`).join('')}</div>`;
@@ -815,6 +815,7 @@ const AGENTS_ATLAS = [
   ['jur','Juridique','Projets de contrats, conformité, risques — à faire vérifier par un professionnel'],
   ['com','Commercial','Prospects, offres, argumentaires, relances'],
   ['pol','Stratégie politique et électorale','Analyse du contexte et de l\'opinion, positionnement, messages, plan de campagne, discours, débats, gestion de crise — confidentiel, dans le respect de la loi électorale'],
+  ['res','Réseautage électoral et intelligence territoriale','Base électorale (lieux et bureaux de vote), cellules territoriales, référents par lieu de vote, collecte des PV, couverture du terrain, tableaux de bord du réseau — données agrégées, membres déclarés à l\'ARTCI'],
   ['mkt','Marketing et communication','Marque, contenus, campagnes, réseaux sociaux'],
   ['tech','Technique','Applications, automatisations, sites, outils numériques (agent informatique)'],
   ['prod','Production','Rapports, études, présentations, livrables clients (agent consultant)'],
@@ -828,6 +829,8 @@ const ST_ORDRE = { nouvelle:['Nouvelle',''], en_cours:['Travaux en cours','b'], 
 const ETAPES = [['Mission','nouvelle'],['Répartition','en_cours'],['Travaux','en_cours'],['Contrôle','controle'],['Validation','a_valider']];
 const MODELES_ATLAS = [
   ['Stratégie de campagne électorale', 'Stratégie politique et électorale', ['dg','pol','rech','mkt','fin','jur','qual','audit'], 'Élaborer la stratégie de campagne de … (candidat ou parti, confidentiel) pour l\'élection … à … : analyse du terrain et des résultats passés, forces et faiblesses, électorats cibles, positionnement et messages clés, plan d\'action et calendrier jusqu\'au scrutin, plan médias et réseaux sociaux, budget en FCFA, règles de la loi électorale et du code de bonne conduite à respecter, gestion des risques.'],
+  ['Réseautage électoral — phase (zone)', 'Stratégie politique et électorale', ['dg','res','pol','rech','tech','jur','qual','audit'], 'Conduire la phase … (1 inventaire, 2 structuration, 3 statistiques, 4 réseautage, 5 pilotage) du réseau électoral pour la zone … (circonscription n° … / commune / département), selon le prompt maître de réseautage d\'IGC. Partir de la base électorale IGC (Base électorale → fiche de la zone → Copier). Livrables : le livrable de la phase, un tableau Excel/CSV exploitable, les sources avec dates, les données manquantes et comment les obtenir, les 3 décisions à prendre par la coordination.'],
+  ['Rapport hebdomadaire du réseau électoral', 'Stratégie politique et électorale', ['dg','res','ops','qual'], 'Établir le rapport hebdomadaire du réseau pour la zone … : cellules actives et inactives, lieux de vote couverts par un référent (sur le total), rapports reçus et en retard, PV saisis, anomalies, 3 actions prioritaires de la semaine suivante.'],
   ['Communication politique (hors campagne)', 'Stratégie politique et électorale', ['dg','pol','mkt','rech','qual'], 'Construire la communication de … (élu, institution ou parti) sur 3 mois : image et positionnement, messages, discours clés, prises de parole, réseaux sociaux, relations presse, plan de gestion de crise.'],
   ['Étude de marché', 'Conseil et stratégie', ['dg','rech','com','fin','prod','qual'], 'Étudier le marché de … en … : taille, clients, concurrents, prix pratiqués, réglementation, opportunités. Livrable : étude de 8 à 12 pages avec sources et recommandations.'],
   ['Réponse à un appel d\'offres', 'Conseil et stratégie', ['dg','rech','jur','fin','prod','qual','audit'], 'Préparer la réponse d\'IGC à l\'appel d\'offres « … » (lien : …). Livrables : analyse du dossier et des critères, offre technique, offre financière, liste des pièces administratives, calendrier jusqu\'à la date limite.'],
@@ -888,7 +891,7 @@ VIEWS.atlas = () => {
   <div class="card"><div class="bar"><div class="segm">${[['actives','En cours'],['a_valider','À valider'],['validees','Validées'],['toutes','Toutes']].map(([k, t]) => `<button class="${ATF === k ? 'on' : ''}" onclick="ATF='${k}';render()">${t} <span class="cnt">${L.filter(F[k]).length}</span></button>`).join('')}</div></div>
   ${tbl([['N°'],['Mission'],['Pôle'],['Agents','n'],['Échéance'],['Statut']], V.map(o => `<tr class="click" onclick="go('ordre','${o.id}')"><td class="b">${esc(o.num)}</td><td><b>${esc(o.titre)}</b>${o.clientId ? `<div class="small muted">${esc(cli(o.clientId).nom)}</div>` : ''}</td><td>${esc(o.pole)}</td><td class="n">${(o.agents || []).length}</td><td>${o.echeance ? dfr(o.echeance) : '—'}${o.echeance && o.echeance < today() && !['validee','abandonnee'].includes(o.statut) ? ' <span class="tag r">retard</span>' : ''}</td><td>${tagOrdre(o)}</td></tr>`), 'Aucune mission ici. Touchez « + Nouvelle mission » ou partez d\'un modèle.')}</div>
   <div class="card" style="margin-top:12px"><h3>Démarrer d'un modèle</h3><div class="grid g3">${MODELES_ATLAS.map((m, i) => `<button class="btn" style="white-space:normal;text-align:left;padding:10px" onclick="editOrdre(null,${i})"><b>${esc(m[0])}</b><br><span class="small muted">${esc(m[1])} · ${m[2].length} agents</span></button>`).join('')}</div></div>
-  <div class="card" style="margin-top:12px"><h3>L'équipe ATLAS IA (13 agents)</h3>${tbl([['Agent'],['Rôle']], AGENTS_ATLAS.map(a => `<tr><td><b>${esc(a[1])}</b></td><td class="small">${esc(a[2])}</td></tr>`))}</div>`;
+  <div class="card" style="margin-top:12px"><h3>L'équipe ATLAS IA (${AGENTS_ATLAS.length} agents)</h3>${tbl([['Agent'],['Rôle']], AGENTS_ATLAS.map(a => `<tr><td><b>${esc(a[1])}</b></td><td class="small">${esc(a[2])}</td></tr>`))}</div>`;
 };
 function editOrdre(id, modele){
   const o = id ? get('ordres', id) : (() => { const m = MODELES_ATLAS[modele]; return m ? { titre: m[0], pole: m[1], agents: m[2], consigne: m[3], priorite: 'Normale' } : { pole: POLES[0], agents: ['dg','qual'], priorite: 'Normale' }; })();
@@ -935,7 +938,8 @@ MÉTHODE
 4. Auditeur général : signale incohérences, risques, informations non vérifiées.
 5. Rends un livrable final complet (document Claude si utile).
 
-${o.pole === 'Stratégie politique et électorale' || (o.agents || []).includes('pol') ? `RÈGLES POLITIQUES : dossier strictement confidentiel ; respect du code électoral ivoirien et des règles de la CEI et de la HACA ; aucune désinformation, aucune fausse nouvelle, aucun faux compte, aucune attaque personnelle ou propos haineux ; pas de collecte illégale de données d'électeurs ; analyses fondées sur des sources publiques citées.
+${o.pole === 'Stratégie politique et électorale' || (o.agents || []).includes('pol') || (o.agents || []).includes('res') ? `RÈGLES POLITIQUES : dossier strictement confidentiel ; respect du code électoral ivoirien et des règles de la CEI et de la HACA ; aucune désinformation, aucune fausse nouvelle, aucun faux compte, aucune attaque personnelle ou propos haineux ; pas de collecte illégale de données d'électeurs ; analyses fondées sur des sources publiques citées.
+` : ''}${(o.agents || []).includes('res') ? `RÈGLES DU RÉSEAU : la CEI ne publie ni les résultats ni les inscrits par bureau de vote — ces chiffres viennent des procès-verbaux remis aux représentants ou des relevés de terrain, et sont marqués « source : PV » ou « relevé IGC » ; découpage en vigueur : 31 régions et 2 districts autonomes (Abidjan, Yamoussoukro) ; identifiant de bureau : CIRCONSCRIPTION-LIEU-BUREAU ; aucune donnée nominative d'électeur ; fichier des membres : consentement écrit, déclaration ARTCI (loi n° 2013-450), accès limité par niveau ; chaque ligne porte source, date et statut VÉRIFIÉ / ESTIMÉ / INDISPONIBLE.
 ` : ''}RÈGLES : n'invente aucun chiffre, contact, date ou appel d'offres ; distingue faits vérifiés et hypothèses ; aucune dépense, signature, envoi au client ou engagement sans la validation de Moaye ; documents juridiques à faire vérifier par un professionnel ; montants en FCFA.
 
 FORMAT DE RÉPONSE
