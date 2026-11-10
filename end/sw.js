@@ -1,5 +1,5 @@
 /* END Dons — fonctionnement hors ligne (page d'abord demandée au réseau). */
-const CACHE = 'end-shell-9';
+const CACHE = 'end-shell-10';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/logo.svg'];
 const LIBS = ['www.gstatic.com'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });

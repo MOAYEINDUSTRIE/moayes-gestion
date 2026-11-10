@@ -191,7 +191,7 @@ tr.click:hover td{background:#fbf7ef}
 <script>
 'use strict';
 /* =====================  END — Dons des volontaires  ===================== */
-const VERSION = 'V1.8.2';
+const VERSION = 'V1.8.3';
 const ADMIN_EMAIL = 'moayepos@gmail.com';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -319,7 +319,7 @@ function renderLogin(msg){
 function renderBlocked(msg){
   $('#root').innerHTML = `<div class="login"><div class="box"><img class="logo" src="icons/logo.svg" alt="END"><div class="alert w">${msg}</div><p class="small muted">${esc(AUTH && AUTH.email)}</p><div class="act"><button class="btn" onclick="firebase.auth().signOut()">Se déconnecter</button><button class="btn p" onclick="location.reload()">Réessayer</button></div></div></div>`;
 }
-const authErr = e => ({ 'auth/invalid-credential':'E-mail ou mot de passe incorrect.', 'auth/wrong-password':'Mot de passe incorrect.', 'auth/user-not-found':'Aucun compte avec cet e-mail.', 'auth/invalid-email':'E-mail invalide.', 'auth/too-many-requests':'Trop d\'essais. Patientez quelques minutes.', 'auth/network-request-failed':'Pas de connexion internet.', 'auth/email-already-in-use':'Cet e-mail a déjà un compte.', 'auth/weak-password':'Mot de passe trop court (8 caractères minimum).', 'auth/operation-not-allowed':'La connexion par e-mail n\'est pas activée dans Firebase (voir le guide, étape 1).', 'auth/requires-recent-login':'Par sécurité, reconnectez-vous puis recommencez.' }[e && e.code] || ('Erreur : ' + (e && (e.code || e.message))));
+const authErr = e => ({ 'auth/invalid-credential':'E-mail ou mot de passe incorrect. Touchez l\'œil pour vérifier ce que vous avez tapé, ou « Mot de passe oublié » pour recevoir un lien de réinitialisation.', 'auth/invalid-login-credentials':'E-mail ou mot de passe incorrect. Touchez l\'œil pour vérifier ce que vous avez tapé, ou « Mot de passe oublié » pour recevoir un lien de réinitialisation.', 'auth/missing-password':'Saisissez le mot de passe.', 'auth/wrong-password':'Mot de passe incorrect.', 'auth/user-not-found':'Aucun compte avec cet e-mail.', 'auth/invalid-email':'E-mail invalide.', 'auth/too-many-requests':'Trop d\'essais. Patientez quelques minutes.', 'auth/network-request-failed':'Pas de connexion internet.', 'auth/email-already-in-use':'Cet e-mail a déjà un compte.', 'auth/weak-password':'Mot de passe trop court (8 caractères minimum).', 'auth/operation-not-allowed':'La connexion par e-mail n\'est pas activée dans Firebase (voir le guide, étape 1).', 'auth/requires-recent-login':'Par sécurité, reconnectez-vous puis recommencez.' }[e && e.code] || ('Erreur : ' + (e && (e.code || e.message))));
 async function login(){
   const e = $('#l_e').value.trim(), p = $('#l_p').value;
   if (!e || !p) return toast('E-mail et mot de passe');
