@@ -1,0 +1,34 @@
+name: END — état du compte administrateur (lecture seule)
+on:
+  workflow_dispatch:
+jobs:
+  compte:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Lire l'état du compte
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          pip install --quiet google-auth requests
+          python - <<'PY'
+          import json, os, requests, datetime
+          from google.oauth2 import service_account
+          from google.auth.transport.requests import Request
+          info = json.loads(os.environ['SA'])
+          cred = service_account.Credentials.from_service_account_info(info, scopes=['https://www.googleapis.com/auth/cloud-platform','https://www.googleapis.com/auth/firebase.database','https://www.googleapis.com/auth/userinfo.email'])
+          cred.refresh(Request()); h = {'Authorization': 'Bearer ' + cred.token}
+          r = requests.post(f"https://identitytoolkit.googleapis.com/v1/projects/{info['project_id']}/accounts:lookup", headers=h, json={'email': ['moayepos@gmail.com']}, timeout=60)
+          print('Statut API :', r.status_code)
+          if r.status_code != 200: print(r.text[:300])
+          for u in r.json().get('users', []):
+              t = lambda ms: datetime.datetime.utcfromtimestamp(int(ms)/1000).strftime('%Y-%m-%d %H:%M UTC') if ms else '-'
+              print('Compte trouvé : oui | désactivé :', u.get('disabled', False), '| e-mail vérifié :', u.get('emailVerified', False))
+              print('Fournisseurs :', [p.get('providerId') for p in u.get('providerUserInfo', [])], '| mot de passe défini :', bool(u.get('passwordHash') or any(p.get('providerId')=='password' for p in u.get('providerUserInfo', []))))
+              print('Créé le :', t(u.get('createdAt')), '| dernière connexion :', t(u.get('lastLoginAt')), '| mot de passe modifié le :', t(u.get('passwordUpdatedAt')))
+              uid = u.get('localId')
+              role = requests.get(f"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app/end/roles/{uid}.json", headers=h, timeout=60).json()
+              print('Rôle END :', (role or {}).get('role'), '| actif :', (role or {}).get('actif'))
+          if not r.json().get('users'): print('Compte trouvé : NON')
+          PY
