@@ -179,7 +179,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  IGC Gestion  ===================== */
-const VERSION = 'V1.8.2';
+const VERSION = 'V1.9';
 const KEY = 'igc_gestion_v1';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -418,7 +418,7 @@ window.__back = () => { if ($('.modal-bg')){ closeModal(); return true; } if (VI
 function render(){
   const root = $('#root');
   if (!SESSION){ root.innerHTML = loginHTML(); return; }
-  const titre = VIEW === 'ordre' ? 'Mission ATLAS IA' : VIEW === 'circo' ? 'Fiche électorale' : (MENU.flatMap(g => g[1]).find(m => m[0] === VIEW) || [,,'Fiche'])[2];
+  const titre = VIEW === 'ordre' ? 'Mission ATLAS IA' : VIEW === 'circo' ? 'Fiche électorale' : VIEW === 'strategie' ? 'Stratégie de réseau' : (MENU.flatMap(g => g[1]).find(m => m[0] === VIEW) || [,,'Fiche'])[2];
   const body = (VIEWS[VIEW] || VIEWS.tableau)(ARG);
   root.innerHTML = `<div class="app">
     <aside class="side"><div class="brand"><div class="logo">IGC</div><div><b>IGC Gestion</b><small>Impact Global Consulting</small></div></div>
@@ -1053,7 +1053,7 @@ VIEWS.elec = () => {
   const ins = base.reduce((s, [t]) => s + t[6], 0), vot = base.reduce((s, [t]) => s + t[7], 0);
   const gains = {}; if (!EL_PRES(e)) base.forEach(([, i]) => { const w = elVainq(i).w; if (w) gains[w[1]] = (gains[w[1]] || 0) + 1; });
   const serres = EL_PRES(e) ? 0 : base.filter(([, i]) => { const v = elVainq(i); return v.ecart !== null && v.ecart < 5; }).length;
-  return `<div class="alert">🗳️ Résultats officiels publiés par la CEI · ${ELEC.E.length} scrutins · extraction du ${dfr(ELEC.maj)}. Touchez une ligne pour ouvrir la fiche et le diagnostic.</div>
+  return `<div class="alert">🗳️ Résultats officiels publiés par la CEI · ${ELEC.E.length} scrutins · extraction du ${dfr(ELEC.maj)}. Touchez une circonscription ou une commune pour ouvrir sa fiche, puis <b>📊 Stratégie de réseau</b> : la stratégie complète se calcule automatiquement.</div>
   <div class="card" style="margin-bottom:12px"><div class="segm elsegm">${ELEC.E.map((n, k) => `<button class="${e === k ? 'on' : ''}" onclick="ELF.e=${k};render()">${esc(n.replace('Présidentielle', 'Présid.').replace('Législatives', 'Législ.'))}</button>`).join('')}</div>
     <input id="elq" style="margin-top:10px;width:100%" placeholder="Rechercher : numéro (021), commune, région…" value="${esc(ELF.q)}" oninput="ELF.q=this.value;clearTimeout(window.__elq);window.__elq=setTimeout(()=>{render();const x=$('#elq');x.focus();x.setSelectionRange(x.value.length,x.value.length)},250)"></div>
   <div class="grid g4" style="margin-bottom:12px">
@@ -1068,7 +1068,7 @@ VIEWS.elec = () => {
   <p class="small muted" style="margin-top:10px">${esc(ELEC.src)}. Données publiques agrégées : aucune donnée personnelle d'électeur.</p>`;
 };
 function diagEtat(i){
-  if (!DIAG[i]){ const t = elT(i); DIAG[i] = { camp: 0, allies: [], part: Math.round(elPart(t) * 10) / 10, marge: 5, abst: 5, besoin: '' }; }
+  if (!DIAG[i]){ const t = elT(i); DIAG[i] = { camp: 0, allies: [], part: Math.round(elPart(t) * 10) / 10, marge: 5, abst: elPart(t) < 25 ? 2 : 5, besoin: '' }; }
   return DIAG[i];
 }
 function diagCalc(i){
@@ -1087,13 +1087,13 @@ function diagCalc(i){
   return { t, cs, d, camp, allies, adv, nuls, besoinAuto, besoin, votAtt, exprAtt, objectif, abst, vCamp, vAll, vAbst, reservoir, ratio, verdict, manque: Math.max(0, objectif - reservoir) };
 }
 function diagRes(i){
-  const r = diagCalc(i); setTimeout(() => { if (LV_I === i) lvMajListe(i); }, 0);
+  const r = diagCalc(i); setTimeout(() => { if (LV_I === i) lvMajListe(i); if (VIEW === 'strategie' && STRAT_I === i) majStrat(i); }, 0);
   return `<div class="grid g3" style="margin-top:10px">
     <div class="card kpi"><div class="l">Objectif de voix</div><div class="v">${F(r.objectif)}</div><div class="s">${F(r.t[6])} inscrits × ${P1(r.d.part)} × ${P1((1 - r.nuls) * 100)} valides × ${P1(r.besoin)}</div></div>
     <div class="card kpi"><div class="l">Réservoir de voix</div><div class="v">${F(r.reservoir)}</div><div class="s">camp ${F(r.vCamp)} + alliés ${F(r.vAll)} + abstentionnistes ${F(r.vAbst)}</div></div>
     <div class="card kpi gold"><div class="l">Verdict</div><div class="v">${r.verdict[0]} · ${Math.round(r.ratio)} %</div><div class="s">réservoir ÷ objectif</div></div></div>
   <div class="alert ${r.verdict[1]}"><b>${r.verdict[0]}.</b> ${r.verdict[2]} ${r.manque ? `Il manque environ <b>${F(r.manque)} voix</b> pour couvrir l'objectif.` : `Marge d'environ <b>${F(r.reservoir - r.objectif)} voix</b> au-dessus de l'objectif.`}${r.adv ? ` Principal adversaire : ${esc(r.adv[1])} (${P1(r.adv[4])}).` : ''}</div>
-  <p class="small muted">Seuils de la méthode ATLAS : favorable au-dessus de 120 %, disputé entre 90 et 120 %, difficile en dessous de 90 %. Les hypothèses (participation, marge, abstentionnistes mobilisables, alliés) sont à confirmer sur le terrain.</p>`;
+  <p class="small muted">Seuils de la méthode ATLAS : favorable au-dessus de 120 %, disputé entre 90 et 120 %, difficile en dessous de 90 %. Abstentionnistes mobilisables : 2 % par défaut quand la participation est inférieure à 25 %, sinon 5 %. Les hypothèses (participation, marge, abstentionnistes mobilisables, alliés) sont à confirmer sur le terrain.</p>`;
 }
 function diagHTML(i){
   const cs = elC(i), d = diagEtat(i), r = diagCalc(i);
@@ -1123,7 +1123,7 @@ VIEWS.circo = a => {
   const i = +a, t = elT(i); if (!t) return VIEWS.elec();
   const v = elVainq(i), al = elAlertes(i), lies = elLies(i), E = ELEC.E[t[0]];
   const ecartVoix = v.w && v.s ? v.w[3] - v.s[3] : null;
-  return `<div class="bar no-print" style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" onclick="go('elec')">← Base électorale</button><span style="flex:1"></span><button class="btn sm" onclick="copierFiche(${i})">📋 Copier</button><button class="btn sm" onclick="imprimerFiche(${i})">🖨 Imprimer</button><button class="btn sm g" onclick="missionFiche(${i})">🧭 Mission ATLAS</button></div>
+  return `<div class="bar no-print" style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" onclick="go('elec')">← Base électorale</button><span style="flex:1"></span>${t[0] <= 2 ? `<button class="btn sm p" onclick="go('strategie',${i})">📊 Stratégie de réseau</button>` : ''}<button class="btn sm" onclick="copierFiche(${i})">📋 Copier</button><button class="btn sm" onclick="imprimerFiche(${i})">🖨 Imprimer</button><button class="btn sm g" onclick="missionFiche(${i})">🧭 Mission ATLAS</button></div>
   <div class="card" style="margin-bottom:12px"><div class="small muted">${esc(E)} · ${esc(elNiv(t))} · ${esc(t[2])}</div><h2 style="margin:4px 0 2px;font-size:19px">${esc(elNom(t))}</h2>
     <div class="small muted">${t[5] ? F(t[5]) + ' bureaux de vote · ' : ''}Source : résultats officiels CEI${t[0] === 0 ? ' (provisoires)' : ''}</div>
     ${al.map(x => `<div class="alert w">⚠️ À vérifier sur le procès-verbal : ${esc(x)}</div>`).join('')}</div>
@@ -1147,7 +1147,7 @@ function chargeLV(){
     d.parC = {}; d.parCom = {}; d.Ai = {};
     d.L.forEach(x => { (d.parC[x[0]] = d.parC[x[0]] || []).push(x); const k = elNorm(d.S[x[4]]); (d.parCom[k] = d.parCom[k] || []).push(x); });
     d.A.forEach(a => { d.Ai[elNorm(a[1])] = a; });
-    LV = d; LV_ETAT = ''; lvRafraichir();
+    LV = d; LV_ETAT = ''; if (VIEW === 'strategie') render(); else lvRafraichir();
   }).catch(() => { LV_ETAT = 'erreur'; lvRafraichir(); });
 }
 function lvRafraichir(){ const z = $('#lvcard'); if (z && LV_I !== null){ z.innerHTML = lvCorps(LV_I); lignesMobiles(z); } }
@@ -1170,7 +1170,7 @@ function lvProfil(L){
   const vus = {}, out = [];
   L.forEach(x => { const dep = LV.S[x[2]], k = dep === 'ABIDJAN' ? LV.S[x[4]] : dep; if (vus[k]) return; vus[k] = 1; const a = LV.Ai[elNorm(k)]; if (a) out.push(a); });
   if (!out.length) return '';
-  return `<h3 style="margin-top:16px">Profil des électeurs (liste définitive 2025, par ${out.length > 1 ? 'départements' : 'département'})</h3>
+  return `<h3 style="margin-top:16px">Profil des électeurs (liste définitive 2025, ${out.length > 1 ? 'départements concernés' : esc(out[0][1].charAt(0) + out[0][1].slice(1).toLowerCase())})</h3>
   ${tbl([['Département / commune'], ['Électeurs','n'], ['Femmes','n'], ['18–34 ans','n'], ['35–60 ans','n'], ['Plus de 60 ans','n']], out.map(a => { const v = a[2], T = v[6] || 1;
     return `<tr><td><b>${esc(a[1])}</b><div class="small muted">${esc(a[0])}</div></td><td class="n">${F(T)}</td><td class="n">${P1((v[0] + v[1] + v[2]) / T * 100)}</td><td class="n">${P1((v[0] + v[3]) / T * 100)}</td><td class="n">${P1((v[1] + v[4]) / T * 100)}</td><td class="n">${P1((v[2] + v[5]) / T * 100)}</td></tr>`; }))}
   <p class="small muted">Le profil par âge et par sexe est publié au niveau du département (ou de la commune à Abidjan), pas de la circonscription : il peut couvrir une zone plus large.</p>`;
@@ -1256,6 +1256,154 @@ function missionFiche(i){
   if (c) c.value = (c.value ? c.value + '\n\n' : '') + 'Point de départ (base électorale IGC) :\n' + ficheTexte(i);
 }
 
+/* ---------- V1.9 — Stratégie de réseau automatique (par circonscription ou commune) ---------- */
+const STRAT = { symp: 50, deleg: 2, parCellule: 4, parSecteur: 14 };
+let STRAT_I = null;
+const ceil = x => Math.ceil(x);
+const partiCle = p => elNorm(String(p || '').split('/')[0]);
+function stratData(i){
+  const t = elT(i), cs = elC(i), v = elVainq(i), L = lvDe(i) || [], d = diagEtat(i), r = cs.length ? diagCalc(i) : null;
+  const tot = L.reduce((s, x) => s + x[8], 0) || t[6], bv = L.reduce((s, x) => s + x[7], 0) || t[5] || 0, n = L.length;
+  const tri = [...L].sort((a, b) => b[8] - a[8]); let c = 0; const prio = tri.map(x => { const avant = c; c += x[8]; return [x, avant / (tot || 1) < 0.5 ? 1 : avant / (tot || 1) < 0.8 ? 2 : 3]; });
+  const coeur = prio.filter(p => p[1] === 1).map(p => p[0]), appui = prio.filter(p => p[1] === 2).length, veille = prio.filter(p => p[1] === 3).length;
+  let lies = [i, ...elLies(i).filter(j => j !== i)].map(j => ({ j, u: elT(j), cs: elC(j) })).sort((a, b) => a.u[0] - b.u[0]);
+  lies = lies.filter(o => !(o.u[0] >= 4 && !o.u[1] && lies.some(q => q.u[0] === o.u[0] && q.u[1])));
+  const camp = r && r.camp ? r.camp : null, cle = camp ? partiCle(camp[1]) : '';
+  const histo = camp ? lies.map(o => { const m = o.cs.filter(x => partiCle(x[1]) === cle && cle !== 'INDEPENDANT'); return { o, voix: m.reduce((s, x) => s + x[3], 0), pct: m.reduce((s, x) => s + x[4], 0) }; }) : [];
+  const meilleur = histo.reduce((m, h) => h.voix > m.voix ? h : m, { voix: 0 });
+  const scen = r ? [-5, 0, 5].map(dp => { const p = Math.max(3, num(d.part) + dp); return [p, Math.round(t[6] * p / 100 * (1 - r.nuls)), Math.round(t[6] * p / 100 * (1 - r.nuls) * r.besoin / 100)]; }) : [];
+  const res = { secteurs: n ? ceil(n / STRAT.parSecteur) : 0, cellules: n ? ceil(n / STRAT.parCellule) : 0, referents: n, delegues: bv * STRAT.deleg, symp: bv * STRAT.symp };
+  res.cadresCel = res.cellules * 4; res.coord = 6; res.total = res.coord + res.secteurs + res.cadresCel + res.referents + res.delegues;
+  const votBV = bv ? t[6] * num(d.part) / 100 / bv : 0, voixBV = bv && r ? r.objectif / bv : 0;
+  return { t, cs, v, L, d, r, tot, bv, n, coeur, appui, veille, lies, camp, histo, meilleur, scen, res, votBV, voixBV };
+}
+function stratCorps(i){
+  const D = stratData(i), { t, r, d, res } = D, E = ELEC.E[t[0]];
+  if (!LV){ chargeLV(); return '<div class="empty">Chargement du répertoire des lieux de vote…</div>'; }
+  if (t[0] > 2) return '<div class="alert w">La stratégie de réseau se calcule pour une circonscription législative ou une commune (municipales), là où la CEI publie les lieux de vote. Ouvrez la circonscription ou la commune concernée.</div>';
+  const Lb = x => esc(x);
+  const top = o => [0, 1, 2].map(k => o.cs[k] ? `${esc(o.cs[k][1])} ${F(o.cs[k][3])} (${P1(o.cs[k][4])})` : '—');
+  const verdict = r ? r.verdict : null;
+  const dormant = D.camp && D.meilleur.voix > D.camp[3] * 1.2 ? D.meilleur : null;
+  const objectif = r ? r.objectif : 0;
+  return `
+  <div class="card" style="margin-bottom:12px"><h3>1. Synthèse</h3>
+    <p style="margin:.2em 0 .6em"><b>${r ? `Verdict pour ${esc(D.camp ? D.camp[1] : 'un nouveau candidat')} : ${verdict[0]} (${Math.round(r.ratio)} %).` : 'Pas de résultat chiffré pour ce territoire.'}</b> ${elPart(t) < 25 ? `La participation est faible (${P1(elPart(t))}) : la victoire se joue d'abord sur la <b>mobilisation</b>, plus que sur la persuasion.` : `La participation est de ${P1(elPart(t))}.`}</p>
+    <div class="grid g4">
+      <div class="card kpi"><div class="l">Électeurs 2025</div><div class="v">${F(D.tot)}</div><div class="s">${F(D.n)} lieux · ${F(D.bv)} bureaux</div></div>
+      <div class="card kpi"><div class="l">Objectif de voix</div><div class="v">${F(objectif)}</div><div class="s">${r ? P1(r.besoin) + ' des exprimés à ' + P1(d.part) + ' de participation' : ''}</div></div>
+      <div class="card kpi"><div class="l">Réseau à constituer</div><div class="v">${F(res.total)}</div><div class="s">personnes à recruter et former</div></div>
+      <div class="card kpi gold"><div class="l">Lieux « cœur »</div><div class="v">${D.coeur.length}</div><div class="s">moitié des électeurs</div></div></div></div>
+
+  <div class="card" style="margin-bottom:12px"><h3>2. Ce que disent les scrutins de la zone</h3>
+    ${tbl([['Scrutin'], ['Inscrits','n'], ['Participation','n'], ['1er'], ['2e'], ['3e']], D.lies.map(o => `<tr><td><b>${esc(ELEC.E[o.u[0]])}</b><div class="small muted">${esc(elNom(o.u))}</div></td><td class="n">${F(o.u[6])}</td><td class="n">${P1(elPart(o.u))}</td>${top(o).map(x => `<td class="small">${x}</td>`).join('')}</tr>`))}
+    ${D.camp && D.histo.length ? `<p class="small" style="margin-top:8px"><b>Voix du camp ${esc(D.camp[1])} dans la zone :</b> ${D.histo.map(h => `${esc(ELEC.E[h.o.u[0]])} : ${h.voix ? F(h.voix) : '—'}`).join(' · ')}.${dormant ? ` <b>Réservoir dormant :</b> ${F(dormant.voix)} voix à « ${esc(ELEC.E[dormant.o.u[0]])} » contre ${F(D.camp[3])} au scrutin de la fiche — environ ${F(dormant.voix - D.camp[3])} électeurs à faire revenir.` : ''}</p>` : ''}
+    <p class="small muted">Les présidentielles couvrent parfois un territoire plus large (département) et ne mesurent pas le poids local des partis.</p></div>
+
+  <div class="card" style="margin-bottom:12px"><h3>3. Qui vote</h3>${lvProfil(D.L) || '<div class="empty">Profil par âge et sexe non disponible pour cette zone.</div>'}</div>
+
+  <div class="card" style="margin-bottom:12px"><h3>4. Objectif de voix</h3>
+    ${r ? tbl([['Participation','n'], ['Exprimés attendus','n'], ['Objectif ('+P1(r.besoin)+')','n']], D.scen.map(s => `<tr${s[0] === num(d.part) ? ' style="font-weight:700"' : ''}><td class="n">${P1(s[0])}</td><td class="n">${F(s[1])}</td><td class="n">${F(s[2])}</td></tr>`)) : ''}
+    ${r ? `<div class="alert ${verdict[1]}" style="margin-top:10px"><b>${verdict[0]}</b> — réservoir ${F(r.reservoir)} voix (camp ${F(r.vCamp)} + alliés ${F(r.vAll)} + abstentionnistes mobilisés ${F(r.vAbst)}) pour un objectif de ${F(r.objectif)}. ${verdict[2]}</div>` : ''}</div>
+
+  <div class="card" style="margin-bottom:12px"><h3>5. Le réseau à constituer</h3>
+    <p>Règle : <b>1 bureau de vote = ${STRAT.symp} sympathisants identifiés et ${STRAT.deleg} délégué(s)</b>. À ${P1(d.part)} de participation, un bureau compte environ ${F(Math.round(D.votBV))} votants ; il faut ${F(Math.round(D.voixBV))} voix par bureau pour atteindre l'objectif.</p>
+    ${tbl([['Niveau'], ['Rôle'], ['Effectif','n']], [
+      ['Coordination', 'coordonnateur ; statistiques et procès-verbaux ; cartographie ; suivi ; jeunes ; femmes', res.coord],
+      ['Secteurs', `1 responsable pour environ ${STRAT.parSecteur} lieux de vote (quartiers à délimiter sur le terrain)`, res.secteurs],
+      ['Cellules', `${F(res.cellules)} cellules de ${STRAT.parCellule} lieux de vote environ ; responsable, adjoint, secrétaire, suivi`, res.cadresCel],
+      ['Lieux de vote', '1 référent par lieu de vote', res.referents],
+      ['Bureaux de vote', `${STRAT.deleg} délégué(s) par bureau, qui sont aussi les mobilisateurs du bureau`, res.delegues]].map(x => `<tr><td><b>${x[0]}</b></td><td class="small">${x[1]}</td><td class="n">${F(x[2])}</td></tr>`).concat([`<tr><td><b>Total</b></td><td></td><td class="n b">${F(res.total)}</td></tr>`]))}
+    <p class="small" style="margin-top:8px">Sympathisants à identifier : <b>${F(res.symp)}</b>${objectif ? ` (${(res.symp / objectif).toFixed(1).replace('.', ',')} fois l'objectif de voix)` : ''}. Chaque délégué suit ${F(Math.round(STRAT.symp / Math.max(STRAT.deleg, 1)))} sympathisants de son bureau et les rappelle la veille et le jour du vote.</p></div>
+
+  <div class="card" style="margin-bottom:12px"><h3>6. Lieux de vote prioritaires</h3>
+    <p><b>${D.coeur.length} lieux « cœur »</b> réunissent la moitié des électeurs (${F(D.coeur.reduce((s, x) => s + x[8], 0))} électeurs, ${F(D.coeur.reduce((s, x) => s + x[7], 0))} bureaux) : ils sont couverts en premier. Puis ${D.appui} lieux « appui » (jusqu'à 80 % des électeurs) et ${D.veille} lieux « veille ».</p>
+    ${tbl([['Lieu de vote'], ['Bureaux','n'], ['Électeurs','n'], ['Objectif de voix','n']], D.coeur.map(x => `<tr><td><b>${esc(x[6])}</b><div class="small muted">${esc(lvLieu(x))} · code ${esc(x[5])}</div></td><td class="n">${F(x[7])}</td><td class="n">${F(x[8])}</td><td class="n">${objectif ? F(Math.round(objectif * x[8] / D.tot)) : '—'}</td></tr>`))}
+    <p class="small muted">Liste complète des ${D.n} lieux et des ${F(D.bv)} bureaux : boutons « ⬇ Lieux de vote » et « ⬇ Bureaux de vote » en haut de page.</p></div>
+
+  <div class="card" style="margin-bottom:12px"><h3>7. Plan d'action en 4 temps (J = jour du vote)</h3>
+    ${tbl([['Temps'], ['Actions'], ['Indicateur de passage']], [
+      ['1. Fondations (J−24 à J−18 mois)', `Nommer le coordonnateur et son équipe (${res.coord}) ; délimiter ${F(res.secteurs)} secteur(s) ; récupérer les procès-verbaux par bureau du dernier scrutin ; relever quartier et GPS des ${D.n} lieux ; déclarer le fichier à l'ARTCI`, `${D.n} lieux localisés, PV saisis, équipe complète`],
+      ['2. Implantation (J−18 à J−9 mois)', `Créer ${F(res.cellules)} cellules ; nommer un référent dans les ${D.coeur.length} lieux cœur puis dans les autres ; recruter les délégués`, `${D.n} référents, ${F(Math.round(res.symp / 2))} sympathisants (50 %)`],
+      ['3. Mobilisation (J−9 à J−1 mois)', `Atteindre ${F(res.symp)} sympathisants ; vérifier pendant la révision de la liste électorale qu'ils sont inscrits dans la zone ; actions jeunes et femmes ; former les ${F(res.delegues)} délégués`, `${F(res.symp)} sympathisants, 100 % des délégués formés`],
+      ['4. Jour du vote (J−7 à J+2)', `Trois rappels à chaque sympathisant ; délégués présents dans les ${F(D.bv)} bureaux ; photo et saisie de chaque procès-verbal le soir même ; recours dans le cadre légal si nécessaire`, `${F(D.bv)} PV centralisés le soir du vote`]].map(x => `<tr><td><b>${x[0]}</b></td><td class="small">${x[1]}</td><td class="small">${x[2]}</td></tr>`))}</div>
+
+  <div class="card" style="margin-bottom:12px"><h3>8. Tableau de bord hebdomadaire</h3>
+    ${tbl([['Indicateur'], ['Vert'], ['Orange'], ['Rouge']], [
+      ['Lieux de vote avec un référent', `${F(ceil(D.n * 0.9))} ou plus`, `${F(ceil(D.n * 0.7))} à ${F(ceil(D.n * 0.9) - 1)}`, `moins de ${F(ceil(D.n * 0.7))}`],
+      ['Sympathisants identifiés / calendrier', 'dans les temps', '10 à 25 % de retard', 'plus de 25 % de retard'],
+      ['Cellules actives (rapport de la semaine)', `${F(ceil(res.cellules * 0.9))} ou plus`, `${F(ceil(res.cellules * 0.7))} à ${F(ceil(res.cellules * 0.9) - 1)}`, `moins de ${F(ceil(res.cellules * 0.7))}`],
+      ['Délégués formés', `${F(res.delegues)}`, '80 à 99 %', 'moins de 80 %'],
+      ['PV saisis le soir du vote', `${F(D.bv)}`, '90 à 99 %', 'moins de 90 %']].map(x => `<tr>${x.map((c, k) => `<td${k ? ' class="small"' : ''}>${k ? c : '<b>' + c + '</b>'}</td>`).join('')}</tr>`))}
+    <p class="small muted">Deux indicateurs rouges deux semaines de suite : réunion de correction avec le coordonnateur.</p></div>
+
+  <div class="card"><h3>9. Risques, règles et décisions</h3>
+    <ul class="small">
+      <li><b>Hausse de la participation :</b> à ${r ? P1(D.scen[2][0]) : '—'}, l'objectif passe à ${r ? F(D.scen[2][2]) : '—'} voix ; prévoir plus de sympathisants par bureau.</li>
+      <li><b>Bureaux sans délégué :</b> pas de procès-verbal, pas de contrôle ni de recours possible. La couverture des ${F(D.bv)} bureaux est prioritaire.</li>
+      <li><b>Données :</b> ${t[0] === 0 ? 'résultats 2025 provisoires ; ' : ''}les réservoirs sont des hypothèses, à affiner avec les procès-verbaux par bureau.${elAlertes(i).length ? ' ⚠️ ' + esc(elAlertes(i).join(' ; ')) : ''}</li>
+      <li><b>Règles :</b> code électoral, CEI et HACA ; aucune pression sur les électeurs, aucun achat de voix, aucune désinformation ; aucune donnée nominative d'électeur ; fichier des sympathisants avec accord écrit, déclaré à l'ARTCI (loi n° 2013-450) ; dossier confidentiel.</li></ul>
+    <p class="small"><b>Décisions à prendre :</b> 1) le camp accompagné et ses alliés ; 2) le coordonnateur et le budget du temps 1 ; 3) la récupération des procès-verbaux par bureau.</p>
+    <p class="small muted">Sources : résultats officiels CEI (${esc(ELEC.E.join(', '))}) ; répertoire CEI des lieux et bureaux de vote 2025 ; statistiques de la liste électorale définitive 2025. Calculs automatiques IGC Gestion, ${dfr(today())}.</p></div>`;
+}
+const stratResume = i => `⚙ Hypothèses (touchez pour modifier) : camp ${esc((elC(i)[diagEtat(i).camp] || ['', 'nouveau candidat'])[1])}, participation ${P1(diagEtat(i).part)}, ${STRAT.symp} sympathisants par bureau`;
+function majStrat(i){ const z = $('#stratcorps'); if (z && STRAT_I === i){ z.innerHTML = stratCorps(i); lignesMobiles(z); const r = $('#stratsum'); if (r) r.innerHTML = stratResume(i); } }
+VIEWS.strategie = a => {
+  if (!ELEC) return elAttente();
+  const i = +a, t = elT(i); if (!t) return VIEWS.elec();
+  STRAT_I = i; LV_I = null; if (!LV) chargeLV();
+  const champ = (k, lab) => `<div><label>${lab}</label><input inputmode="numeric" value="${STRAT[k]}" oninput="STRAT.${k}=Math.max(1,num(this.value)||1);majStrat(${i})"></div>`;
+  return `<div class="bar no-print" style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" onclick="go('circo',${i})">← Fiche</button><span style="flex:1"></span>
+    <button class="btn sm" onclick="copierStrat(${i})">📋 Copier</button><button class="btn sm" onclick="imprimerStrat(${i})">🖨 Imprimer / PDF</button><button class="btn sm" onclick="lvExport(${i})">⬇ Lieux de vote</button><button class="btn sm" onclick="bvExport(${i})">⬇ Bureaux de vote</button><button class="btn sm g" onclick="missionStrat(${i})">🧭 Mission ATLAS</button></div>
+  <div class="card" style="margin-bottom:12px"><div class="small muted">${esc(ELEC.E[t[0]])} · ${esc(elNiv(t))} · ${esc(t[2])}</div><h2 style="margin:4px 0 6px;font-size:19px">Stratégie de réseau — ${esc(elNom(t))}</h2>
+    <p class="small">Tout se recalcule dès que vous changez une hypothèse ci-dessous.</p>
+    <details><summary id="stratsum" style="cursor:pointer;font-weight:700;margin:6px 0">${stratResume(i)}</summary>
+      <div id="diag">${diagHTML(i)}</div>
+      <div class="f" style="margin-top:10px">${champ('symp', 'Sympathisants par bureau')}${champ('deleg', 'Délégués par bureau')}${champ('parCellule', 'Lieux de vote par cellule')}${champ('parSecteur', 'Lieux de vote par secteur')}</div></details></div>
+  <div id="stratcorps">${stratCorps(i)}</div>`;
+};
+function stratTexte(i){
+  const D = stratData(i), { t, r, d, res } = D;
+  const l = [`STRATÉGIE DE RÉSEAU — ${elNom(t)} (${ELEC.E[t[0]]}, ${t[2]})`, `Calcul automatique IGC Gestion du ${dfr(today())} — document confidentiel`, ''];
+  if (r) l.push(`Camp : ${D.camp ? D.camp[1] + ' — ' + D.camp[2] : 'nouveau candidat'} · participation attendue ${P1(d.part)} · part nécessaire ${P1(r.besoin)}`, `Objectif : ${F(r.objectif)} voix · réservoir ${F(r.reservoir)} · verdict ${r.verdict[0].toUpperCase()} (${Math.round(r.ratio)} %)`);
+  l.push(`Zone : ${F(D.tot)} électeurs, ${D.n} lieux de vote, ${F(D.bv)} bureaux · ${D.coeur.length} lieux cœur (moitié des électeurs)`, '', 'Scrutins de la zone :');
+  D.lies.forEach(o => l.push(`- ${ELEC.E[o.u[0]]} (${elNom(o.u)}) : participation ${P1(elPart(o.u))} ; ` + o.cs.slice(0, 3).map(c => `${c[1]} ${F(c[3])} (${P1(c[4])})`).join(', ')));
+  l.push('', `Réseau (1 bureau = ${STRAT.symp} sympathisants et ${STRAT.deleg} délégué(s)) : coordination ${res.coord}, secteurs ${res.secteurs}, cellules ${res.cellules} (${res.cadresCel} cadres), référents ${res.referents}, délégués ${F(res.delegues)} → ${F(res.total)} personnes ; sympathisants à identifier ${F(res.symp)}.`, '', 'Lieux de vote cœur :');
+  D.coeur.forEach((x, k) => l.push(`${k + 1}. ${x[6]} (${x[5]}) : ${F(x[8])} électeurs, ${x[7]} bureaux${r ? ', objectif ' + F(Math.round(r.objectif * x[8] / D.tot)) + ' voix' : ''}`));
+  l.push('', 'Plan : 1) Fondations J−24 à J−18 mois ; 2) Implantation J−18 à J−9 ; 3) Mobilisation J−9 à J−1 ; 4) Jour du vote. Règles : code électoral, CEI, HACA ; aucune donnée nominative d\'électeur ; fichier des sympathisants déclaré à l\'ARTCI.');
+  return l.join('\n');
+}
+function copierStrat(i){
+  const s = stratTexte(i);
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(s).then(() => toast('Stratégie copiée'), () => modal(`<h2>Stratégie à copier</h2><textarea style="width:100%;min-height:300px">${esc(s)}</textarea><div class="act"><button class="btn" onclick="closeModal()">Fermer</button></div>`));
+  else modal(`<h2>Stratégie à copier</h2><textarea style="width:100%;min-height:300px">${esc(s)}</textarea><div class="act"><button class="btn" onclick="closeModal()">Fermer</button></div>`);
+}
+function imprimerStrat(i){
+  const t = elT(i), titre = `Stratégie de réseau ${t[3] ? t[3] + ' ' : ''}${t[4]}`.slice(0, 90);
+  const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>${esc(titre)}</title><style>body{font:11.5px/1.45 Arial,sans-serif;color:#16202e;margin:18px}h1{font-size:17px;color:#14213a;margin:0 0 2px}h3{font-size:13.5px;color:#14213a;margin:14px 0 6px;border-bottom:2px solid #c9a227;padding-bottom:2px}table{width:100%;border-collapse:collapse;margin:4px 0}th,td{border-bottom:1px solid #dde1ea;padding:4px 5px;text-align:left;vertical-align:top}th{background:#eef0f5;font-size:10.5px}.n{text-align:right;white-space:nowrap}.small{font-size:10.5px}.muted{color:#667085}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.kpi{border:1px solid #dde1ea;border-radius:6px;padding:6px}.kpi .l{font-size:10px;color:#667085}.kpi .v{font-size:15px;font-weight:700}.kpi .s{font-size:10px;color:#667085}.alert{border:1px solid #e7c873;background:#fff8e1;padding:6px;border-radius:6px}.card{break-inside:avoid-page}.empty{color:#667085}.ft{margin-top:14px;border-top:1px solid #ccc;padding-top:6px;font-size:9.5px;color:#667085}@page{size:A4;margin:12mm}</style></head><body>
+    <h1>Impact Global Consulting — ATLAS IA</h1><div class="small muted">${esc(titre)} · ${esc(ELEC.E[t[0]])} · ${esc(t[2])} · document confidentiel</div>${stratCorps(i)}<div class="ft">Calcul automatique IGC Gestion · ${esc(ELEC.src)} · édité le ${dfr(today())}</div></body></html>`;
+  if (window.AndroidBridge && AndroidBridge.printHtml){ AndroidBridge.printHtml(html, titre); return; }
+  const w = window.open('', '_blank'); if (!w){ toast('Autorisez les fenêtres pour imprimer'); return; }
+  w.document.write(html); w.document.close(); setTimeout(() => { w.focus(); w.print(); }, 400);
+}
+function bvExport(i){
+  const t = elT(i), L = [...(lvDe(i) || [])].sort((a, b) => String(a[5]).localeCompare(String(b[5]))), cs = elC(i), tot = L.reduce((s, x) => s + x[8], 0), obj = cs.length ? diagCalc(i).objectif : 0;
+  const cols = cs.length > 4 ? cs.slice(0, 3).map(c => c[1] + ' (PV)').concat(['Autres listes (PV)']) : cs.map(c => c[1] + ' (PV)');
+  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const rows = [['Identifiant bureau','Code circonscription','Commune','Code lieu','Lieu de vote','N° bureau','Inscrits estimés','Statut inscrits','Objectif de voix (prorata)','Délégué titulaire (code)','Délégué suppléant (code)','Votants (PV)','Nuls (PV)','Blancs (PV)','Exprimés (PV)', ...cols, 'Statut PV']];
+  L.forEach(x => { const base = Math.floor(x[8] / x[7]), reste = x[8] - base * x[7];
+    for (let b = 1; b <= x[7]; b++){ const ins = base + (b <= reste ? 1 : 0); rows.push([`${x[0]}-${x[5]}-${String(b).padStart(2, '0')}`, x[0], LV.S[x[4]], x[5], x[6], b, ins, 'ESTIMÉ (répartition égale)', obj ? Math.round(obj * ins / tot) : '', '', '', '', '', '', '', ...cols.map(() => ''), 'À COLLECTER']); } });
+  saveFile(`Bureaux_de_vote_${(t[3] ? t[3] + '_' : '') + t[4].replace(/[^A-Za-z0-9]+/g, '_').slice(0, 40)}.csv`, 'text/csv', '﻿' + rows.map(r => r.map(q).join(';')).join('\r\n'));
+  toast('Fichier Excel prêt');
+}
+function missionStrat(i){
+  const k = MODELES_ATLAS.findIndex(m => m[0].startsWith('Réseautage électoral')), t = elT(i);
+  editOrdre(null, k >= 0 ? k : undefined);
+  const ti = $('#o_t'), c = $('#o_c');
+  if (ti) ti.value = `Réseau électoral — ${elNom(t)}`.slice(0, 120);
+  if (c) c.value = (c.value ? c.value + '\n\n' : '') + 'Point de départ (stratégie calculée par IGC Gestion) :\n' + stratTexte(i);
+}
+
 VIEWS.parametres = () => {
   const s = DATA.societe;
   if (!can()) return `<div class="card"><p>Les paramètres sont réservés au gérant et à la cogérante.</p><h3>Changer mon code PIN</h3>${pinForm()}</div>`;
@@ -1290,6 +1438,7 @@ function saveSociete(){
 
 /* ----- aide ----- */
 VIEWS.aide = () => `<div class="card"><h3>Mode d'emploi en 6 gestes</h3><ol>
+  <li><b>Base électorale → stratégie</b> : choisissez l'onglet du scrutin (législatives ou municipales), touchez la circonscription ou la commune, puis <b>📊 Stratégie de réseau</b>. Choisissez le camp et la participation attendue : objectif de voix, verdict, réseau à constituer, lieux de vote prioritaires, plan en 4 temps et tableau de bord se calculent seuls. Boutons : Imprimer / PDF, listes Excel des lieux et des bureaux, Mission ATLAS.</li>
   <li><b>ATLAS IA — Commandement</b> : « + Nouvelle mission » (ou un modèle), choisissez les agents, touchez « Copier l'ordre de mission » et collez-le dans Claude (Projet IGC). Collez ensuite le rapport, faites le contrôle qualité, puis validez ou renvoyez « À reprendre ». Les indicateurs (missions, reprises, coût, valeur) se calculent seuls.</li>
   <li><b>Paramètres</b> : remplissez une fois les informations du cabinet (RCCM, compte contribuable, banque). Changez les codes PIN.</li>
   <li><b>Trésorerie</b> : saisissez ce qu'il y a aujourd'hui en banque, en caisse et sur mobile.</li>
