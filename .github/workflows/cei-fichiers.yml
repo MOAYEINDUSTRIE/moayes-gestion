@@ -1,0 +1,30 @@
+name: Fichiers CEI (téléchargement brut)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['data-electorales/fichiers.txt']
+permissions:
+  contents: write
+jobs:
+  telecharger:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Télécharger
+        run: |
+          mkdir -p /tmp/f
+          while read nom url; do
+            [ -z "$nom" ] && continue
+            u=$(python3 -c "import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1],safe=':/?=&%'))" "$url")
+            curl -sSL --retry 3 -A "Mozilla/5.0" -o "/tmp/f/$nom" "$u" && ls -la "/tmp/f/$nom" && file "/tmp/f/$nom" || echo "ÉCHEC $url"
+          done < data-electorales/fichiers.txt
+      - name: Enregistrer sur la branche donnees-cei-fichiers
+        run: |
+          git config user.name "Claude"; git config user.email "noreply@anthropic.com"
+          git fetch origin donnees-cei-fichiers 2>/dev/null && git checkout donnees-cei-fichiers || git checkout --orphan donnees-cei-fichiers
+          git rm -rq --cached . 2>/dev/null || true
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp /tmp/f/* . && printf 'Fichiers publics de la CEI (statistiques agrégées, lieux et bureaux de vote).\n' > LISEZMOI.md
+          git add -A && git commit -qm "Fichiers CEI" || true
+          git push origin HEAD:donnees-cei-fichiers
