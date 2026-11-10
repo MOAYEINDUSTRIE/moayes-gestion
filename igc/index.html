@@ -130,7 +130,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  IGC Gestion  ===================== */
-const VERSION = 'V1.4';
+const VERSION = 'V1.5';
 const KEY = 'igc_gestion_v1';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -411,7 +411,7 @@ function lignesMobiles(root){
   root.querySelectorAll('table.resp').forEach(t => {
     const h = [...t.querySelectorAll('thead th')].map(x => x.textContent.trim());
     let ti = -1; for (const n of TITRES_COL){ ti = h.findIndex(x => x.toLowerCase().startsWith(n.toLowerCase())); if (ti >= 0) break; } if (ti < 0) ti = 0;
-    let ai = -1; h.forEach((x, i) => { if (/montant|total|ttc|reste|solde|statut/i.test(x) && i !== ti) ai = i; });
+    let ai = -1; h.forEach((x, i) => { if (/montant|total|ttc|reste|solde|statut|électeurs/i.test(x) && i !== ti) ai = i; });
     t.querySelectorAll('tbody tr').forEach(tr => [...tr.children].forEach((td, i) => { td.setAttribute('data-l', h[i] || ''); td.classList.add(i === ti ? 'm-t' : i === ai ? 'm-a' : 'm-d'); }));
   });
 }
@@ -1032,7 +1032,7 @@ function diagCalc(i){
   return { t, cs, d, camp, allies, adv, nuls, besoinAuto, besoin, votAtt, exprAtt, objectif, abst, vCamp, vAll, vAbst, reservoir, ratio, verdict, manque: Math.max(0, objectif - reservoir) };
 }
 function diagRes(i){
-  const r = diagCalc(i);
+  const r = diagCalc(i); setTimeout(() => { if (LV_I === i) lvMajListe(i); }, 0);
   return `<div class="grid g3" style="margin-top:10px">
     <div class="card kpi"><div class="l">Objectif de voix</div><div class="v">${F(r.objectif)}</div><div class="s">${F(r.t[6])} inscrits × ${P1(r.d.part)} × ${P1((1 - r.nuls) * 100)} valides × ${P1(r.besoin)}</div></div>
     <div class="card kpi"><div class="l">Réservoir de voix</div><div class="v">${F(r.reservoir)}</div><div class="s">camp ${F(r.vCamp)} + alliés ${F(r.vAll)} + abstentionnistes ${F(r.vAbst)}</div></div>
@@ -1079,8 +1079,92 @@ VIEWS.circo = a => {
     <div class="card kpi gold"><div class="l">Écart 1er – 2e</div><div class="v">${ecartVoix === null ? '—' : F(ecartVoix) + ' voix'}</div><div class="s">${v.ecart === null ? '' : P1(v.ecart).replace(' %', ' point(s)')}</div></div></div>
   <div class="card" style="margin-bottom:12px"><h3>Résultats</h3>${elBarres(i)}</div>
   ${lies.length ? `<div class="card" style="margin-bottom:12px"><h3>${t[0] < 2 ? 'La même zone dans les autres scrutins' : 'Circonscriptions législatives liées'}</h3>${tbl([['Élection'], ['Territoire'], ['Participation','n'], ['Vainqueur'], ['Second']], lies.map(j => { const u = elT(j), w = elVainq(j); return `<tr class="click" onclick="go('circo',${j})"><td><b>${esc(ELEC.E[u[0]])}</b></td><td>${esc(elNom(u))}${EL_PRES(u[0]) ? ` <span class="tag">${u[1] ? 'Département' : 'Région'}</span>` : ''}</td><td class="n">${P1(elPart(u))}</td><td>${w.w ? esc(w.w[1]) + ' ' + P1(w.w[4]) : '—'}</td><td>${w.s ? esc(w.s[1]) + ' ' + P1(w.s[4]) : '—'}</td></tr>`; }))}<p class="small muted">Rapprochement par le nom des communes et de la région : un département ou une région couvre souvent plus large que la circonscription.</p></div>` : ''}
-  <div class="card"><h3>Diagnostic de gagnabilité (méthode ATLAS)</h3><div id="diag">${diagHTML(i)}</div></div>`;
+  <div class="card"><h3>Diagnostic de gagnabilité (méthode ATLAS)</h3><div id="diag">${diagHTML(i)}</div></div>
+  ${lvCarte(i)}`;
 };
+/* ---------- V1.5 — Lieux de vote 2025 et profil des électeurs (répertoire CEI) ---------- */
+const LV_URL = 'data/lieux-vote-2025.json';
+let LV = null, LV_ETAT = '', LV_I = null;
+const LVF = { q: '', tout: false };
+function chargeLV(){
+  if (LV || LV_ETAT === 'charge') return; LV_ETAT = 'charge';
+  fetch(LV_URL).then(r => { if (!r.ok) throw 0; return r.json(); }).then(d => {
+    d.parC = {}; d.parCom = {}; d.Ai = {};
+    d.L.forEach(x => { (d.parC[x[0]] = d.parC[x[0]] || []).push(x); const k = elNorm(d.S[x[4]]); (d.parCom[k] = d.parCom[k] || []).push(x); });
+    d.A.forEach(a => { d.Ai[elNorm(a[1])] = a; });
+    LV = d; LV_ETAT = ''; lvRafraichir();
+  }).catch(() => { LV_ETAT = 'erreur'; lvRafraichir(); });
+}
+function lvRafraichir(){ const z = $('#lvcard'); if (z && LV_I !== null){ z.innerHTML = lvCorps(LV_I); lignesMobiles(z); } }
+function lvMajListe(i){ const z = $('#lvliste'); if (z){ z.innerHTML = lvListe(i); lignesMobiles(z); } }
+/* L : [circonscription, région, département, sous-préfecture, commune, code LV, lieu de vote, bureaux, électeurs] */
+function lvDe(i){
+  const t = elT(i); if (!LV) return null;
+  if (t[0] < 2) return LV.parC[t[3]] || [];
+  if (t[0] === 2) return LV.parCom[elNorm(t[4])] || [];
+  return null;
+}
+const lvLieu = x => LV.S[x[4]] === LV.S[x[3]] ? LV.S[x[4]] : LV.S[x[4]] + ' · s/p ' + LV.S[x[3]];
+function lvObjectif(i){ return elC(i).length ? diagCalc(i).objectif : 0; }
+function lvCarte(i){
+  const t = elT(i); if (t[0] > 2) return '';
+  LV_I = i; LVF.q = ''; LVF.tout = false;
+  return `<div class="card" style="margin-top:12px" id="lvcard">${lvCorps(i)}</div>`;
+}
+function lvProfil(L){
+  const vus = {}, out = [];
+  L.forEach(x => { const dep = LV.S[x[2]], k = dep === 'ABIDJAN' ? LV.S[x[4]] : dep; if (vus[k]) return; vus[k] = 1; const a = LV.Ai[elNorm(k)]; if (a) out.push(a); });
+  if (!out.length) return '';
+  return `<h3 style="margin-top:16px">Profil des électeurs (liste définitive 2025, par ${out.length > 1 ? 'départements' : 'département'})</h3>
+  ${tbl([['Département / commune'], ['Électeurs','n'], ['Femmes','n'], ['18–34 ans','n'], ['35–60 ans','n'], ['Plus de 60 ans','n']], out.map(a => { const v = a[2], T = v[6] || 1;
+    return `<tr><td><b>${esc(a[1])}</b><div class="small muted">${esc(a[0])}</div></td><td class="n">${F(T)}</td><td class="n">${P1((v[0] + v[1] + v[2]) / T * 100)}</td><td class="n">${P1((v[0] + v[3]) / T * 100)}</td><td class="n">${P1((v[1] + v[4]) / T * 100)}</td><td class="n">${P1((v[2] + v[5]) / T * 100)}</td></tr>`; }))}
+  <p class="small muted">Le profil par âge et par sexe est publié au niveau du département (ou de la commune à Abidjan), pas de la circonscription : il peut couvrir une zone plus large.</p>`;
+}
+function lvListe(i){
+  const L = lvDe(i) || [], tot = L.reduce((s, x) => s + x[8], 0), obj = lvObjectif(i), q = elNorm(LVF.q);
+  const tri = [...L].sort((a, b) => b[8] - a[8]); let cum = 0;
+  const lignes = tri.map(x => { cum += x[8]; return [x, cum]; }).filter(([x]) => !q || elNorm(x[6] + ' ' + LV.S[x[4]] + ' ' + LV.S[x[3]]).includes(q));
+  const vis = LVF.tout || q ? lignes : lignes.slice(0, 30);
+  return tbl([['Lieu de vote'], ['Bureaux','n'], ['Électeurs','n'], ['Part','n'], ['Cumul','n'], ['Objectif de voix','n']], vis.map(([x, c]) => `<tr><td><b>${esc(x[6])}</b><div class="small muted">${esc(lvLieu(x))} · code ${esc(x[5])}</div></td><td class="n">${F(x[7])}</td><td class="n">${F(x[8])}</td><td class="n">${P1(x[8] / tot * 100)}</td><td class="n">${P1(c / tot * 100)}</td><td class="n">${obj ? F(Math.round(obj * x[8] / tot)) : '—'}</td></tr>`), 'Aucun lieu de vote ne correspond.')
+  + (vis.length < lignes.length ? `<button class="btn sm" style="margin-top:8px" onclick="LVF.tout=true;lvMajListe(${i})">Afficher les ${lignes.length} lieux de vote</button>` : '');
+}
+function lvCorps(i){
+  const titre = '<h3>Lieux et bureaux de vote 2025 (répertoire CEI)</h3>';
+  if (!LV){ chargeLV(); return titre + `<div class="empty">${LV_ETAT === 'erreur' ? 'Répertoire indisponible : connectez-vous à Internet puis rouvrez la fiche.' : 'Chargement du répertoire des lieux de vote…'}</div>`; }
+  const L = lvDe(i) || [], t = elT(i);
+  if (!L.length) return titre + '<div class="empty">Aucun lieu de vote rattaché à ce territoire dans le répertoire CEI 2025.</div>';
+  const tot = L.reduce((s, x) => s + x[8], 0), bv = L.reduce((s, x) => s + x[7], 0);
+  const tri = [...L].sort((a, b) => b[8] - a[8]); let c = 0, n50 = 0; for (const x of tri){ c += x[8]; n50++; if (c >= tot / 2) break; }
+  const g = {}; L.forEach(x => { const k = lvLieu(x); g[k] = g[k] || [0, 0, 0]; g[k][0]++; g[k][1] += x[7]; g[k][2] += x[8]; });
+  const ins = t[0] === 0 ? t[6] : null;
+  return titre + `<div class="grid g4" style="margin-bottom:10px">
+    <div class="card kpi"><div class="l">Lieux de vote</div><div class="v">${F(L.length)}</div><div class="s">${F(bv)} bureaux de vote</div></div>
+    <div class="card kpi"><div class="l">Électeurs 2025</div><div class="v">${F(tot)}</div><div class="s">${ins !== null && ins !== tot ? 'PV des résultats : ' + F(ins) + ' inscrits' : 'moyenne ' + F(Math.round(tot / Math.max(bv, 1))) + ' par bureau'}</div></div>
+    <div class="card kpi"><div class="l">Moitié des électeurs</div><div class="v">${n50} lieux</div><div class="s">sur ${F(L.length)} (${P1(n50 / L.length * 100)})</div></div>
+    <div class="card kpi gold"><div class="l">Objectif de voix</div><div class="v">${elC(i).length ? F(lvObjectif(i)) : '—'}</div><div class="s">réparti par lieu de vote ci-dessous</div></div></div>
+  ${Object.keys(g).length > 1 ? tbl([['Commune / sous-préfecture'], ['Lieux','n'], ['Bureaux','n'], ['Électeurs','n'], ['Part','n']], Object.entries(g).sort((a, b) => b[1][2] - a[1][2]).map(([k, v]) => `<tr><td><b>${esc(k)}</b></td><td class="n">${F(v[0])}</td><td class="n">${F(v[1])}</td><td class="n">${F(v[2])}</td><td class="n">${P1(v[2] / tot * 100)}</td></tr>`)) : ''}
+  ${lvProfil(L)}
+  <h3 style="margin-top:16px">Lieux de vote, du plus grand au plus petit</h3>
+  <div class="bar no-print" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><input id="lvq" style="flex:1;min-width:160px;padding:9px 11px;border:1px solid var(--line);border-radius:10px" placeholder="Rechercher un lieu de vote, un village…" oninput="LVF.q=this.value;lvMajListe(${i})"><button class="btn sm" onclick="lvExport(${i})">⬇ Excel</button></div>
+  <div id="lvliste">${lvListe(i)}</div>
+  <p class="small muted">Objectif de voix par lieu de vote = objectif du diagnostic réparti au prorata des électeurs inscrits (hypothèse : même participation partout). À affiner avec les résultats par bureau de vote. Source : ${esc(LV.src)}. Données agrégées : aucune donnée personnelle d'électeur.</p>`;
+}
+function lvExport(i){
+  const t = elT(i), L = [...(lvDe(i) || [])].sort((a, b) => b[8] - a[8]), tot = L.reduce((s, x) => s + x[8], 0), obj = lvObjectif(i);
+  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const rows = [['Région','Circonscription','Département','Sous-préfecture','Commune','Code LV','Lieu de vote','Bureaux de vote','Électeurs 2025','Part (%)','Objectif de voix (prorata)'],
+    ...L.map(x => [LV.S[x[1]], x[0], LV.S[x[2]], LV.S[x[3]], LV.S[x[4]], x[5], x[6], x[7], x[8], (x[8] / tot * 100).toFixed(2).replace('.', ','), obj ? Math.round(obj * x[8] / tot) : ''])];
+  saveFile(`Lieux_de_vote_2025_${(t[3] ? t[3] + '_' : '') + t[4].replace(/[^A-Za-z0-9]+/g, '_').slice(0, 40)}.csv`, 'text/csv', '﻿' + rows.map(r => r.map(q).join(';')).join('\r\n'));
+  toast('Fichier Excel prêt');
+}
+function lvTexte(i){
+  if (!LV) return [];
+  const L = lvDe(i) || []; if (!L.length) return [];
+  const tot = L.reduce((s, x) => s + x[8], 0), obj = lvObjectif(i), tri = [...L].sort((a, b) => b[8] - a[8]);
+  return ['', `Lieux de vote 2025 : ${F(L.length)} lieux, ${F(L.reduce((s, x) => s + x[7], 0))} bureaux, ${F(tot)} électeurs. Les 10 plus grands :`,
+    ...tri.slice(0, 10).map(x => `- ${x[6]} (${lvLieu(x)}) : ${F(x[8])} électeurs, ${x[7]} bureau(x)${obj ? ', objectif ' + F(Math.round(obj * x[8] / tot)) + ' voix' : ''}`)];
+}
+
 function ficheTexte(i){
   const t = elT(i), r = elC(i).length ? diagCalc(i) : null, v = elVainq(i);
   const l = [`FICHE ${elNiv(t).toUpperCase()} — ${elNom(t)}`, `${ELEC.E[t[0]]} · ${t[2]} · source : résultats officiels CEI${t[0] === 0 ? ' (provisoires)' : ''}`, '',
@@ -1092,6 +1176,7 @@ function ficheTexte(i){
     `Hypothèses : participation ${P1(r.d.part)}, part nécessaire ${P1(r.besoin)}, abstentionnistes mobilisables ${P1(r.d.abst)}`,
     `Objectif de voix : ${F(r.objectif)} · réservoir : ${F(r.reservoir)} (camp ${F(r.vCamp)} + alliés ${F(r.vAll)} + abstentionnistes ${F(r.vAbst)})`,
     `Verdict : ${r.verdict[0].toUpperCase()} (${Math.round(r.ratio)} %) — ${r.verdict[2]}`); }
+  l.push(...lvTexte(i));
   elAlertes(i).forEach(x => l.push('', 'À vérifier sur le procès-verbal : ' + x));
   return l.join('\n');
 }
