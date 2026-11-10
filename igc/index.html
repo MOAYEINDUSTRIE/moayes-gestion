@@ -179,7 +179,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  IGC Gestion  ===================== */
-const VERSION = 'V1.11.1';
+const VERSION = 'V1.11.2';
 const KEY = 'igc_gestion_v1';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -1271,8 +1271,7 @@ function stratData(i){
   const taille = STRAT.membres + 1, nuls = t[7] ? t[8] / t[7] : 0;
   const objectifDe = p => { const expr = tot * p / 100 * (1 - nuls); return { votants: Math.round(tot * p / 100), exprimes: Math.round(expr), objectif: Math.floor(expr / 2) + 1 }; };
   const O = objectifDe(num(d.part));
-  let impair = 0;
-  const lieux = [...L].sort((a, b) => b[8] - a[8]).map(x => { const c = Math.max(2, Math.round(x[8] * STRAT.parMille / 1000)); const f = c % 2 ? (impair++ % 2 ? (c - 1) / 2 : (c + 1) / 2) : c / 2; return { x, cel: c, fem: f, hom: c - f, base: c * taille, obj: Math.round(O.objectif * x[8] / tot) }; });
+  const lieux = [...L].sort((a, b) => b[8] - a[8]).map(x => { const paires = Math.max(1, Math.round(x[8] * STRAT.parMille / 2 / 1000)), c = paires * 2, f = paires; return { x, cel: c, fem: f, hom: c - f, base: c * taille, obj: Math.round(O.objectif * x[8] / tot) }; });
   let c = 0; lieux.forEach(l => { const avant = c; c += l.x[8]; l.prio = avant / (tot || 1) < 0.5 ? 1 : avant / (tot || 1) < 0.8 ? 2 : 3; });
   const cel = lieux.reduce((s, l) => s + l.cel, 0), fem = lieux.reduce((s, l) => s + l.fem, 0), hom = cel - fem;
   const base = cel * taille, parMembre = base ? O.objectif / base : 0, aTrouver = base ? ceil(parMembre) : 0;
@@ -1303,7 +1302,7 @@ function stratCorps(i){
   <div class="card" style="margin-bottom:12px"><h3>2. La méthode</h3>
     <ol class="small" style="padding-left:18px;margin:.3em 0">
       <li><b>On travaille lieu de vote par lieu de vote.</b></li>
-      <li><b>Dans chaque lieu : ${STRAT.parMille} cellules pour 1 000 électeurs</b>, en proportion de sa taille, moitié cellules de femmes, moitié cellules d'hommes, et au moins 2 cellules par lieu (1 de femmes, 1 d'hommes), même pour un petit lieu.</li>
+      <li><b>Dans chaque lieu : ${STRAT.parMille} cellules pour 1 000 électeurs, toujours à parité</b> : autant de cellules de femmes que de cellules d'hommes. Quel que soit l'effectif, chaque lieu a au moins 1 cellule de femmes et 1 cellule d'hommes.</li>
       <li><b>Une cellule = 1 responsable + ${STRAT.membres} membres</b>, soit ${D.taille} personnes. Le nombre de cellules donne le nombre de responsables à former.</li>
       <li><b>L'équipe technique rend visite aux membres de chaque cellule</b> pour vérifier que le message est passé et que le travail se fait.</li>
       <li><b>Le taux de participation fixe l'objectif :</b> votants attendus, suffrages exprimés, puis 50 % + 1 voix.</li>
@@ -1468,7 +1467,7 @@ const nomFichierStrat = i => { const t = elT(i); return `Strategie_reseau_${(t[3
 function stratClasseur(i){
   const D = stratData(i), { t, O, d } = D, pc = v => Math.round(v * 10) / 1000, code = l => `${l.x[0]}-${l.x[5]}`;
   const synth = [['Élément', 'Valeur', 'Commentaire'],
-    ['Zone', elNom(t), ELEC.E[t[0]] + ' · ' + t[2]], ['Méthode', 'Cellules par lieu de vote (IGC)', `${STRAT.parMille} cellules pour 1 000 électeurs ; cellule = 1 responsable + ${STRAT.membres} membres`],
+    ['Zone', elNom(t), ELEC.E[t[0]] + ' · ' + t[2]], ['Méthode', 'Cellules par lieu de vote (IGC)', `${STRAT.parMille} cellules pour 1 000 électeurs, toujours à parité femmes / hommes (au moins 1 de chaque par lieu) ; cellule = 1 responsable + ${STRAT.membres} membres`],
     ['Participation attendue', P1(d.part), 'hypothèse'], ['Votants attendus', O.votants, ''], ['Suffrages exprimés attendus', O.exprimes, ''],
     ['Objectif de voix (50 % + 1)', O.objectif, ''], ['Lieux de vote', D.n, 'répertoire CEI 2025'], ['Électeurs 2025', D.tot, ''],
     ['Cellules', D.cel, `${D.fem} de femmes, ${D.hom} d'hommes`], ['Responsables à former', D.cel, ''], ['Membres', D.cel * STRAT.membres, ''],
@@ -1560,7 +1559,7 @@ function saveSociete(){
 
 /* ----- aide ----- */
 VIEWS.aide = () => `<div class="card"><h3>Mode d'emploi en 6 gestes</h3><ol>
-  <li><b>Base électorale → stratégie</b> : choisissez l'onglet du scrutin (législatives ou municipales), touchez la circonscription ou la commune, puis <b>📊 Stratégie de réseau</b>. Méthode IGC des cellules par lieu de vote : 2 cellules (femmes, hommes) pour 1 000 électeurs, cellule = 1 responsable + 25 membres, objectif = 50 % des exprimés + 1 voix, électeurs à trouver par membre = objectif ÷ base électorale. Indiquez la participation attendue : tout se calcule seul. Boutons : 📝 Word, 📄 PDF (choisir « Enregistrer en PDF » dans la fenêtre d'impression), 📊 Excel (classeur complet de 9 onglets), listes des lieux et des bureaux, Mission ATLAS.</li>
+  <li><b>Base électorale → stratégie</b> : choisissez l'onglet du scrutin (législatives ou municipales), touchez la circonscription ou la commune, puis <b>📊 Stratégie de réseau</b>. Méthode IGC des cellules par lieu de vote : 2 cellules pour 1 000 électeurs, toujours à parité (autant de cellules de femmes que d'hommes, au moins 1 de chaque par lieu), cellule = 1 responsable + 25 membres, objectif = 50 % des exprimés + 1 voix, électeurs à trouver par membre = objectif ÷ base électorale. Indiquez la participation attendue : tout se calcule seul. Boutons : 📝 Word, 📄 PDF (choisir « Enregistrer en PDF » dans la fenêtre d'impression), 📊 Excel (classeur complet de 9 onglets), listes des lieux et des bureaux, Mission ATLAS.</li>
   <li><b>ATLAS IA — Commandement</b> : « + Nouvelle mission » (ou un modèle), choisissez les agents, touchez « Copier l'ordre de mission » et collez-le dans Claude (Projet IGC). Collez ensuite le rapport, faites le contrôle qualité, puis validez ou renvoyez « À reprendre ». Les indicateurs (missions, reprises, coût, valeur) se calculent seuls.</li>
   <li><b>Paramètres</b> : remplissez une fois les informations du cabinet (RCCM, compte contribuable, banque). Changez les codes PIN.</li>
   <li><b>Trésorerie</b> : saisissez ce qu'il y a aujourd'hui en banque, en caisse et sur mobile.</li>
