@@ -1,0 +1,54 @@
+name: END — contrôle de cohérence (lecture seule, totaux sans noms)
+on:
+  workflow_dispatch:
+jobs:
+  controle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Contrôler
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          pip install --quiet google-auth requests
+          python - <<'PY'
+          import json, os, requests
+          from collections import defaultdict
+          from google.oauth2 import service_account
+          from google.auth.transport.requests import Request
+          cred = service_account.Credentials.from_service_account_info(json.loads(os.environ['SA']), scopes=['https://www.googleapis.com/auth/firebase.database','https://www.googleapis.com/auth/userinfo.email'])
+          cred.refresh(Request()); h = {'Authorization': 'Bearer ' + cred.token}
+          B = 'https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app/end/'
+          get = lambda p: (requests.get(B + p + '.json', headers=h, timeout=60).json() or {})
+          dons, decs, trs, treso = get('dons'), get('decaissements'), get('transferts'), get('tresorerie')
+          n = lambda x: float(str(x or 0).replace(' ', '').replace(',', '.') or 0)
+          MODE = {'espèces':'caisse','especes':'caisse','wave':'wave','orange money':'orange','mtn mobile money':'mtn','mtn':'mtn','moov money':'moov','moov':'moov','virement':'banque','chèque':'banque','cheque':'banque','banque':'banque'}
+          def cpt(d):
+              if d.get('compte'): return d['compte']
+              m = str(d.get('mode','')).lower()
+              for k,v in MODE.items():
+                  if k in m: return v
+              return 'caisse'
+          deb = treso.get('debut') or '0000-00-00'; so = treso.get('soldes') or {}
+          print('SOLDES DE DÉPART au', deb, ':', {k: n(v) for k, v in so.items()}, '= total', sum(n(v) for v in so.values()))
+          A = [d for d in dons.values() if not d.get('supprime')]; S = [d for d in dons.values() if d.get('supprime')]
+          print(f"DONS actifs : {len(A)} pour {sum(n(d.get('fcfa')) for d in A):,.0f} F ; dons supprimés : {len(S)} pour {sum(n(d.get('fcfa')) for d in S):,.0f} F")
+          avant = sorted([d for d in A if (d.get('date') or '') < deb], key=lambda d: d.get('date',''))
+          print(f"DONS DATÉS AVANT LES SOLDES DE DÉPART ({deb}) : {len(avant)} pour {sum(n(d.get('fcfa')) for d in avant):,.0f} F")
+          for d in avant: print('   ', d.get('recu'), d.get('date'), f"{n(d.get('fcfa')):,.0f} F", 'compte', cpt(d), 'saisi le', d.get('cree') and __import__('datetime').datetime.utcfromtimestamp(d['cree']/1000).strftime('%Y-%m-%d'))
+          DA = [x for x in decs.values() if not x.get('supprime')]
+          print(f"DÉCAISSEMENTS actifs : {len(DA)} pour {sum(n(x.get('montant')) for x in DA):,.0f} F ; avant le départ : {sum(n(x.get('montant')) for x in DA if (x.get('date') or '') < deb):,.0f} F")
+          for x in DA: print('   ', x.get('num'), x.get('date'), f"{n(x.get('montant')):,.0f} F", 'compte', x.get('compte'))
+          r = defaultdict(float)
+          for k, v in so.items(): r[k] += n(v)
+          for d in A:
+              if (d.get('date') or '') >= deb: r[cpt(d)] += n(d.get('fcfa'))
+          for x in DA:
+              if (x.get('date') or '') >= deb: r[x.get('compte')] -= n(x.get('montant'))
+          for t in trs.values():
+              if not t.get('supprime') and (t.get('date') or '') >= deb: r[t.get('de')] -= n(t.get('montant')); r[t.get('vers')] += n(t.get('montant'))
+          print('TRANSFERTS actifs :', len([t for t in trs.values() if not t.get('supprime')]))
+          print('SOLDE RECALCULÉ :', {k: round(v) for k, v in r.items() if v}, '= total', round(sum(r.values())))
+          dates = sorted(d.get('date','') for d in A); print('Dates des dons : du', dates[0] if dates else '-', 'au', dates[-1] if dates else '-')
+          PY
