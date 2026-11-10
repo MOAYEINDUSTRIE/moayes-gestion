@@ -179,7 +179,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  IGC Gestion  ===================== */
-const VERSION = 'V1.11';
+const VERSION = 'V1.11.1';
 const KEY = 'igc_gestion_v1';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -1272,7 +1272,7 @@ function stratData(i){
   const objectifDe = p => { const expr = tot * p / 100 * (1 - nuls); return { votants: Math.round(tot * p / 100), exprimes: Math.round(expr), objectif: Math.floor(expr / 2) + 1 }; };
   const O = objectifDe(num(d.part));
   let impair = 0;
-  const lieux = [...L].sort((a, b) => b[8] - a[8]).map(x => { const c = Math.max(1, Math.round(x[8] * STRAT.parMille / 1000)); const f = c % 2 ? (impair++ % 2 ? (c - 1) / 2 : (c + 1) / 2) : c / 2; return { x, cel: c, fem: f, hom: c - f, base: c * taille, obj: Math.round(O.objectif * x[8] / tot) }; });
+  const lieux = [...L].sort((a, b) => b[8] - a[8]).map(x => { const c = Math.max(2, Math.round(x[8] * STRAT.parMille / 1000)); const f = c % 2 ? (impair++ % 2 ? (c - 1) / 2 : (c + 1) / 2) : c / 2; return { x, cel: c, fem: f, hom: c - f, base: c * taille, obj: Math.round(O.objectif * x[8] / tot) }; });
   let c = 0; lieux.forEach(l => { const avant = c; c += l.x[8]; l.prio = avant / (tot || 1) < 0.5 ? 1 : avant / (tot || 1) < 0.8 ? 2 : 3; });
   const cel = lieux.reduce((s, l) => s + l.cel, 0), fem = lieux.reduce((s, l) => s + l.fem, 0), hom = cel - fem;
   const base = cel * taille, parMembre = base ? O.objectif / base : 0, aTrouver = base ? ceil(parMembre) : 0;
@@ -1303,7 +1303,7 @@ function stratCorps(i){
   <div class="card" style="margin-bottom:12px"><h3>2. La méthode</h3>
     <ol class="small" style="padding-left:18px;margin:.3em 0">
       <li><b>On travaille lieu de vote par lieu de vote.</b></li>
-      <li><b>Dans chaque lieu : ${STRAT.parMille} cellules pour 1 000 électeurs</b>, en proportion de sa taille, moitié cellules de femmes, moitié cellules d'hommes (au moins 1 cellule par lieu).</li>
+      <li><b>Dans chaque lieu : ${STRAT.parMille} cellules pour 1 000 électeurs</b>, en proportion de sa taille, moitié cellules de femmes, moitié cellules d'hommes, et au moins 2 cellules par lieu (1 de femmes, 1 d'hommes), même pour un petit lieu.</li>
       <li><b>Une cellule = 1 responsable + ${STRAT.membres} membres</b>, soit ${D.taille} personnes. Le nombre de cellules donne le nombre de responsables à former.</li>
       <li><b>L'équipe technique rend visite aux membres de chaque cellule</b> pour vérifier que le message est passé et que le travail se fait.</li>
       <li><b>Le taux de participation fixe l'objectif :</b> votants attendus, suffrages exprimés, puis 50 % + 1 voix.</li>
