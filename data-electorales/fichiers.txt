@@ -1,3 +1,8 @@
 EDAN_2025_LV_BV_POP.xlsx https://cei.ci/wp-content/uploads/2025/11/EDAN_2025_REPERTOIRE_STAT_LV_BV_POP-1011.xlsx
 STAT_LED_2025.pdf https://cei.ci/wp-content/uploads/2025/10/STATISTIQUES-LED-2025.pdf
 DECRET_2025_775_annexe.pdf https://cei.ci/wp-content/uploads/2025/10/Annexe-au-Decret-N°2025-775-du-1er-octobre-2025.pdf
+REG_2013.pdf https://cei.ci/wp-content/uploads/2025/09/RESULTAT_REGIONALE-2013-FINAL.pdf
+MUN_2013.pdf https://cei.ci/wp-content/uploads/2025/09/RESULTAT_MUNICIPALE-2013-FINAL.pdf
+EDAN_2016.pdf https://www.cei.ci/wp-content/uploads/2024/03/EDAN-2016-RESULTAT-NATIONAL-18122016-et-29122016-et-28012017.pdf
+REG_2018.pdf https://cei.ci/wp-content/uploads/2020/04/1-ELECTION-DES-CONSEILLERS-REGIONAUX-1.pdf
+MUN_2018.pdf https://cei.ci/wp-content/uploads/2020/04/2-ELECTION-DES-CONSEILLERS-MUNICIPAUX.pdf
