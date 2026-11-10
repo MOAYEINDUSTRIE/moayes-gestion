@@ -179,7 +179,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  IGC Gestion  ===================== */
-const VERSION = 'V1.13';
+const VERSION = 'V1.13.1';
 const KEY = 'igc_gestion_v1';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -1093,7 +1093,7 @@ function diagRes(i){
     <div class="card kpi"><div class="l">Réservoir de voix</div><div class="v">${F(r.reservoir)}</div><div class="s">camp ${F(r.vCamp)} + alliés ${F(r.vAll)} + abstentionnistes ${F(r.vAbst)}</div></div>
     <div class="card kpi gold"><div class="l">Verdict</div><div class="v">${r.verdict[0]} · ${Math.round(r.ratio)} %</div><div class="s">réservoir ÷ objectif</div></div></div>
   <div class="alert ${r.verdict[1]}"><b>${r.verdict[0]}.</b> ${r.verdict[2]} ${r.manque ? `Il manque environ <b>${F(r.manque)} voix</b> pour couvrir l'objectif.` : `Marge d'environ <b>${F(r.reservoir - r.objectif)} voix</b> au-dessus de l'objectif.`}${r.adv ? ` Principal adversaire : ${esc(r.adv[1])} (${P1(r.adv[4])}).` : ''}</div>
-  <p class="small muted">Seuils de la méthode ATLAS : favorable au-dessus de 120 %, disputé entre 90 et 120 %, difficile en dessous de 90 %. Abstentionnistes mobilisables : 2 % par défaut quand la participation est inférieure à 25 %, sinon 5 %. Les hypothèses (participation, marge, abstentionnistes mobilisables, alliés) sont à confirmer sur le terrain.</p>`;
+  <p class="small muted">Seuils de la méthode IGC : favorable au-dessus de 120 %, disputé entre 90 et 120 %, difficile en dessous de 90 %. Abstentionnistes mobilisables : 2 % par défaut quand la participation est inférieure à 25 %, sinon 5 %. Les hypothèses (participation, marge, abstentionnistes mobilisables, alliés) sont à confirmer sur le terrain.</p>`;
 }
 function diagHTML(i){
   const cs = elC(i), d = diagEtat(i), r = diagCalc(i);
@@ -1134,7 +1134,7 @@ VIEWS.circo = a => {
     <div class="card kpi gold"><div class="l">Écart 1er – 2e</div><div class="v">${ecartVoix === null ? '—' : F(ecartVoix) + ' voix'}</div><div class="s">${v.ecart === null ? '' : P1(v.ecart).replace(' %', ' point(s)')}</div></div></div>
   <div class="card" style="margin-bottom:12px"><h3>Résultats</h3>${elBarres(i)}</div>
   ${lies.length ? `<div class="card" style="margin-bottom:12px"><h3>${t[0] < 2 ? 'La même zone dans les autres scrutins' : 'Circonscriptions législatives liées'}</h3>${tbl([['Élection'], ['Territoire'], ['Participation','n'], ['Vainqueur'], ['Second']], lies.map(j => { const u = elT(j), w = elVainq(j); return `<tr class="click" onclick="go('circo',${j})"><td><b>${esc(ELEC.E[u[0]])}</b></td><td>${esc(elNom(u))}${EL_PRES(u[0]) ? ` <span class="tag">${elNiv(u)}</span>` : ''}</td><td class="n">${P1(elPart(u))}</td><td>${w.w ? esc(w.w[1]) + ' ' + P1(w.w[4]) : '—'}</td><td>${w.s ? esc(w.s[1]) + ' ' + P1(w.s[4]) : '—'}</td></tr>`; }))}<p class="small muted">Rapprochement par le nom des communes et de la région : un département ou une région couvre souvent plus large que la circonscription.</p></div>` : ''}
-  <div class="card"><h3>Diagnostic de gagnabilité (méthode ATLAS)</h3><div id="diag">${diagHTML(i)}</div></div>
+  <div class="card"><h3>Diagnostic de gagnabilité (méthode IGC)</h3><div id="diag">${diagHTML(i)}</div></div>
   ${lvCarte(i)}`;
 };
 /* ---------- V1.5 — Lieux de vote 2025 et profil des électeurs (répertoire CEI) ---------- */
@@ -1230,7 +1230,7 @@ function ficheTexte(i){
     ...elC(i).map(c => `- ${c[1]} — ${c[2]} : ${F(c[3])} voix (${P1(c[4])})${c[5] ? ' — ÉLU(E)' : ''}`)];
   if (v.w && v.s) l.push(`Écart 1er – 2e : ${F(v.w[3] - v.s[3])} voix (${P1(v.ecart).replace(' %', ' point(s)')})`);
   const lies = elLies(i); if (lies.length){ l.push('', 'Autres scrutins de la zone :'); lies.forEach(j => { const u = elT(j), w = elVainq(j); l.push(`- ${ELEC.E[u[0]]} · ${elNom(u)} : participation ${P1(elPart(u))}${w.w ? ' · ' + w.w[1] + ' ' + P1(w.w[4]) : ''}${w.s ? ' / ' + w.s[1] + ' ' + P1(w.s[4]) : ''}`); }); }
-  if (r){ l.push('', 'Diagnostic de gagnabilité (méthode ATLAS) :', `Camp : ${r.camp ? r.camp[1] + ' — ' + r.camp[2] : 'nouveau candidat'}${r.allies.length ? ' · alliés : ' + r.allies.map(c => c[1] + ' — ' + c[2]).join(', ') : ''}`,
+  if (r){ l.push('', 'Diagnostic de gagnabilité (méthode IGC) :', `Camp : ${r.camp ? r.camp[1] + ' — ' + r.camp[2] : 'nouveau candidat'}${r.allies.length ? ' · alliés : ' + r.allies.map(c => c[1] + ' — ' + c[2]).join(', ') : ''}`,
     `Hypothèses : participation ${P1(r.d.part)}, part nécessaire ${P1(r.besoin)}, abstentionnistes mobilisables ${P1(r.d.abst)}`,
     `Objectif de voix : ${F(r.objectif)} · réservoir : ${F(r.reservoir)} (camp ${F(r.vCamp)} + alliés ${F(r.vAll)} + abstentionnistes ${F(r.vAbst)})`,
     `Verdict : ${r.verdict[0].toUpperCase()} (${Math.round(r.ratio)} %) — ${r.verdict[2]}`); }
@@ -1246,7 +1246,7 @@ function copierFiche(i){
 function imprimerFiche(i){
   const t = elT(i), titre = `Fiche ${elNiv(t)} ${t[3] ? t[3] + ' ' : ''}${t[4]}`.slice(0, 90);
   const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>${esc(titre)}</title><style>body{font:12.5px/1.5 Arial,sans-serif;color:#16202e;margin:24px}h1{font-size:18px;color:#14213a;margin:0 0 4px}pre{white-space:pre-wrap;font:12.5px/1.55 Arial,sans-serif}.ft{margin-top:18px;border-top:1px solid #ccc;padding-top:6px;font-size:10.5px;color:#667085}@page{size:A4;margin:14mm}</style></head><body>
-    <h1>Impact Global Consulting — ATLAS IA</h1><pre>${esc(ficheTexte(i))}</pre><div class="ft">Document confidentiel · ${esc(ELEC.src)} · édité le ${dfr(today())}</div></body></html>`;
+    <h1>Impact Global Consulting</h1><pre>${esc(ficheTexte(i))}</pre><div class="ft">Document confidentiel · ${esc(ELEC.src)} · édité le ${dfr(today())}</div></body></html>`;
   if (window.AndroidBridge && AndroidBridge.printHtml){ AndroidBridge.printHtml(html, titre); return; }
   const w = window.open('', '_blank'); if (!w){ toast('Autorisez les fenêtres pour imprimer'); return; }
   w.document.write(html); w.document.close(); setTimeout(() => { w.focus(); w.print(); }, 400);
@@ -1522,7 +1522,7 @@ function stratDocHTML(i, word){
   const css = `body{font:11pt/1.45 Arial,sans-serif;color:#16202e;margin:18px}h1{font-size:17pt;color:#14213a;margin:0 0 2px}h2{font-size:14pt;color:#14213a}h3{font-size:12.5pt;color:#14213a;margin:16px 0 6px;border-bottom:2px solid #c9a227;padding-bottom:2px}table{width:100%;border-collapse:collapse;margin:4px 0}th,td{border:1px solid #dde1ea;padding:4px 5px;text-align:left;vertical-align:top;font-size:10pt}th{background:#e9edf5;color:#14213a;font-weight:bold}th.n,td.n{text-align:right;white-space:nowrap;width:13%}th:first-child,td:first-child{width:24%}.small{font-size:9.5pt}.muted{color:#667085}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.kpi{border:1px solid #dde1ea;border-radius:6px;padding:6px;margin:3px 0}.kpi .l{font-size:9pt;color:#667085}.kpi .v{font-size:14pt;font-weight:700}.kpi .s{font-size:9pt;color:#667085}.alert{border:1px solid #e7c873;background:#fff8e1;padding:6px}.card{break-inside:avoid-page}.empty{color:#667085}.ft{margin-top:14px;border-top:1px solid #ccc;padding-top:6px;font-size:8.5pt;color:#667085}@page{size:A4;margin:14mm}`;
   STRAT_DOC = true; let contenu; try { contenu = stratCorps(i); } finally { STRAT_DOC = false; }
   contenu = contenu.replace(/<table class="resp">/g, '<table class="resp" width="100%" cellspacing="0" cellpadding="4">').replace(/<th class="n">/g, '<th class="n" width="14%" nowrap>').replace(/<td class="n">/g, '<td class="n" nowrap>').replace(/<td class="n b">/g, '<td class="n b" nowrap>');
-  const corps = `<h1>Impact Global Consulting — ATLAS IA</h1><div class="small muted">${esc(titre)} · ${esc(ELEC.E[t[0]])} · ${esc(t[2])} · document confidentiel</div>${contenu}<div class="ft">Calcul automatique IGC Gestion · ${esc(ELEC.src)} · édité le ${dfr(today())}</div>`;
+  const corps = `<h1>Impact Global Consulting</h1><div class="small muted">${esc(titre)} · ${esc(ELEC.E[t[0]])} · ${esc(t[2])} · document confidentiel</div>${contenu}<div class="ft">Calcul automatique IGC Gestion · ${esc(ELEC.src)} · édité le ${dfr(today())}</div>`;
   if (word) return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(titre)}</title><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]--><style>${css}</style></head><body>${corps}</body></html>`;
   return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>${esc(titre)}</title><style>${css}</style></head><body>${corps}</body></html>`;
 }
@@ -1565,7 +1565,7 @@ function candModele(i){
   const cinq = ex.slice(0, 5).map(l => l.x[6]);
   const pct = (a, b) => P1(a / (b || 1) * 100);
   const M = [];
-  M.push({ t: 'cover', titre: `${zone.toUpperCase()} ${annee}`, sous: `Stratégie pour gagner ${enjeu}`, ligne: `${presid ? 'Élection' : 'Élections'} ${scrutin} — ${muni ? 'commune de ' + zone : reg ? 'région ' + zone : presid ? elNiv(t).toLowerCase() + ' : ' + zone : 'circonscription ' + t[3] + ', ' + zone}${reg || (presid && !t[1]) ? '' : ' (' + titreCas(t[2]) + ')'}`, infos: [['Remis à', cand], ['Préparé par', 'Impact Global Consulting — ATLAS IA'], ['Date', dfr(today())], ['Statut', 'document strictement confidentiel']], note: 'Toutes les données chiffrées proviennent des publications officielles de la Commission électorale indépendante (CEI) : résultats officiels, liste électorale définitive 2025 et répertoire des lieux de vote 2025.' });
+  M.push({ t: 'cover', titre: `${zone.toUpperCase()} ${annee}`, sous: `Stratégie pour gagner ${enjeu}`, ligne: `${presid ? 'Élection' : 'Élections'} ${scrutin} — ${muni ? 'commune de ' + zone : reg ? 'région ' + zone : presid ? elNiv(t).toLowerCase() + ' : ' + zone : 'circonscription ' + t[3] + ', ' + zone}${reg || (presid && !t[1]) ? '' : ' (' + titreCas(t[2]) + ')'}`, infos: [['Remis à', cand], ['Préparé par', 'Impact Global Consulting'], ['Date', dfr(today())], ['Statut', 'document strictement confidentiel']], note: 'Toutes les données chiffrées proviennent des publications officielles de la Commission électorale indépendante (CEI) : résultats officiels, liste électorale définitive 2025 et répertoire des lieux de vote 2025.' });
   M.push({ t: 'h1', x: '1. La stratégie en une page' });
   M.push({ t: 'p', r: Rn(`${zone} compte ${F(D.tot)} électeurs inscrits sur la liste 2025, répartis dans ${D.n} lieux de vote. Au dernier scrutin de référence (${E}), seuls ${pct(t[7], t[6])} des inscrits ont voté${elu ? ` et ${elu[1]} l'a emporté avec ${F(elu[3])} voix` : ''}. La victoire ira au candidat qui aura construit le réseau le plus solide pour faire voter ses propres soutiens.`) });
   M.push({ t: 'box', titre: 'Votre objectif', r: Rn(`**${F(D.O.objectif)} voix**, soit 50 % des suffrages exprimés plus une voix, avec une participation de ${P1(d.part)}.`) });
