@@ -179,7 +179,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  IGC Gestion  ===================== */
-const VERSION = 'V1.13.1';
+const VERSION = 'V1.14';
 const KEY = 'igc_gestion_v1';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -1099,7 +1099,7 @@ function diagHTML(i){
   const cs = elC(i), d = diagEtat(i), r = diagCalc(i);
   if (!cs.length) return `<div class="empty">Pas de résultat chiffré pour ce territoire : diagnostic impossible.</div>`;
   return `<div class="f">
-    <div class="full"><label>Camp du candidat accompagné</label><select onchange="diagEtat(${i}).camp=+this.value;diagEtat(${i}).allies=diagEtat(${i}).allies.filter(k=>k!==+this.value);$('#diag').innerHTML=diagHTML(${i})">${cs.map((c, k) => `<option value="${k}" ${d.camp === k ? 'selected' : ''}>${esc(c[1])} — ${esc(c[2])} (${P1(c[4])})</option>`).join('')}<option value="-1" ${d.camp === -1 ? 'selected' : ''}>Nouveau candidat (aucune voix passée)</option></select></div>
+    <div class="full"><label>Camp du candidat accompagné</label><select onchange="diagEtat(${i}).camp=+this.value;diagEtat(${i}).campChoisi=1;diagEtat(${i}).allies=diagEtat(${i}).allies.filter(k=>k!==+this.value);$('#diag').innerHTML=diagHTML(${i})">${cs.map((c, k) => `<option value="${k}" ${d.camp === k ? 'selected' : ''}>${esc(c[1])} — ${esc(c[2])} (${P1(c[4])})</option>`).join('')}<option value="-1" ${d.camp === -1 ? 'selected' : ''}>Nouveau candidat (aucune voix passée)</option></select></div>
     <div><label>Participation attendue (%)</label><input inputmode="decimal" value="${esc(d.part)}" oninput="diagEtat(${i}).part=num(this.value);$('#diagres').innerHTML=diagRes(${i})"></div>
     <div><label>Marge de sécurité (points)</label><input inputmode="decimal" value="${esc(d.marge)}" oninput="diagEtat(${i}).marge=num(this.value);$('#diagres').innerHTML=diagRes(${i})"></div>
     <div><label>Abstentionnistes mobilisables (%)</label><input inputmode="decimal" value="${esc(d.abst)}" oninput="diagEtat(${i}).abst=num(this.value);$('#diagres').innerHTML=diagRes(${i})"></div>
@@ -1174,8 +1174,8 @@ function lvProfil(L){
   L.forEach(x => { const dep = LV.S[x[2]], k = dep === 'ABIDJAN' ? LV.S[x[4]] : dep; if (vus[k]) return; vus[k] = 1; const a = LV.Ai[elNorm(k)]; if (a) out.push(a); });
   if (!out.length) return '';
   return `<h3 style="margin-top:16px">Profil des électeurs (liste définitive 2025, ${out.length > 1 ? 'départements concernés' : esc(out[0][1].charAt(0) + out[0][1].slice(1).toLowerCase())})</h3>
-  ${tbl([['Département / commune'], ['Électeurs','n'], ['Femmes','n'], ['18–34 ans','n'], ['35–60 ans','n'], ['Plus de 60 ans','n']], out.map(a => { const v = a[2], T = v[6] || 1;
-    return `<tr><td><b>${esc(a[1])}</b><div class="small muted">${esc(a[0])}</div></td><td class="n">${F(T)}</td><td class="n">${P1((v[0] + v[1] + v[2]) / T * 100)}</td><td class="n">${P1((v[0] + v[3]) / T * 100)}</td><td class="n">${P1((v[1] + v[4]) / T * 100)}</td><td class="n">${P1((v[2] + v[5]) / T * 100)}</td></tr>`; }))}
+  ${tbl([['Département / commune'], ['Électeurs','n'], ['Femmes','n'], ['Hommes','n'], ['18–34 ans','n'], ['35–60 ans','n'], ['Plus de 60 ans','n']], out.map(a => { const v = a[2], T = v[6] || 1;
+    return `<tr><td><b>${esc(a[1])}</b><div class="small muted">${esc(a[0])}</div></td><td class="n">${F(T)}</td><td class="n">${P1((v[0] + v[1] + v[2]) / T * 100)}</td><td class="n">${P1((v[3] + v[4] + v[5]) / T * 100)}</td><td class="n">${P1((v[0] + v[3]) / T * 100)}</td><td class="n">${P1((v[1] + v[4]) / T * 100)}</td><td class="n">${P1((v[2] + v[5]) / T * 100)}</td></tr>`; }))}
   <p class="small muted">Le profil par âge et par sexe est publié au niveau du département (ou de la commune à Abidjan), pas de la circonscription : il peut couvrir une zone plus large.</p>`;
 }
 function lvListe(i){
@@ -1301,11 +1301,27 @@ function stratCorps(i){
     : `<div class="grid g4">${kpis.map((k, j) => `<div class="card kpi${j === 3 ? ' gold' : ''}"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="s">${k[2]}</div></div>`).join('')}</div>`;
   const lignesLieux = D.lieux.slice(0, 300).map(l => `<tr><td><b>${esc(l.x[6])}</b><div class="small muted">${esc(lvLieu(l.x))} · ${['', 'cœur', 'appui', 'veille'][l.prio]}</div></td><td class="n">${F(l.x[8])}</td><td class="n">${F(l.cel)}</td><td class="n">${F(l.fem)} F · ${F(l.hom)} H</td><td class="n">${F(l.base)}</td><td class="n">${F(l.obj)}</td></tr>`);
   return `
-  <div class="card" style="margin-bottom:12px"><h3>1. L'essentiel</h3>
-    <p style="margin:.2em 0 .6em"><b>Pour gagner ${esc(elNom(t))}, il faut ${F(O.objectif)} voix</b> (50 % des suffrages exprimés + 1 voix, avec ${P1(d.part)} de participation sur les ${F(D.tot)} électeurs de la liste 2025). Le réseau repose sur <b>${F(D.cel)} cellules</b> réparties dans les ${D.n} lieux de vote : elles forment une base électorale de <b>${F(D.base)} personnes</b>. Pour atteindre l'objectif, <b>chaque membre doit trouver ${F(D.aTrouver)} électeur(s)</b> et les fidéliser.</p>
+  <div class="card" style="margin-bottom:12px"><h3>L'essentiel</h3>
+    <p style="margin:.2em 0 .6em"><b>${esc(cibleDe(t).Scrutin)} — pour gagner ${esc(elNom(t))}, il faut environ ${F(O.objectif)} voix</b> : 50 % des suffrages exprimés + 1 voix. <b>C'est une estimation fondée sur les élections antérieures</b> (référence : ${esc(E)}), avec ${P1(d.part)} de participation sur les ${F(D.tot)} électeurs de la liste 2025. Le réseau repose sur <b>${F(D.cel)} cellules</b> réparties dans les ${D.n} lieux de vote : elles forment une base électorale de <b>${F(D.base)} personnes</b>. Pour atteindre l'objectif, <b>chaque membre doit trouver ${F(D.aTrouver)} électeur(s)</b> et les fidéliser.</p>
     ${blocKpi}</div>
 
-  <div class="card" style="margin-bottom:12px"><h3>2. La méthode</h3>
+  <h2 class="partie" style="margin:18px 0 8px;font-size:17px;color:#1b2a4a;border-bottom:3px solid #c9a227;padding-bottom:3px">Partie 1 — Analyse électorale</h2>
+
+  <div class="card" style="margin-bottom:12px"><h3>1.1 Ce que disent les scrutins de la zone</h3>
+    ${(() => { const A = analyseData(i); return tbl([['Scrutin'], ['Inscrits','n'], ['Votants','n'], ['Participation','n'], ['Non-votants','n']], A.evo.map(g => `<tr><td><b>${esc(g.lab)}</b>${g.ref ? ' <span class="tag">référence</span>' : ''}${g.partiel ? ' <span class="tag w">autre périmètre</span>' : ''}</td><td class="n">${F(g.ins)}</td><td class="n">${F(g.vot)}</td><td class="n">${P1(g.part)}</td><td class="n">${F(g.non)}</td></tr>`).concat([`<tr><td><b>Liste électorale 2025</b></td><td class="n">${F(D.tot)}</td><td></td><td></td><td></td></tr>`])); })()}
+    <p class="small muted">Résultats par liste :</p>
+    ${tbl([['Scrutin'], ['Inscrits','n'], ['Participation','n'], ['1er'], ['2e'], ['3e']], D.lies.map(o => `<tr><td><b>${esc(ELEC.E[o.u[0]])}</b><div class="small muted">${esc(elNom(o.u))}</div></td><td class="n">${F(o.u[6])}</td><td class="n">${P1(elPart(o.u))}</td>${top(o).map(x => `<td class="small">${x}</td>`).join('')}</tr>`))}
+    ${D.camp && D.histo.length && d.campChoisi ? `<p class="small" style="margin-top:8px"><b>Voix du camp ${esc(D.camp[1])} dans la zone :</b> ${D.histo.map(h => `${esc(ELEC.E[h.o.u[0]])} : ${h.voix ? F(h.voix) : '—'}`).join(' · ')}. Objectif : ${F(O.objectif)} voix.</p>` : ''}
+    ${lvProfil(D.L)}</div>
+
+  <div class="card" style="margin-bottom:12px"><h3>1.2 Objectif selon la participation (estimation)</h3>
+    <p class="small">Objectif = 50 % des suffrages exprimés + 1 voix, estimé à partir des élections antérieures : participation appliquée aux électeurs de la liste 2025, bulletins nuls au taux observé en ${esc(E)}. Les scénarios complets (40 à 60 % et taux réels des scrutins passés) figurent dans le document Word / PDF.</p>
+    ${tbl([['Participation','n'], ['Votants','n'], ['Objectif (50 % + 1)','n'], ['À trouver par membre','n']], D.scen.map(s => `<tr${s[0] === num(d.part) ? ' style="font-weight:700"' : ''}><td class="n">${P1(s[0])}</td><td class="n">${F(s[1])}</td><td class="n">${F(s[2])}</td><td class="n">${F(ceil(s[3]))} (${s[3].toFixed(2).replace('.', ',')})</td></tr>`))}
+    <p class="small muted">La participation se modifie dans « Hypothèses ». Par défaut : celle du scrutin de la fiche (${P1(elPart(t))}).</p></div>
+
+  <h2 class="partie" style="margin:18px 0 8px;font-size:17px;color:#1b2a4a;border-bottom:3px solid #c9a227;padding-bottom:3px">Partie 2 — Stratégie électorale</h2>
+
+  <div class="card" style="margin-bottom:12px"><h3>2.1 La méthode</h3>
     <ol class="small" style="padding-left:18px;margin:.3em 0">
       <li><b>On travaille lieu de vote par lieu de vote.</b></li>
       <li><b>Dans chaque lieu : ${STRAT.parMille} cellules pour 1 000 électeurs, toujours à parité</b> : autant de cellules de femmes que de cellules d'hommes. Quel que soit l'effectif, chaque lieu a au moins 1 cellule de femmes et 1 cellule d'hommes.</li>
@@ -1314,26 +1330,14 @@ function stratCorps(i){
       <li><b>Le taux de participation fixe l'objectif :</b> votants attendus, suffrages exprimés, puis 50 % + 1 voix.</li>
       <li><b>Les membres des cellules forment la base électorale.</b> Objectif ÷ base = nombre d'électeurs que chaque membre doit trouver. Ces électeurs sont enregistrés dans un fichier pour les fidéliser au projet du candidat.</li></ol></div>
 
-  <div class="card" style="margin-bottom:12px"><h3>3. Objectif selon la participation</h3>
-    ${tbl([['Participation','n'], ['Votants','n'], ['Objectif (50 % + 1)','n'], ['À trouver par membre','n']], D.scen.map(s => `<tr${s[0] === num(d.part) ? ' style="font-weight:700"' : ''}><td class="n">${P1(s[0])}</td><td class="n">${F(s[1])}</td><td class="n">${F(s[2])}</td><td class="n">${F(ceil(s[3]))} (${s[3].toFixed(2).replace('.', ',')})</td></tr>`))}
-    <p class="small muted">La participation se modifie dans « Hypothèses ». Par défaut : celle du scrutin de la fiche (${P1(elPart(t))}).</p></div>
-
-  <div class="card" style="margin-bottom:12px"><h3>4. Les cellules, lieu par lieu</h3>
+  <div class="card" style="margin-bottom:12px"><h3>2.2 Les cellules, lieu par lieu</h3>
     <p class="small">${D.n} lieux de vote · ${F(D.tot)} électeurs · <b>${F(D.cel)} cellules</b> (${F(D.fem)} de femmes, ${F(D.hom)} d'hommes) · <b>${F(D.cel)} responsables</b> · <b>${F(D.cel * STRAT.membres)} membres</b>. Les ${D.coeur.length} lieux « cœur » réunissent la moitié des électeurs : on y installe les cellules en premier.</p>
     ${tbl([['Lieu de vote'], ['Électeurs','n'], ['Cellules','n'], ['Femmes · hommes','n'], ['Base','n'], ['Voix à obtenir','n']], lignesLieux)}${D.lieux.length > 300 ? `<p class="small muted">Les 300 plus grands lieux sont affichés sur ${F(D.lieux.length)} : la liste complète est dans le fichier Excel.</p>` : ''}</div>
 
-  <div class="card" style="margin-bottom:12px"><h3>5. Le contrôle par l'équipe technique</h3>
-    <p class="small">Avec 1 contrôleur pour ${STRAT.ctrlCel} cellules, il faut <b>${F(D.ctrl)} contrôleurs</b>. À ${STRAT.visitesSem} membres visités par contrôleur et par semaine, un tour complet des ${F(D.base)} membres prend <b>${F(D.tour)} semaine(s)</b>. À chaque visite, le contrôleur vérifie : le membre connaît le candidat et son projet ; il a reçu le message de son responsable ; il a commencé à trouver ses ${F(D.aTrouver)} électeur(s) ; il est inscrit sur la liste électorale et sait où il vote.</p></div>
-
-  <div class="card" style="margin-bottom:12px"><h3>6. La fidélisation</h3>
+  <div class="card" style="margin-bottom:12px"><h3>2.3 La fidélisation</h3>
     <p class="small">Fichier à constituer : <b>${F(D.base * D.aTrouver)} électeurs trouvés</b> (${F(D.base)} membres × ${F(D.aTrouver)}). Pour chacun : lieu de vote, membre qui l'a trouvé, téléphone, date de son accord. On les fait vivre dans le projet : réunions de quartier, messages du candidat, invitations, remontée de leurs attentes. Le fichier est confidentiel, chaque personne y figure avec son accord écrit, et il est déclaré à l'ARTCI (loi n° 2013-450).</p></div>
 
-  <div class="card" style="margin-bottom:12px"><h3>7. Ce que disent les scrutins de la zone</h3>
-    ${tbl([['Scrutin'], ['Inscrits','n'], ['Participation','n'], ['1er'], ['2e'], ['3e']], D.lies.map(o => `<tr><td><b>${esc(ELEC.E[o.u[0]])}</b><div class="small muted">${esc(elNom(o.u))}</div></td><td class="n">${F(o.u[6])}</td><td class="n">${P1(elPart(o.u))}</td>${top(o).map(x => `<td class="small">${x}</td>`).join('')}</tr>`))}
-    ${D.camp && D.histo.length ? `<p class="small" style="margin-top:8px"><b>Voix du camp ${esc(D.camp[1])} dans la zone :</b> ${D.histo.map(h => `${esc(ELEC.E[h.o.u[0]])} : ${h.voix ? F(h.voix) : '—'}`).join(' · ')}. Objectif : ${F(O.objectif)} voix.</p>` : ''}
-    ${lvProfil(D.L)}</div>
-
-  <div class="card" style="margin-bottom:12px"><h3>8. Le plan</h3>
+  <div class="card" style="margin-bottom:12px"><h3>2.4 Le plan</h3>
     ${tbl([['Étape'], ['Ce qu\'on fait'], ['Résultat attendu']], [
       ['1. Les responsables', `Recruter et former les ${F(D.cel)} responsables (${F(D.fem)} femmes, ${F(D.hom)} hommes), en commençant par les ${D.coeur.length} lieux cœur ; constituer l'équipe technique (${F(D.ctrl)} contrôleurs) ; déclarer le fichier à l'ARTCI`, `${F(D.cel)} responsables formés`],
       ['2. Les cellules', `Chaque responsable constitue sa cellule de ${STRAT.membres} membres et leur transmet le message du candidat`, `${F(D.cel * STRAT.membres)} membres, base de ${F(D.base)} personnes`],
@@ -1341,7 +1345,12 @@ function stratCorps(i){
       ['4. La recherche et la fidélisation', `Chaque membre trouve ${F(D.aTrouver)} électeur(s), vérifie leur inscription pendant la révision de la liste électorale et les enregistre`, `${F(D.base * D.aTrouver)} électeurs fidélisés`],
       ['5. Le jour du vote', 'Chaque membre fait voter ses électeurs ; des représentants surveillent les bureaux et récupèrent les procès-verbaux', `${F(O.objectif)} voix`]].map(x => `<tr><td><b>${x[0]}</b></td><td class="small">${x[1]}</td><td class="small">${x[2]}</td></tr>`))}</div>
 
-  <div class="card" style="margin-bottom:12px"><h3>9. Tableau de bord hebdomadaire</h3>
+  <h2 class="partie" style="margin:18px 0 8px;font-size:17px;color:#1b2a4a;border-bottom:3px solid #c9a227;padding-bottom:3px">Partie 3 — Suivi et évaluation</h2>
+
+  <div class="card" style="margin-bottom:12px"><h3>3.1 Le contrôle par l'équipe technique</h3>
+    <p class="small">Avec 1 contrôleur pour ${STRAT.ctrlCel} cellules, il faut <b>${F(D.ctrl)} contrôleurs</b>. À ${STRAT.visitesSem} membres visités par contrôleur et par semaine, un tour complet des ${F(D.base)} membres prend <b>${F(D.tour)} semaine(s)</b>. À chaque visite, le contrôleur vérifie : le membre connaît le candidat et son projet ; il a reçu le message de son responsable ; il a commencé à trouver ses ${F(D.aTrouver)} électeur(s) ; il est inscrit sur la liste électorale et sait où il vote.</p></div>
+
+  <div class="card" style="margin-bottom:12px"><h3>3.2 Tableau de bord hebdomadaire</h3>
     ${tbl([['Indicateur'], ['Objectif'], ['Vert'], ['Orange'], ['Rouge']], [
       ['Responsables formés', F(D.cel), `${F(ceil(D.cel * 0.9))} ou plus`, `${F(ceil(D.cel * 0.7))} à ${F(ceil(D.cel * 0.9) - 1)}`, `moins de ${F(ceil(D.cel * 0.7))}`],
       ['Cellules complètes (25 membres)', F(D.cel), '90 % ou plus', '70 à 89 %', 'moins de 70 %'],
@@ -1349,7 +1358,7 @@ function stratCorps(i){
       ['Électeurs trouvés et enregistrés', F(D.base * D.aTrouver), 'dans les temps', '10 à 25 % de retard', 'plus de 25 % de retard'],
       ['Lieux de vote couverts', F(D.n), `${F(ceil(D.n * 0.9))} ou plus`, `${F(ceil(D.n * 0.7))} à ${F(ceil(D.n * 0.9) - 1)}`, `moins de ${F(ceil(D.n * 0.7))}`]].map(x => `<tr>${x.map((v, k) => `<td${k ? ' class="small"' : ''}>${k ? v : '<b>' + v + '</b>'}</td>`).join('')}</tr>`))}</div>
 
-  <div class="card"><h3>10. Règles et points de vigilance</h3>
+  <div class="card"><h3>3.3 Règles et points de vigilance</h3>
     <ul class="small">
       <li>Si la participation monte de 5 points, l'objectif passe à ${F(D.scen[2][2])} voix : chaque membre devra trouver ${F(ceil(D.scen[2][3]))} électeur(s).</li>
       <li>On compte les électeurs qui votent, pas ceux qui promettent : le fichier de fidélisation sert à les faire voter le jour J.</li>
@@ -1373,8 +1382,9 @@ VIEWS.strategie = a => {
     <details><summary id="stratsum" style="cursor:pointer;font-weight:700;margin:6px 0">${stratResume(i)}</summary>
       <div class="f" style="margin-top:8px">
         <div><label>Participation attendue (%)</label><input inputmode="decimal" value="${esc(d.part)}" oninput="diagEtat(${i}).part=num(this.value)||1;majStrat(${i})"></div>
-        ${cs.length ? `<div><label>Camp du candidat (pour l'historique)</label><select onchange="diagEtat(${i}).camp=+this.value;majStrat(${i})">${cs.map((c, k) => `<option value="${k}" ${d.camp === k ? 'selected' : ''}>${esc(c[1])} — ${esc(c[2])}</option>`).join('')}<option value="-1" ${d.camp === -1 ? 'selected' : ''}>Nouveau candidat</option></select></div>` : ''}
-        ${champ('parMille', 'Cellules pour 1 000 électeurs')}${champ('membres', 'Membres par cellule (en plus du responsable)')}${champ('ctrlCel', 'Cellules suivies par contrôleur')}${champ('visitesSem', 'Visites par contrôleur et par semaine')}</div></details></div>
+        ${cs.length ? `<div><label>Camp du candidat (pour l'historique)</label><select onchange="diagEtat(${i}).camp=+this.value;diagEtat(${i}).campChoisi=1;majStrat(${i})">${cs.map((c, k) => `<option value="${k}" ${d.camp === k ? 'selected' : ''}>${esc(c[1])} — ${esc(c[2])}</option>`).join('')}<option value="-1" ${d.camp === -1 ? 'selected' : ''}>Nouveau candidat</option></select></div>` : ''}
+        ${champ('parMille', 'Cellules pour 1 000 électeurs')}${champ('membres', 'Membres par cellule (en plus du responsable)')}${champ('ctrlCel', 'Cellules suivies par contrôleur')}${champ('visitesSem', 'Visites par contrôleur et par semaine')}
+        ${cs.length ? `<div class="full"><label>Origine politique des candidats (lecture des acteurs dans le document ; laisser vide si identique à l'étiquette)</label>${cs.slice(0, 8).map((c, k) => `<div style="display:flex;gap:6px;align-items:center;margin:4px 0;flex-wrap:wrap"><span class="small" style="flex:1 1 160px">${esc(c[1])} — ${esc(c[2])}</span><input style="flex:1 1 140px" value="${esc((d.orig || {})[k] || '')}" placeholder="ex. PDCI-RDA" oninput="(diagEtat(${i}).orig=diagEtat(${i}).orig||{})[${k}]=this.value"></div>`).join('')}</div>` : ''}</div></details></div>
   <div id="stratcorps">${stratCorps(i)}</div>`;
 };
 function stratTexte(i){
@@ -1395,7 +1405,7 @@ function copierStrat(i){
 }
 function imprimerStrat(i){
   if (!LV){ toast('Répertoire des lieux de vote en cours de chargement…'); chargeLV(); return; }
-  const t = elT(i), titre = `Stratégie de réseau ${t[3] ? t[3] + ' ' : ''}${t[4]}`.slice(0, 90), html = stratDocHTML(i, false);
+  const t = elT(i), titre = `Stratégie électorale ${t[3] ? t[3] + ' ' : ''}${titreCas(t[4])} — ${cibleDe(t).Scrutin}`.slice(0, 120), html = stratDocHTML(i, false);
   if (window.AndroidBridge && AndroidBridge.printHtml){ AndroidBridge.printHtml(html, titre); return; }
   const w = window.open('', '_blank'); if (!w){ toast('Autorisez les fenêtres pour imprimer'); return; }
   w.document.write(html); w.document.close(); setTimeout(() => { w.focus(); w.print(); }, 400);
@@ -1455,6 +1465,7 @@ function xlsxBytes(sheets){
       const ref = col(ci) + (ri + 1), hd = sh.entete !== false && ri === 0, f = (sh.formats || {})[ci];
       if (hd) return `<c r="${ref}" t="inlineStr" s="1"><is><t>${x(v)}</t></is></c>`;
       if (typeof v === 'number' && isFinite(v)) return `<c r="${ref}" s="${f === 'pct' ? 3 : Number.isInteger(v) ? 2 : 4}"><v>${v}</v></c>`;
+      if (typeof v === 'string' && v.charAt(0) === '=') return `<c r="${ref}" s="${f === 'pct' ? 3 : 2}"><f>${x(v.slice(1))}</f></c>`;
       if (v === '' || v === null || v === undefined) return '';
       return `<c r="${ref}" t="inlineStr" s="${(sh.gras || []).includes(ri) ? 1 : 0}"><is><t xml:space="preserve">${x(v)}</t></is></c>`;
     }).join('') + '</row>').join('');
@@ -1465,7 +1476,7 @@ function xlsxBytes(sheets){
   files.unshift(
     ['[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${feuilles.map((_, k) => `<Override PartName="/xl/worksheets/sheet${k + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`],
     ['_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
-    ['xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${feuilles.map((n, k) => `<sheet name="${x(n)}" sheetId="${k + 1}" r:id="rId${k + 1}"/>`).join('')}</sheets></workbook>`],
+    ['xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${feuilles.map((n, k) => `<sheet name="${x(n)}" sheetId="${k + 1}" r:id="rId${k + 1}"/>`).join('')}</sheets><calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>`],
     ['xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${feuilles.map((_, k) => `<Relationship Id="rId${k + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${k + 1}.xml"/>`).join('')}<Relationship Id="rId${feuilles.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
     ['xl/styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="0.0%"/></numFmts><fonts count="3"><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="10"/><name val="Arial"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1B2A4A"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="3" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`]);
   return zipStore(files);
@@ -1474,9 +1485,9 @@ const nomFichierStrat = i => { const t = elT(i); return `Strategie_reseau_${(t[3
 function stratClasseur(i){
   const D = stratData(i), { t, O, d } = D, pc = v => Math.round(v * 10) / 1000, code = l => `${l.x[0]}-${l.x[5]}`;
   const synth = [['Élément', 'Valeur', 'Commentaire'],
-    ['Zone', elNom(t), ELEC.E[t[0]] + ' · ' + t[2]], ['Méthode', 'Cellules par lieu de vote (IGC)', `${STRAT.parMille} cellules pour 1 000 électeurs, toujours à parité femmes / hommes (au moins 1 de chaque par lieu) ; cellule = 1 responsable + ${STRAT.membres} membres`],
+    ['Zone', elNom(t), ELEC.E[t[0]] + ' · ' + t[2]], ['Scrutin visé', cibleDe(t).Scrutin, 'données de référence : ' + ELEC.E[t[0]] + ' et liste électorale 2025'], ['Méthode', 'Cellules par lieu de vote (IGC)', `${STRAT.parMille} cellules pour 1 000 électeurs, toujours à parité femmes / hommes (au moins 1 de chaque par lieu) ; cellule = 1 responsable + ${STRAT.membres} membres`],
     ['Participation attendue', P1(d.part), 'hypothèse'], ['Votants attendus', O.votants, ''], ['Suffrages exprimés attendus', O.exprimes, ''],
-    ['Objectif de voix (50 % + 1)', O.objectif, ''], ['Lieux de vote', D.n, 'répertoire CEI 2025'], ['Électeurs 2025', D.tot, ''],
+    ['Objectif de voix (50 % + 1)', O.objectif, 'estimation fondée sur les élections antérieures (participation retenue appliquée à la liste 2025)'], ['Lieux de vote', D.n, 'répertoire CEI 2025'], ['Électeurs 2025', D.tot, ''],
     ['Cellules', D.cel, `${D.fem} de femmes, ${D.hom} d'hommes`], ['Responsables à former', D.cel, ''], ['Membres', D.cel * STRAT.membres, ''],
     ['Base électorale', D.base, `${D.cel} × ${D.taille}`], ['Électeurs à trouver par membre', D.aTrouver, `${D.parMembre.toFixed(2).replace('.', ',')} arrondi au-dessus`],
     ['Électeurs à fidéliser', D.base * D.aTrouver, ''], ['Contrôleurs de l\'équipe technique', D.ctrl, `1 pour ${STRAT.ctrlCel} cellules`], ['Tour complet des visites (semaines)', D.tour, `${STRAT.visitesSem} visites par contrôleur et par semaine`],
@@ -1485,8 +1496,23 @@ function stratClasseur(i){
     .concat(D.lieux.map(l => [l.x[5], l.x[6], LV.S[l.x[4]], LV.S[l.x[3]], l.x[8], ['', '1 - Cœur', '2 - Appui', '3 - Veille'][l.prio], l.cel, l.fem, l.hom, l.base, l.obj, l.base * D.aTrouver]));
   const cellules = [['Code cellule', 'Lieu de vote', 'Code lieu', 'Type', 'Responsable (nom)', 'Téléphone', 'Date de formation', 'Membres inscrits (sur ' + STRAT.membres + ')', 'Dernière visite technique', 'Contrôleur', 'Statut']];
   D.lieux.forEach(l => { for (let k = 1; k <= l.fem; k++) cellules.push([`${code(l)}-F${k}`, l.x[6], l.x[5], 'Femmes', '', '', '', '', '', '', 'À constituer']); for (let k = 1; k <= l.hom; k++) cellules.push([`${code(l)}-H${k}`, l.x[6], l.x[5], 'Hommes', '', '', '', '', '', '', 'À constituer']); });
-  const membres = [['Code cellule', 'N°', 'Nom et prénoms', 'Téléphone', 'Lieu de vote', 'Inscrit sur la liste (oui/non)', 'Accord écrit (date)', 'Électeurs trouvés', 'Dernière visite']].concat([['', '', 'Fichier confidentiel : accord écrit de chaque membre et déclaration à l\'ARTCI avant toute saisie.', '', '', '', '', '', '']]);
-  const fideles = [['Code cellule', 'Membre (nom)', 'Électeur trouvé (nom)', 'Téléphone', 'Lieu de vote', 'Inscrit sur la liste (oui/non)', 'Accord écrit (date)', 'Contacts / activités', 'A voté (oui/non)']].concat([['', '', 'Fichier de fidélisation confidentiel : uniquement des personnes qui ont donné leur accord écrit ; déclaré à l\'ARTCI.', '', '', '', '', '', '']]);
+  const membres = [['Code cellule', 'N°', 'Nom et prénoms', 'Sexe (F/H)', 'Tranche d\'âge (18-34 / 35-60 / 60+)', 'Métier', 'Téléphone', 'Lieu de vote', 'Inscrit sur la liste (oui/non)', 'Accord écrit (date)', 'Électeurs trouvés', 'Dernière visite']].concat([['', '', 'Fichier confidentiel : accord écrit de chaque membre et déclaration à l\'ARTCI avant toute saisie.', '', '', '', '', '', '', '', '', '']]);
+  const fideles = [['Code cellule', 'Membre (nom)', 'Électeur trouvé (nom)', 'Sexe (F/H)', 'Tranche d\'âge (18-34 / 35-60 / 60+)', 'Métier', 'Téléphone', 'Lieu de vote', 'Inscrit sur la liste (oui/non)', 'Accord écrit (date)', 'Contacts / activités', 'A voté (oui/non)']].concat([['', '', 'Fichier de fidélisation confidentiel : uniquement des personnes qui ont donné leur accord écrit ; déclaré à l\'ARTCI.', '', '', '', '', '', '', '', '', '']]);
+  const A = analyseData(i), P = A.P, PT = P[6] || 0, fidT = D.base * D.aTrouver;
+  const evoF = [['Scrutin', 'Inscrits', 'Votants', 'Participation', 'Non-votants', 'Exprimés', 'Périmètre']].concat(A.evo.map(g => [g.lab, g.ins, g.vot, pc(g.part), g.non, g.base, g.partiel ? 'autre périmètre (pour information)' : 'zone étudiée'])).concat([['Liste électorale 2025', D.tot, '', '', '', '', 'zone étudiée']]);
+  const partis = [['Liste ou parti'].concat(A.evo.map(g => g.lab + ' (voix)'))].concat(A.cles.map(k => { const nm = (A.evo.find(g => g.p[k]) || { p: { [k]: { nom: k } } }).p[k].nom; return [nm].concat(A.evo.map(g => g.p[k] ? g.p[k].voix : '')); })).concat([['Suffrages exprimés'].concat(A.evo.map(g => g.base))]);
+  const terrF = [['Département ou commune', 'Sous-préfecture', 'Lieux de vote', 'Bureaux', 'Électeurs 2025', 'Part de la zone']]; A.terr.forEach(a => a.sps.forEach(s2 => terrF.push([a.nom, s2.nom, s2.lv, s2.bv, s2.el, D.tot ? s2.el / D.tot : 0])));
+  const profF = [['Territoire (publication CEI)', 'Femmes 18-34', 'Femmes 35-60', 'Femmes 60+', 'Hommes 18-34', 'Hommes 35-60', 'Hommes 60+', 'Total']].concat(A.prof.map(a => [a.nom].concat(a.v))).concat([['Total'].concat(P)]);
+  const scenF = [['Hypothèse', 'Participation', 'Votants', 'Non-votants', 'Exprimés', 'Objectif (50 % + 1)', 'Électeurs à trouver par membre']].concat(A.scen.map(s2 => [s2.l, s2.p / 100, s2.vot, s2.non, s2.ex, s2.obj, s2.mb]));
+  const cib = (n) => PT ? n / PT : 0;
+  const suivi = [['Indicateur', 'Cible', 'Réalisé (calcul automatique)', 'Écart']];
+  const ligneS = (lab, cible, f) => { const r = suivi.length + 1; suivi.push([lab, cible, f, `=C${r}-B${r}`]); };
+  ligneS('Membres femmes', D.fem * D.taille, '=COUNTIF(Membres!D:D,"F")'); ligneS('Membres hommes', D.hom * D.taille, '=COUNTIF(Membres!D:D,"H")');
+  [['18-34', P[0] + P[3]], ['35-60', P[1] + P[4]], ['60+', P[2] + P[5]]].forEach(([k, n]) => ligneS('Membres ' + k + ' ans', Math.round(D.base * cib(n)), `=COUNTIF(Membres!E:E,"${k}")`));
+  ligneS('Électeurs trouvés femmes', Math.round(fidT * cib(P[0] + P[1] + P[2])), "=COUNTIF('Électeurs fidélisés'!D:D,\"F\")"); ligneS('Électeurs trouvés hommes', Math.round(fidT * cib(P[3] + P[4] + P[5])), "=COUNTIF('Électeurs fidélisés'!D:D,\"H\")");
+  [['18-34', P[0] + P[3]], ['35-60', P[1] + P[4]], ['60+', P[2] + P[5]]].forEach(([k, n]) => ligneS('Électeurs trouvés ' + k + ' ans', Math.round(fidT * cib(n)), `=COUNTIF('Électeurs fidélisés'!E:E,"${k}")`));
+  ligneS('Électeurs fidélisés ayant voté', fidT, "=COUNTIF('Électeurs fidélisés'!L:L,\"oui\")");
+  suivi.push(['', '', '', ''], ['Métiers : saisir le métier dans les onglets Membres et Électeurs fidélisés ; compter un métier avec =COUNTIF(Membres!F:F;"Commerçant")', '', '', '']);
   const visites = [['Date', 'Contrôleur', 'Code cellule', 'Membres visités', 'Message reçu (oui/non)', 'Travail en cours (oui/non)', 'Électeurs trouvés à ce jour', 'Observations']];
   const sc = [['Participation', 'Votants', 'Objectif (50 % + 1)', 'Électeurs à trouver par membre']].concat(D.scen.map(s => [pc(s[0]), s[1], s[2], ceil(s[3])]));
   const scr = [['Scrutin', 'Territoire', 'Inscrits', 'Votants', 'Participation', '1er', 'Voix', '%', '2e', 'Voix', '%', '3e', 'Voix', '%']];
@@ -1503,10 +1529,16 @@ function stratClasseur(i){
     { nom: 'Synthèse', cols: [34, 34, 60], lignes: synth },
     { nom: 'Lieux et cellules', cols: [9, 40, 16, 16, 12, 11, 9, 10, 10, 11, 11, 12], lignes: lieux },
     { nom: 'Cellules', cols: [16, 36, 9, 9, 24, 14, 14, 14, 16, 16, 12], lignes: cellules },
-    { nom: 'Membres', cols: [16, 6, 30, 14, 30, 14, 16, 14, 14], lignes: membres },
-    { nom: 'Électeurs fidélisés', cols: [16, 24, 30, 14, 30, 14, 16, 30, 12], lignes: fideles },
+    { nom: 'Membres', cols: [16, 6, 30, 10, 16, 20, 14, 30, 14, 16, 14, 14], lignes: membres },
+    { nom: 'Électeurs fidélisés', cols: [16, 24, 30, 10, 16, 20, 14, 30, 14, 16, 30, 12], lignes: fideles },
+    { nom: 'Suivi par profil', cols: [40, 14, 24, 12], lignes: suivi },
     { nom: 'Visites techniques', cols: [12, 20, 16, 14, 14, 14, 16, 40], lignes: visites },
     { nom: 'Objectif', cols: [14, 12, 18, 22], lignes: sc, formats: { 0: 'pct' } },
+    { nom: 'Évolution', cols: [26, 12, 12, 12, 12, 12, 30], lignes: evoF, formats: { 3: 'pct' } },
+    { nom: 'Résultats par parti', cols: [30].concat(A.evo.map(() => 18)), lignes: partis },
+    { nom: 'Répartition territoriale', cols: [26, 26, 12, 10, 14, 14], lignes: terrF, formats: { 5: 'pct' } },
+    { nom: 'Profil des électeurs', cols: [30, 12, 12, 12, 12, 12, 12, 12], lignes: profF },
+    { nom: 'Scénarios', cols: [40, 12, 12, 12, 12, 16, 18], lignes: scenF, formats: { 1: 'pct' } },
     { nom: 'Scrutins de la zone', cols: [22, 30, 11, 10, 12, 30, 9, 8, 30, 9, 8, 30, 9, 8], lignes: scr, formats: { 4: 'pct', 7: 'pct', 10: 'pct', 13: 'pct' } },
     { nom: 'Plan', cols: [24, 70, 30], lignes: plan },
     { nom: 'Tableau de bord', cols: [32, 12, 16, 18, 20], lignes: tb },
@@ -1518,11 +1550,11 @@ function exportStratExcel(i){
   toast('Fichier Excel prêt');
 }
 function stratDocHTML(i, word){
-  const t = elT(i), titre = `Stratégie de réseau ${t[3] ? t[3] + ' ' : ''}${t[4]}`.slice(0, 90);
+  const t = elT(i), C = cibleDe(t), titre = `Stratégie électorale ${t[3] ? t[3] + ' ' : ''}${titreCas(t[4])} — ${C.Scrutin}`.slice(0, 120);
   const css = `body{font:11pt/1.45 Arial,sans-serif;color:#16202e;margin:18px}h1{font-size:17pt;color:#14213a;margin:0 0 2px}h2{font-size:14pt;color:#14213a}h3{font-size:12.5pt;color:#14213a;margin:16px 0 6px;border-bottom:2px solid #c9a227;padding-bottom:2px}table{width:100%;border-collapse:collapse;margin:4px 0}th,td{border:1px solid #dde1ea;padding:4px 5px;text-align:left;vertical-align:top;font-size:10pt}th{background:#e9edf5;color:#14213a;font-weight:bold}th.n,td.n{text-align:right;white-space:nowrap;width:13%}th:first-child,td:first-child{width:24%}.small{font-size:9.5pt}.muted{color:#667085}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.kpi{border:1px solid #dde1ea;border-radius:6px;padding:6px;margin:3px 0}.kpi .l{font-size:9pt;color:#667085}.kpi .v{font-size:14pt;font-weight:700}.kpi .s{font-size:9pt;color:#667085}.alert{border:1px solid #e7c873;background:#fff8e1;padding:6px}.card{break-inside:avoid-page}.empty{color:#667085}.ft{margin-top:14px;border-top:1px solid #ccc;padding-top:6px;font-size:8.5pt;color:#667085}@page{size:A4;margin:14mm}`;
   STRAT_DOC = true; let contenu; try { contenu = stratCorps(i); } finally { STRAT_DOC = false; }
   contenu = contenu.replace(/<table class="resp">/g, '<table class="resp" width="100%" cellspacing="0" cellpadding="4">').replace(/<th class="n">/g, '<th class="n" width="14%" nowrap>').replace(/<td class="n">/g, '<td class="n" nowrap>').replace(/<td class="n b">/g, '<td class="n b" nowrap>');
-  const corps = `<h1>Impact Global Consulting</h1><div class="small muted">${esc(titre)} · ${esc(ELEC.E[t[0]])} · ${esc(t[2])} · document confidentiel</div>${contenu}<div class="ft">Calcul automatique IGC Gestion · ${esc(ELEC.src)} · édité le ${dfr(today())}</div>`;
+  const corps = `<h1>Impact Global Consulting</h1><div class="small muted">${esc(titre)} · données de référence : ${esc(ELEC.E[t[0]])} (CEI) et liste électorale 2025 · ${esc(t[2])} · document confidentiel</div>${contenu}<div class="ft">Calcul automatique IGC Gestion · ${esc(ELEC.src)} · édité le ${dfr(today())}</div>`;
   if (word) return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(titre)}</title><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]--><style>${css}</style></head><body>${corps}</body></html>`;
   return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>${esc(titre)}</title><style>${css}</style></head><body>${corps}</body></html>`;
 }
@@ -1535,91 +1567,224 @@ function exportStratWord(i){
 /* ---------- V1.12 — Document de stratégie du candidat (Word .docx et PDF), généré automatiquement ---------- */
 const titreCas = s => String(s || '').toLowerCase().replace(/(^|[\s\-'’(])([a-zàâäéèêëîïôöùûüç])/g, (m, a, b) => a + b.toUpperCase()).replace(/(\S)( |-)(De|Du|Des|La|Le|Les|Et|En|Sur|Au|Aux)(?=[ -])/g, (m, a, sp, w) => a + sp + w.toLowerCase()).replace(/(\S)( |-)(De|Du|Des|La|Le|Les|Et|En|Sur|Au|Aux)(?=[ -])/g, (m, a, sp, w) => a + sp + w.toLowerCase()).replace(/(\S )(D|L)'/g, (m, a, w) => a + w.toLowerCase() + "'").replace(/ Autonome /g, ' autonome ');
 const Rn = s => String(s).split(/(\*\*[^*]+\*\*)/).filter(Boolean).map(x => x.startsWith('**') ? [x.slice(2, -2), 1] : [x, 0]);
-function candModele(i){
-  const t = elT(i), D = stratData(i), d = D.d, cs = elC(i), E = ELEC.E[t[0]];
-  const muni = t[0] === 2, reg = t[0] === 3, presid = t[0] >= 4, zone = titreCas(String(t[4]).replace(/\s*\(.*?\)/g, '')), annee = STRAT.annee || (muni || reg ? 2028 : 2030);
-  const enjeu = muni ? 'la mairie' : reg ? 'le conseil régional' : presid ? 'la présidentielle dans ce territoire' : 'le siège de député';
-  const poste = muni ? `la mairie de ${zone}` : `le siège de député de la circonscription ${t[3]} (${zone})`;
+/* ---------- V1.14 — Analyse électorale complète (modèle validé par Moaye le 10/11/2026 : 1. Analyse électorale, 2. Stratégie électorale, 3. Suivi et évaluation) ---------- */
+const anneeDe = e => +(String(ELEC.E[e]).match(/\d{4}/) || [0])[0];
+function cibleDe(t){
+  const muni = t[0] === 2, reg = t[0] === 3, presid = t[0] >= 4, annee = STRAT.annee || (muni || reg ? 2028 : 2030);
   const scrutin = muni ? `municipales ${annee}` : reg ? `régionales ${annee}` : presid ? `présidentielle ${annee}` : `législatives ${annee}`;
+  return { muni, reg, presid, annee, scrutin, Scrutin: (presid ? 'Élection ' : 'Élections ') + scrutin };
+}
+function analyseData(i){
+  const D = stratData(i), t = D.t, d = D.d, nuls = t[7] ? t[8] / t[7] : 0;
+  const units = D.lies.slice();
+  if (t[0] === 3 || (t[0] >= 4 && !t[1])) ELEC.T.forEach((u, j) => { if (u[0] < 2 && u[2] === t[2] && !units.some(o => o.j === j)) units.push({ j, u, cs: elC(j) }); });
+  const G = {};
+  units.forEach(o => {
+    const e = o.u[0], g = G[e] || (G[e] = { e, lab: ELEC.E[e], an: anneeDe(e), ins: 0, vot: 0, nul: 0, expr: 0, n: 0, p: {} });
+    g.ins += o.u[6] || 0; g.vot += o.u[7] || 0; g.nul += o.u[8] || 0; g.expr += o.u[9] || 0; g.n++;
+    o.cs.forEach(c => { const k = partiCle(c[1]) || 'AUTRE', q = g.p[k] || (g.p[k] = { k, nom: k === 'INDEPENDANT' ? 'Indépendants' : String(c[1]).split('/')[0].trim(), voix: 0 }); q.voix += c[3]; });
+  });
+  const evo = Object.values(G).sort((a, b) => a.an - b.an || b.e - a.e);
+  evo.forEach(g => {
+    g.part = g.ins ? g.vot / g.ins * 100 : 0; g.non = Math.max(0, g.ins - g.vot); g.partiel = D.tot ? Math.abs(g.ins / D.tot - 1) > 0.2 : false; g.ref = g.e === t[0];
+    g.lst = Object.values(g.p).sort((a, b) => b.voix - a.voix); g.base = g.expr || g.lst.reduce((s, q) => s + q.voix, 0);
+  });
+  const cles = []; evo.forEach(g => g.lst.slice(0, 3).forEach(q => { if (!cles.includes(q.k)) cles.push(q.k); }));
+  const cles6 = cles.slice(0, 6);
+  /* répartition territoriale */
+  const ab = x => LV.S[x[2]] === 'ABIDJAN', T = {};
+  D.L.forEach(x => { const dn = ab(x) ? LV.S[x[4]] : LV.S[x[2]], sp = LV.S[x[3]], a = T[dn] || (T[dn] = { nom: dn, lv: 0, bv: 0, el: 0, sp: {} }); a.lv++; a.bv += x[7]; a.el += x[8]; const s = a.sp[sp] || (a.sp[sp] = { nom: sp, lv: 0, bv: 0, el: 0 }); s.lv++; s.bv += x[7]; s.el += x[8]; });
+  const terr = Object.values(T).sort((a, b) => b.el - a.el); terr.forEach(a => { a.sps = Object.values(a.sp).sort((p, q) => q.el - p.el); });
+  const classes = [[0, 1000, 'Moins de 1 000 électeurs'], [1000, 3000, '1 000 à 2 999 électeurs'], [3000, 5000, '3 000 à 4 999 électeurs'], [5000, 1e9, '5 000 électeurs et plus']].map(([a, b, l]) => { const s = D.L.filter(x => x[8] >= a && x[8] < b); return { l, n: s.length, el: s.reduce((u, x) => u + x[8], 0), bv: s.reduce((u, x) => u + x[7], 0) }; }).filter(c => c.n);
+  /* profil femmes / hommes et âge (CEI, liste définitive 2025) */
+  const prof = [], vus = {}, P = [0, 0, 0, 0, 0, 0, 0];
+  D.L.forEach(x => { const k = ab(x) ? LV.S[x[4]] : LV.S[x[2]]; if (vus[k]) return; vus[k] = 1; const a = LV.Ai[elNorm(k)]; if (a){ prof.push({ nom: a[1], v: a[2] }); a[2].forEach((n, j) => P[j] += n); } });
+  /* scénarios de participation */
+  const pts = [[40, 'Repère bas'], [45, 'Repère'], [50, 'Repère médian'], [55, 'Repère haut'], [60, 'Test de sensibilité']];
+  evo.forEach(g => { if (!g.partiel && g.part) pts.push([g.part, `Taux réel — ${g.lab}`]); });
+  pts.push([num(d.part), 'Hypothèse retenue']);
+  pts.sort((a, b) => a[0] - b[0]);
+  const fus = []; pts.forEach(p => { const f = fus.find(q => Math.abs(q[0] - p[0]) < 0.005); if (f) f[1] += ' · ' + p[1]; else fus.push(p.slice()); });
+  const scen = fus.map(([p, l]) => { const v = D.tot * p / 100, ex = v * (1 - nuls), obj = Math.floor(ex / 2) + 1; return { p, l, vot: Math.round(v), non: D.tot - Math.round(v), ex: Math.round(ex), obj, mb: D.base ? ceil(obj / D.base) : 0, ret: Math.abs(p - num(d.part)) < 0.005 }; });
+  /* acteurs */
+  const orig = d.orig || {};
+  const acteurs = D.cs.map((c, k) => ({ c, k, saisi: String(orig[k] || '').trim(), orig: String(orig[k] || '').trim() || (partiCle(c[1]) === 'INDEPENDANT' ? '' : String(c[1]).split('/')[0].trim()) }));
+  const saisie = acteurs.some(a => a.saisi);
+  const parOrig = {}; acteurs.forEach(a => { const k = a.orig || 'Origine non précisée'; parOrig[k] = (parOrig[k] || 0) + a.c[3]; });
+  return { D, t, d, nuls, evo, cles: cles6, terr, classes, prof, P, scen, acteurs, saisie, parOrig };
+}
+const sgn = v => (v > 0 ? '+' : v < 0 ? '−' : '') + F(Math.abs(v));
+const sgnP = v => (v > 0 ? '+' : v < 0 ? '−' : '') + P1(Math.abs(v)).replace(' %', '');
+function candModele(i){
+  const A = analyseData(i), { D, t, d, evo, nuls } = A, cs = elC(i), E = ELEC.E[t[0]];
+  const C = cibleDe(t), { muni, reg, presid, annee, scrutin } = C;
+  const zone = titreCas(String(t[4]).replace(/\s*\(.*?\)/g, ''));
+  const enjeu = muni ? 'la mairie' : reg ? 'le conseil régional' : presid ? 'la présidentielle dans ce territoire' : 'le siège de député';
   const cand = (STRAT.candidat || '').trim() || '[Nom du candidat]';
   const abst = t[6] - t[7], plus = Math.floor(abst / 1000) * 1000;
-  const top = cs.slice(0, 4), autres = cs.slice(4), sAut = autres.reduce((s, c) => s + c[3], 0), pAut = autres.reduce((s, c) => s + c[4], 0);
-  const resultats = top.map((c, k) => [`${c[1]} — ${titreCas(c[2])}${c[5] ? ' (élu)' : ''}`, F(c[3]), P1(c[4])]);
-  if (autres.length) resultats.push([`${autres.length === 1 ? 'Une autre liste' : autres.length + ' autres listes'}`, F(sAut), P1(pAut)]);
-  resultats.push([`Votants : ${F(t[7])} sur ${F(t[6])} inscrits`, '', `participation ${P1(elPart(t))}`]);
   const v = elVainq(i), elu = v.w;
+  const pct = (a, b) => P1(a / (b || 1) * 100);
+  const taille = D.taille, fid = D.base * D.aTrouver;
   /* enseignements calculés */
-  const ens = [[`**Plus de ${F(plus)} inscrits n'ont pas voté.** `, `C'est la plus grande réserve de voix de la zone. Il ne s'agit pas de convaincre tout le monde, mais de faire voter une partie de ceux qui restent chez eux.`]];
+  const ens = [[`**Plus de ${F(plus)} inscrits n'ont pas voté en ${E}.** `, `C'est la plus grande réserve de voix de la zone. Il ne s'agit pas de convaincre tout le monde, mais de faire voter une partie de ceux qui restent chez eux.`]];
   const pres = D.lies.find(o => o.u[0] === 4);
-  if (pres){ cs.slice(0, 2).forEach(c => { const k = partiCle(c[1]); if (k === 'INDEPENDANT') return; const pv = pres.cs.filter(x => partiCle(x[1]) === k).reduce((s, x) => s + x[3], 0); if (pv > c[3] * 1.5) ens.push([`**Les électorats bougent selon l'enjeu.** `, `Le ${c[1]} a obtenu ${F(pv)} voix ici à la présidentielle de 2025, contre ${F(c[3])} à ce scrutin. Des milliers d'électeurs ne votent qu'aux grands scrutins nationaux : un candidat qui sait les mobiliser localement change le rapport de force.`]); }); }
+  if (pres && pres.j !== i){ cs.slice(0, 2).forEach(c => { const k = partiCle(c[1]); if (k === 'INDEPENDANT') return; const pv = pres.cs.filter(x => partiCle(x[1]) === k).reduce((s, x) => s + x[3], 0); if (pv > c[3] * 1.5) ens.push([`**Les électorats bougent selon l'enjeu.** `, `Le ${c[1]} a obtenu ${F(pv)} voix ici à la présidentielle de 2025, contre ${F(c[3])} à ce scrutin. Des milliers d'électeurs ne votent qu'aux grands scrutins nationaux : un candidat qui sait les mobiliser localement change le rapport de force.`]); }); }
   const l21 = D.lies.find(o => o.u[0] === 1), l25 = D.lies.find(o => o.u[0] === 0);
   if (elu && l21 && l25){ const k = partiCle(elu[1]); const a = l21.cs.filter(x => partiCle(x[1]) === k).reduce((s, x) => s + x[3], 0), b2 = l25.cs.filter(x => partiCle(x[1]) === k).reduce((s, x) => s + x[3], 0); if (a && b2 && b2 < a * 0.9) ens.push([`**Le camp sortant s'use.** `, `Aux législatives, le ${elu[1]} est passé de ${F(a)} voix en 2021 à ${F(b2)} en 2025. La place n'est acquise à personne.`]); }
-  /* profil */
-  const vus = {}, prof = [0, 0, 0, 0, 0, 0, 0]; let profNom = [];
-  D.L.forEach(x => { const dep = LV.S[x[2]], k = dep === 'ABIDJAN' ? LV.S[x[4]] : dep; if (vus[k]) return; vus[k] = 1; const a = LV.Ai[elNorm(k)]; if (a){ a[2].forEach((n, j) => prof[j] += n); profNom.push(titreCas(a[1])); } });
-  const fem = prof[0] + prof[1] + prof[2], hom = prof[3] + prof[4] + prof[5], T = prof[6] || 1;
   const parLieu = rx => D.L.filter(x => rx.test(x[6])).reduce((s, x) => s + x[8], 0);
   const etu = parLieu(/UNIVERSIT|\bENS\b|ENSEA|INSAAC|INP-?HB/), fds = parLieu(/\bCAMP\b|GENDARMERIE|POLICE|MILITAIRE|CASERNE/);
   const ex = D.lieux, gros = ex[0], second = ex[1], petit = ex[ex.length - 1];
   const celCoeur = D.coeur.reduce((s, l) => s + l.cel, 0), appui = ex.filter(l => l.prio === 2).length, veille = ex.filter(l => l.prio === 3).length;
   const cinq = ex.slice(0, 5).map(l => l.x[6]);
-  const pct = (a, b) => P1(a / (b || 1) * 100);
+  const P = A.P, PT = P[6] || 0, fem = P[0] + P[1] + P[2], hom = P[3] + P[4] + P[5];
+  const ages = [['18 à 34 ans', P[0], P[3]], ['35 à 60 ans', P[1], P[4]], ['Plus de 60 ans', P[2], P[5]]];
+  const comparables = evo.filter(g => !g.partiel);
   const M = [];
-  M.push({ t: 'cover', titre: `${zone.toUpperCase()} ${annee}`, sous: `Stratégie pour gagner ${enjeu}`, ligne: `${presid ? 'Élection' : 'Élections'} ${scrutin} — ${muni ? 'commune de ' + zone : reg ? 'région ' + zone : presid ? elNiv(t).toLowerCase() + ' : ' + zone : 'circonscription ' + t[3] + ', ' + zone}${reg || (presid && !t[1]) ? '' : ' (' + titreCas(t[2]) + ')'}`, infos: [['Remis à', cand], ['Préparé par', 'Impact Global Consulting'], ['Date', dfr(today())], ['Statut', 'document strictement confidentiel']], note: 'Toutes les données chiffrées proviennent des publications officielles de la Commission électorale indépendante (CEI) : résultats officiels, liste électorale définitive 2025 et répertoire des lieux de vote 2025.' });
-  M.push({ t: 'h1', x: '1. La stratégie en une page' });
-  M.push({ t: 'p', r: Rn(`${zone} compte ${F(D.tot)} électeurs inscrits sur la liste 2025, répartis dans ${D.n} lieux de vote. Au dernier scrutin de référence (${E}), seuls ${pct(t[7], t[6])} des inscrits ont voté${elu ? ` et ${elu[1]} l'a emporté avec ${F(elu[3])} voix` : ''}. La victoire ira au candidat qui aura construit le réseau le plus solide pour faire voter ses propres soutiens.`) });
-  M.push({ t: 'box', titre: 'Votre objectif', r: Rn(`**${F(D.O.objectif)} voix**, soit 50 % des suffrages exprimés plus une voix, avec une participation de ${P1(d.part)}.`) });
-  M.push({ t: 'p', r: Rn('**Notre méthode : un réseau de cellules organisé lieu de vote par lieu de vote.**') });
-  M.push({ t: 'ul', items: [Rn(`**${F(D.cel)} cellules** dans les ${D.n} lieux de vote, toujours à parité : ${F(D.fem)} cellules de femmes et ${F(D.hom)} cellules d'hommes.`), Rn(`**${F(D.cel)} responsables** à recruter et à former, un par cellule.`), Rn(`**${F(D.base)} personnes** dans les cellules (1 responsable + ${STRAT.membres} membres par cellule) : c'est votre base électorale.`), Rn(`**${F(D.aTrouver)} électeur(s)** à trouver, convaincre et fidéliser par chaque membre de cette base.`), Rn(`**Une équipe technique de ${F(D.ctrl)} contrôleurs** qui rend visite aux membres pour s'assurer que le travail est fait.`)] });
-  M.push({ t: 'p', r: Rn('**Les trois conditions de la victoire :**') });
-  M.push({ t: 'ol', items: [Rn('**Commencer maintenant.** Un réseau de cette taille demande de longs mois pour être construit, formé et fidélisé.'), Rn('**Contrôler sans relâche.** Une cellule qui n\'est pas visitée finit par s\'endormir. L\'équipe technique est le cœur du dispositif.'), Rn('**Faire voter, pas seulement adhérer.** On ne compte que les électeurs qui votent le jour J ; toute la fidélisation sert ce seul moment.')] });
-  M.push({ t: 'h1', x: `2. Ce que ${zone} nous apprend` });
-  M.push({ t: 'h2', x: 'Les résultats du dernier scrutin' });
-  M.push({ t: 'table', head: [`${E} — ${zone}`, 'Voix', 'Part des exprimés'], rows: resultats, w: [5226, 1600, 2200], right: [1, 2], bold: [resultats.length - 1] });
-  M.push({ t: 'p', r: Rn('Enseignements pour votre campagne :') });
-  M.push({ t: 'ul', items: ens.map(e => Rn(e[0] + e[1])) });
-  if (prof[6]){
-    M.push({ t: 'h2', x: 'Qui sont les électeurs' });
-    M.push({ t: 'table', head: [`Électeurs inscrits (liste 2025${profNom.length === 1 ? ', ' + profNom[0] : ''})`, 'Nombre', 'Part'], rows: [['Femmes', F(fem), pct(fem, T)], ['Hommes', F(hom), pct(hom, T)], ['18 à 34 ans', F(prof[0] + prof[3]), pct(prof[0] + prof[3], T)], ['35 à 60 ans', F(prof[1] + prof[4]), pct(prof[1] + prof[4], T)], ['Plus de 60 ans', F(prof[2] + prof[5]), pct(prof[2] + prof[5], T)], ['Total', F(T), '100 %']], w: [5226, 1900, 1900], right: [1, 2], bold: [5] });
-    M.push({ t: 'p', r: Rn(`Les femmes représentent ${pct(fem, T)} de l'électorat : c'est pourquoi chaque lieu de vote reçoit autant de cellules de femmes que de cellules d'hommes. Les 35 à 60 ans forment ${pct(prof[1] + prof[4], T)} des électeurs : ce sont eux qu'il faut d'abord convaincre et faire voter.${profNom.length > 1 || (D.L.length && LV.S[D.L[0][2]] !== 'ABIDJAN') ? ' (Statistiques publiées par la CEI à l\'échelle du département.)' : ''}`) });
+  /* couverture */
+  M.push({ t: 'cover', titre: `${zone.toUpperCase()} ${annee}`, sous: `Analyse électorale et stratégie pour gagner ${enjeu}`, ligne: `${C.Scrutin} — ${muni ? 'commune de ' + zone : reg ? 'région ' + zone : presid ? elNiv(t).toLowerCase() + ' : ' + zone : 'circonscription ' + t[3] + ', ' + zone}${reg || (presid && !t[1]) ? '' : ' (' + titreCas(t[2]) + ')'}`, infos: [['Remis à', cand], ['Préparé par', 'Impact Global Consulting'], ['Scrutin visé', C.Scrutin], ['Données de référence', `${E} (résultats officiels de la CEI) et liste électorale définitive 2025`], ['Date', dfr(today())], ['Statut', 'document strictement confidentiel']], note: 'Toutes les données chiffrées proviennent des publications officielles de la Commission électorale indépendante (CEI) : résultats officiels des scrutins, liste électorale définitive 2025 (statistiques par sexe et par âge) et répertoire des lieux et bureaux de vote 2025. Les objectifs de voix sont des estimations fondées sur les élections antérieures.' });
+  /* l'essentiel */
+  M.push({ t: 'h1', x: 'L\'essentiel' });
+  M.push({ t: 'p', r: Rn(`${zone} compte ${F(D.tot)} électeurs inscrits sur la liste 2025, répartis dans ${D.n} lieux de vote et ${F(D.bv)} bureaux. Au scrutin de référence (${E}), ${pct(t[7], t[6])} des inscrits ont voté${elu ? ` et ${elu[1]} l'a emporté avec ${F(elu[3])} voix` : ''}. La victoire aux ${scrutin} ira au candidat qui aura construit le réseau le plus solide pour faire voter ses propres soutiens.`) });
+  M.push({ t: 'box', titre: 'Votre objectif (estimation)', r: Rn(`**Environ ${F(D.O.objectif)} voix**, soit 50 % des suffrages exprimés plus une voix. C'est une estimation fondée sur les élections antérieures : participation retenue de ${P1(d.part)} sur les ${F(D.tot)} électeurs de la liste 2025, et ${P1(nuls * 100)} de bulletins nuls comme en ${E}. Elle sera recalculée avec la liste électorale applicable en ${annee}.`) });
+  M.push({ t: 'ul', items: [Rn(`**${F(D.cel)} cellules** à parité (${F(D.fem)} de femmes, ${F(D.hom)} d'hommes) dans les ${D.n} lieux de vote, soit **${F(D.cel)} responsables** à former.`), Rn(`**${F(D.base)} personnes** dans la base électorale ; **${F(D.aTrouver)} électeur(s)** à trouver et fidéliser par membre.`), Rn(`**${F(D.ctrl)} contrôleurs** dans l'équipe technique pour vérifier que le travail est fait.`)] });
+  M.push({ t: 'p', r: Rn('Le document comporte trois parties : **1. l\'analyse électorale** (ce que disent les chiffres), **2. la stratégie électorale** (comment gagner) et **3. le suivi et l\'évaluation** (comment vérifier que la stratégie avance).') });
+
+  /* ===== PARTIE 1 ===== */
+  M.push({ t: 'h1', x: 'Partie 1 — Analyse électorale' });
+  M.push({ t: 'h2', x: '1.1 Indicateurs clés' });
+  const ind = [['Électeurs inscrits (liste définitive 2025)', F(D.tot)], ['Lieux et bureaux de vote', `${F(D.n)} lieux · ${F(D.bv)} bureaux`]];
+  if (PT) ind.push(['Femmes · hommes (liste 2025)', `${pct(fem, PT)} · ${pct(hom, PT)}`]);
+  evo.forEach(g => ind.push([`Participation — ${g.lab}`, P1(g.part) + (g.partiel ? ' (autre périmètre)' : '')]));
+  M.push({ t: 'table', head: ['Indicateur', 'Valeur'], rows: ind, w: [5526, 3500], right: [1] });
+  M.push({ t: 'h2', x: '1.2 Périmètre et sources' });
+  M.push({ t: 'p', r: Rn(`Analyse à l'horizon des ${scrutin}, sur la base des ${F(D.tot)} électeurs de la liste électorale définitive 2025. Le millésime 2025 désigne le fichier électoral et non une élection : les chiffres seront actualisés avec la liste applicable au scrutin de ${annee}. Scrutins analysés : ${evo.map(g => g.lab).join(', ')}. Les résultats antérieurs à 2020 (municipales et régionales 2018, législatives 2016) ne sont pas encore intégrés.`) });
+  const part = evo.filter(g => g.partiel);
+  if (part.length) M.push({ t: 'p', r: Rn(`Attention : le territoire de ${part.length === 1 ? 'ce scrutin' : 'ces scrutins'} ne coïncide pas avec la zone étudiée (circonscriptions ou niveau de publication différents) : ${part.map(g => `${g.lab} (${F(g.ins)} inscrits)`).join(', ')}. ${part.length === 1 ? 'Ses chiffres sont donnés' : 'Leurs chiffres sont donnés'} pour information et ne servent pas aux scénarios.`) });
+  M.push({ t: 'h2', x: '1.3 Évolution du corps électoral et de la participation' });
+  M.push({ t: 'table', head: ['Scrutin', 'Inscrits', 'Votants', 'Participation', 'Non-votants'], rows: evo.map(g => [g.lab + (g.ref ? ' (référence)' : '') + (g.partiel ? ' *' : ''), F(g.ins), F(g.vot), P1(g.part), F(g.non)]).concat([['Liste électorale 2025', F(D.tot), '', '', '']]), w: [3226, 1450, 1450, 1450, 1450], right: [1, 2, 3, 4], bold: [evo.length] });
+  if (comparables.length >= 2){
+    const a = comparables[0], b = comparables[comparables.length - 1];
+    M.push({ t: 'p', r: Rn(`De ${a.lab} à ${b.lab}, les inscrits passent de ${F(a.ins)} à ${F(b.ins)} (${sgn(b.ins - a.ins)}, soit ${sgnP((b.ins / a.ins - 1) * 100)} %) et les votants de ${F(a.vot)} à ${F(b.vot)} (${sgn(b.vot - a.vot)}, soit ${sgnP((b.vot / (a.vot || 1) - 1) * 100)} %). Les non-votants ${b.non >= a.non ? 'augmentent' : 'diminuent'} de ${F(Math.abs(b.non - a.non))}. ${b.part < a.part ? 'La participation baisse : le vote progresse moins vite que les inscriptions.' : 'La participation progresse.'}`) });
   }
+  const refg = evo.find(g => g.ref);
+  if (refg) M.push({ t: 'p', r: Rn(`Du scrutin de référence (${E}) à la liste 2025, ${D.tot >= refg.ins ? 'le gain' : 'la baisse'} est de ${F(Math.abs(D.tot - refg.ins))} inscrits (${sgnP((D.tot / (refg.ins || 1) - 1) * 100)} %). Cette évolution ne renseigne pas, à elle seule, sur la participation future ni sur les préférences politiques.`) });
+  const barres = []; comparables.forEach(g => { barres.push([`${g.lab} — inscrits`, g.ins, '1B2A4A'], [`${g.lab} — votants`, g.vot, '44A6A0']); }); barres.push(['Liste 2025 — inscrits', D.tot, '1B2A4A']);
+  M.push({ t: 'bars', rows: barres });
+  M.push({ t: 'small', x: `Participation = votants ÷ inscrits ; non-votants = inscrits − votants.${part.length ? ' * Territoire différent de la zone étudiée.' : ''} Source : résultats officiels de la CEI et liste électorale définitive 2025.` });
+  M.push({ t: 'h2', x: '1.4 Résultats historiques' });
+  const nomCle = k => { for (const g of evo){ if (g.p[k]) return g.p[k].nom; } return k; };
+  M.push({ t: 'table', head: ['Liste ou parti'].concat(evo.map(g => g.lab)), rows: A.cles.map(k => [nomCle(k)].concat(evo.map(g => g.p[k] ? `${F(g.p[k].voix)} (${pct(g.p[k].voix, g.base)})` : '—'))).concat([['Suffrages exprimés'].concat(evo.map(g => F(g.base)))]), w: [2226].concat(evo.map(() => Math.floor(6800 / evo.length))), right: evo.map((_, k) => k + 1), bold: [A.cles.length] });
+  M.push({ t: 'ul', items: evo.filter(g => g.lst.length).map(g => Rn(`**${g.lab}** : ${g.lst[0].nom} arrive en tête avec ${F(g.lst[0].voix)} voix (${pct(g.lst[0].voix, g.base)})${g.lst[1] ? `, ${F(g.lst[0].voix - g.lst[1].voix)} voix de plus que ${g.lst[1].nom}` : ''}.`)) });
+  const autre = [...evo].reverse().find(g => !g.ref && !g.partiel && g.lst.length);
+  if (refg && autre){
+    const [g1, g2] = autre.an <= refg.an ? [autre, refg] : [refg, autre];
+    M.push({ t: 'p', r: Rn(`**Variation des voix de ${g1.lab} à ${g2.lab}** (scrutins ${autre.e === refg.e ? 'de même nature' : 'de nature différente : écart indicatif'}) :`) });
+    M.push({ t: 'table', head: ['Liste ou parti', g1.lab, g2.lab, 'Variation de voix', 'Variation (points)'], rows: A.cles.filter(k => g1.p[k] || g2.p[k]).map(k => { const a = g1.p[k] ? g1.p[k].voix : 0, b = g2.p[k] ? g2.p[k].voix : 0; return [nomCle(k), F(a), F(b), sgn(b - a), sgnP(b / (g2.base || 1) * 100 - a / (g1.base || 1) * 100)]; }), w: [2626, 1600, 1600, 1600, 1600], right: [1, 2, 3, 4] });
+  }
+  M.push({ t: 'p', r: Rn('Il est impossible de déduire un transfert individuel de voix entre ces listes : les candidatures, les alliances, les inscriptions et la participation changent d\'un scrutin à l\'autre. La catégorie « indépendants » ne désigne pas le même ensemble politique d\'un scrutin à l\'autre.') });
+  M.push({ t: 'h2', x: '1.5 Répartition territoriale' });
+  if (A.terr.length > 1){
+    M.push({ t: 'table', head: [D.L.length && LV.S[D.L[0][2]] === 'ABIDJAN' ? 'Commune' : 'Département', 'Lieux de vote', 'Bureaux', 'Électeurs 2025', 'Part'], rows: A.terr.map(a => [titreCas(a.nom), F(a.lv), F(a.bv), F(a.el), pct(a.el, D.tot)]).concat([['Total', F(D.n), F(D.bv), F(D.tot), '100 %']]), w: [3226, 1450, 1450, 1450, 1450], right: [1, 2, 3, 4], bold: [A.terr.length] });
+  }
+  A.terr.forEach(a => { if (a.sps.length > 1) M.push({ t: 'table', head: [`Sous-préfectures${A.terr.length > 1 ? ' — ' + titreCas(a.nom) : ''}`, 'Lieux de vote', 'Électeurs 2025', 'Part'], rows: a.sps.slice(0, 20).map(s => [titreCas(s.nom), F(s.lv), F(s.el), pct(s.el, a.el)]).concat([['Total', F(a.lv), F(a.el), '100 %']]), w: [4026, 1600, 1800, 1600], right: [1, 2, 3], bold: [Math.min(20, a.sps.length)] }); });
+  M.push({ t: 'table', head: ['Taille des lieux de vote', 'Lieux', 'Bureaux', 'Électeurs', 'Part'], rows: A.classes.map(c => [c.l, F(c.n), F(c.bv), F(c.el), pct(c.el, D.tot)]), w: [3226, 1450, 1450, 1450, 1450], right: [1, 2, 3, 4] });
+  M.push({ t: 'p', r: Rn(`Les ${D.coeur.length} plus grands lieux de vote réunissent la moitié des électeurs. Les sommes par territoire correspondent au total de la zone (répertoire CEI 2025).`) });
+  M.push({ t: 'h2', x: '1.6 Profil des électeurs : femmes, hommes et tranches d\'âge' });
+  if (PT){
+    M.push({ t: 'table', head: ['Tranche d\'âge', 'Femmes', 'Hommes', 'Total', 'Part'], rows: ages.map(a => [a[0], F(a[1]), F(a[2]), F(a[1] + a[2]), pct(a[1] + a[2], PT)]).concat([['Total', F(fem), F(hom), F(PT), '100 %'], ['Part', pct(fem, PT), pct(hom, PT), '100 %', '']]), w: [2826, 1550, 1550, 1550, 1550], right: [1, 2, 3, 4], bold: [3] });
+    if (A.prof.length > 1) M.push({ t: 'table', head: ['Département ou commune', 'Femmes', 'Hommes', '18–34 ans', '35–60 ans', 'Plus de 60 ans'], rows: A.prof.map(a => [titreCas(a.nom), F(a.v[0] + a.v[1] + a.v[2]), F(a.v[3] + a.v[4] + a.v[5]), F(a.v[0] + a.v[3]), F(a.v[1] + a.v[4]), F(a.v[2] + a.v[5])]), w: [2526, 1300, 1300, 1300, 1300, 1300], right: [1, 2, 3, 4, 5] });
+    const jeunes = P[0] + P[3], dom = ages.slice().sort((a, b) => (b[1] + b[2]) - (a[1] + a[2]))[0];
+    M.push({ t: 'p', r: Rn(`Les ${fem >= hom ? 'femmes' : 'hommes'} sont majoritaires (${pct(Math.max(fem, hom), PT)} des électeurs). Les ${dom[0].toLowerCase()} forment le groupe le plus nombreux (${pct(dom[1] + dom[2], PT)}) ; les jeunes de 18 à 34 ans représentent ${pct(jeunes, PT)} de l'électorat.${Math.abs(PT - D.tot) > D.tot * 0.02 ? ` Ces statistiques sont publiées par la CEI au niveau du département (ou de la commune à Abidjan) : elles portent sur ${F(PT)} électeurs, une zone plus large que la zone étudiée ; les parts restent indicatives.` : ''}`) });
+  } else M.push({ t: 'p', r: Rn('La CEI ne publie pas de statistiques par sexe et par âge pour ce territoire.') });
+  M.push({ t: 'p', r: Rn('**Métiers :** la CEI ne publie aucune statistique des électeurs par profession. La répartition par métier sera établie à partir des fiches des membres des cellules et des électeurs fidélisés, recueillies avec leur accord (voir partie 3).') });
+  M.push({ t: 'h2', x: '1.7 Lecture des acteurs' });
+  M.push({ t: 'table', head: ['Candidat ou liste', `Étiquette (${E})`, 'Origine politique', 'Voix', 'Part'], rows: A.acteurs.slice(0, 8).map(a => [titreCas(a.c[2]) + (a.c[5] ? ' (élu)' : ''), a.c[1], a.orig || 'à préciser', F(a.c[3]), P1(a.c[4])]), w: [2726, 1700, 1800, 1400, 1400], right: [3, 4] });
+  if (A.saisie){
+    const po = Object.entries(A.parOrig).sort((a, b) => b[1] - a[1]), totv = cs.reduce((s, c) => s + c[3], 0);
+    M.push({ t: 'p', r: Rn(`**Somme arithmétique des voix par origine politique (${E})** :`) });
+    M.push({ t: 'table', head: ['Origine politique', 'Voix', 'Part'], rows: po.map(([k, n]) => [k, F(n), pct(n, totv)]), w: [5026, 2000, 2000], right: [1, 2] });
+    if (po.length > 1) M.push({ t: 'p', r: Rn(`Écart arithmétique entre les deux premières origines : ${F(po[0][1] - po[1][1])} voix. Cette somme décrit une combinaison comptable de résultats distincts : elle ne représente ni le résultat d'une candidature commune, ni une estimation pour ${annee}, et les reports de voix ne sont pas mesurés.`) });
+  } else M.push({ t: 'p', r: Rn('L\'origine politique des candidatures indépendantes n\'est pas encore renseignée. Elle se saisit dans IGC Gestion (page Stratégie, Hypothèses) ; le document calcule alors la somme des voix par origine.') });
+  M.push({ t: 'p', r: Rn('Pour comparer les acteurs dans le temps, il faut distinguer l\'origine politique, l\'étiquette au moment du scrutin et l\'affiliation ultérieure, vérifiées par des références datées. Un changement d\'affiliation ne permet pas de réaffecter automatiquement les voix passées.') });
+  M.push({ t: 'h2', x: '1.8 Scénarios de participation' });
+  M.push({ t: 'p', r: Rn(`Ces simulations appliquent différents taux de participation aux ${F(D.tot)} électeurs de la liste 2025, à fichier constant. Elles mesurent la sensibilité de l'objectif à la participation : ce ne sont pas des prévisions. Un point de participation représente environ ${F(Math.round(D.tot / 100))} votants.`) });
+  M.push({ t: 'table', head: ['Hypothèse', 'Participation', 'Votants', 'Non-votants', 'Exprimés', 'Objectif 50 % + 1'], rows: A.scen.map(s => [s.l, P1(s.p), F(s.vot), F(s.non), F(s.ex), F(s.obj)]), w: [2526, 1300, 1300, 1300, 1300, 1300], right: [1, 2, 3, 4, 5], bold: A.scen.map((s, k) => s.ret ? k : -1).filter(k => k >= 0) });
+  M.push({ t: 'small', x: `Suffrages exprimés = votants × ${P1((1 - nuls) * 100)} (part des bulletins valides observée en ${E}). Objectif = moitié des exprimés + 1 voix. Taux historiques non arrondis.` });
+  if (A.terr.length > 1){
+    const p = num(d.part);
+    M.push({ t: 'p', r: Rn(`**Votants estimés par ${D.L.length && LV.S[D.L[0][2]] === 'ABIDJAN' ? 'commune' : 'département'} avec ${P1(p)} de participation :**`) });
+    M.push({ t: 'table', head: ['Territoire', 'Électeurs 2025', 'Part', 'Votants estimés', 'Voix à obtenir'], rows: A.terr.map(a => [titreCas(a.nom), F(a.el), pct(a.el, D.tot), F(Math.round(a.el * p / 100)), F(Math.round(D.O.objectif * a.el / D.tot))]).concat([['Total', F(D.tot), '100 %', F(D.O.votants), F(D.O.objectif)]]), w: [2826, 1550, 1550, 1550, 1550], right: [1, 2, 3, 4], bold: [A.terr.length] });
+    M.push({ t: 'small', x: 'Calcul à taux uniforme : les taux réels peuvent différer d\'un territoire à l\'autre. Les votants estimés incluent les bulletins nuls.' });
+  }
+  M.push({ t: 'h2', x: '1.9 Enseignements de l\'analyse' });
+  M.push({ t: 'ul', items: ens.map(e => Rn(e[0] + e[1])) });
   if (etu || fds) M.push({ t: 'p', r: Rn(`Publics particuliers, d'après le nom des lieux de vote : ${etu ? `les étudiants (environ ${F(etu)} électeurs inscrits dans des lieux universitaires), qui votent très peu` : ''}${etu && fds ? ' ; ' : ''}${fds ? `les électeurs inscrits dans des camps et écoles des forces de défense et de sécurité (environ ${F(fds)}), où les activités de campagne sont strictement encadrées` : ''}.`) });
-  M.push({ t: 'h1', x: '3. Votre objectif de voix' });
-  M.push({ t: 'p', r: Rn('Pour être élu sans dépendre des autres candidats, vous visez la majorité absolue : 50 % des suffrages exprimés plus une voix. Le nombre de voix dépend de la participation ; nous préparons le réseau pour le cas où elle monterait.') });
-  M.push({ t: 'table', head: ['Participation', 'Votants', 'Objectif de voix', 'Électeurs à trouver par membre'], rows: D.scen.map(s => [P1(s[0]) + (s[0] === num(d.part) ? ' (hypothèse centrale)' : ''), F(s[1]), F(s[2]), F(ceil(s[3]))]), w: [2826, 1800, 2000, 2400], right: [1, 2, 3], bold: [1] });
-  M.push({ t: 'p', r: Rn(`Si la participation monte de 5 points, l'objectif passe à ${F(D.scen[2][2])} voix et chaque membre devra trouver ${F(ceil(D.scen[2][3]))} électeur(s). L'équipe technique suit chaque mois le nombre d'électeurs réellement trouvés.`) });
-  M.push({ t: 'h1', x: '4. Le réseau de cellules' });
-  M.push({ t: 'h2', x: 'Le principe' });
+
+  /* ===== PARTIE 2 ===== */
+  M.push({ t: 'h1', x: 'Partie 2 — Stratégie électorale' });
+  M.push({ t: 'h2', x: '2.1 L\'objectif de voix retenu' });
+  M.push({ t: 'p', r: Rn(`Pour être élu sans dépendre des autres candidats, vous visez la majorité absolue : 50 % des suffrages exprimés plus une voix. **Avec ${P1(d.part)} de participation, l'estimation est de ${F(D.O.objectif)} voix.** Cette hypothèse est tirée des élections antérieures (partie 1.8) ; nous préparons le réseau pour le cas où la participation monterait.`) });
+  M.push({ t: 'table', head: ['Participation', 'Votants', 'Objectif de voix', 'Électeurs à trouver par membre'], rows: D.scen.map(s => [P1(s[0]) + (s[0] === num(d.part) ? ' (hypothèse retenue)' : ''), F(s[1]), F(s[2]), F(ceil(s[3]))]), w: [2826, 1800, 2000, 2400], right: [1, 2, 3], bold: [1] });
+  M.push({ t: 'h2', x: '2.2 La méthode des cellules' });
   M.push({ t: 'p', r: Rn('Le lieu de vote (l\'école ou le centre où l\'on vote) est la base de toute l\'organisation : les électeurs le connaissent, l\'équipe peut s\'y retrouver et les résultats s\'y comptent.') });
   M.push({ t: 'ol', items: [Rn(`**Dans chaque lieu de vote, ${STRAT.parMille} cellules pour 1 000 électeurs**, toujours à parité : autant de cellules de femmes que de cellules d'hommes. Même le plus petit lieu a au moins une cellule de femmes et une cellule d'hommes.`), Rn(`**Une cellule = 1 responsable + ${STRAT.membres} membres.** Le responsable est formé par la direction de campagne ; il transmet le message, anime sa cellule et rend compte chaque semaine.`), Rn(`**Les membres des cellules forment la base électorale.** Chacun trouve ${F(D.aTrouver)} électeur(s) dans son entourage (famille, voisins, collègues, communauté religieuse, association), les convainc et les fait voter.`), Rn('**L\'équipe technique contrôle.** Elle rend visite aux membres pour vérifier que le message est bien passé et que le travail avance.'), Rn('**Les électeurs trouvés sont fidélisés.** Ils sont enregistrés, invités, informés : ils doivent se sentir partie prenante du projet jusqu\'au jour du vote.')] });
-  M.push({ t: 'h2', x: `Le réseau à ${zone}` });
-  M.push({ t: 'table', head: ['Élément', 'Nombre'], rows: [['Lieux de vote', F(D.n)], ['Cellules', `${F(D.cel)} (${F(D.fem)} de femmes, ${F(D.hom)} d'hommes)`], ['Responsables à former', F(D.cel)], ['Membres', F(D.cel * STRAT.membres)], ['Base électorale (responsables + membres)', F(D.base)], ['Électeurs à trouver par membre', F(D.aTrouver)], ['Électeurs à fidéliser', F(D.base * D.aTrouver)], ['Contrôleurs de l\'équipe technique', `${F(D.ctrl)} (1 pour ${STRAT.ctrlCel} cellules)`]], w: [5026, 4000] });
+  M.push({ t: 'h2', x: `2.3 Le réseau à ${zone}` });
+  M.push({ t: 'table', head: ['Élément', 'Nombre'], rows: [['Lieux de vote', F(D.n)], ['Cellules', `${F(D.cel)} (${F(D.fem)} de femmes, ${F(D.hom)} d'hommes)`], ['Responsables à former', F(D.cel)], ['Membres', F(D.cel * STRAT.membres)], ['Base électorale (responsables + membres)', F(D.base)], ['Électeurs à trouver par membre', F(D.aTrouver)], ['Électeurs à fidéliser', F(fid)], ['Contrôleurs de l\'équipe technique', `${F(D.ctrl)} (1 pour ${STRAT.ctrlCel} cellules)`]], w: [5026, 4000] });
   if (gros) M.push({ t: 'p', r: Rn(`Exemples : le plus grand lieu de vote, ${gros.x[6]} (${F(gros.x[8])} électeurs), reçoit ${gros.fem} cellule(s) de femmes et ${gros.hom} d'hommes${second ? ` ; ${second.x[6]} (${F(second.x[8])} électeurs) en reçoit ${second.fem} et ${second.hom}` : ''}${petit && petit !== gros ? ` ; le plus petit, ${petit.x[6]} (${F(petit.x[8])} électeurs), en reçoit une de chaque` : ''}.`) });
-  M.push({ t: 'h2', x: 'Où commencer' });
-  M.push({ t: 'p', r: Rn(`${D.coeur.length} lieux de vote réunissent à eux seuls la moitié des électeurs : ils reçoivent leurs cellules en premier (${F(celCoeur)} cellules). Viennent ensuite ${appui} lieux (jusqu'à 80 % des électeurs) puis les ${veille} derniers. Les plus grands sont : ${cinq.join(', ')}. La répartition complète, lieu par lieu, est tenue dans l'outil de suivi d'IGC.`) });
-  M.push({ t: 'h1', x: '5. Le contrôle et la fidélisation' });
-  M.push({ t: 'h2', x: 'L\'équipe technique' });
+  M.push({ t: 'h2', x: '2.4 Où commencer' });
+  M.push({ t: 'p', r: Rn(`${D.coeur.length} lieux de vote réunissent à eux seuls la moitié des électeurs : ils reçoivent leurs cellules en premier (${F(celCoeur)} cellules). Viennent ensuite ${appui} lieux (jusqu'à 80 % des électeurs) puis les ${veille} derniers. Les plus grands sont : ${cinq.join(', ')}. La répartition complète, lieu par lieu, figure dans le fichier Excel de terrain d'IGC Gestion.`) });
+  if (PT){
+    M.push({ t: 'h2', x: '2.5 Cibles par sexe et par âge' });
+    const ligne = (lab, n, memb) => [lab, pct(n, PT), F(memb), F(Math.round(fid * n / PT))];
+    M.push({ t: 'table', head: ['Public', 'Part de l\'électorat', 'Membres des cellules', 'Électeurs à trouver'], rows: [ligne('Femmes', fem, D.fem * taille), ligne('Hommes', hom, D.hom * taille)].concat(ages.map(a => ligne(a[0], a[1] + a[2], Math.round(D.base * (a[1] + a[2]) / PT)))), w: [2826, 2000, 2000, 2200], right: [1, 2, 3] });
+    M.push({ t: 'p', r: Rn(`Les cellules sont à parité ; les électeurs à trouver suivent la composition de l'électorat. Pour refléter les âges, une cellule de ${STRAT.membres} membres compte environ ${ages.map(a => `${Math.round(STRAT.membres * (a[1] + a[2]) / PT)} ${a[0].toLowerCase().replace('plus de 60 ans', 'de plus de 60 ans').replace(/^(\d)/, 'de $1')}`).join(', ')}.`) });
+  }
+  M.push({ t: 'h2', x: `2.${PT ? 6 : 5} La fidélisation des électeurs` });
+  M.push({ t: 'ul', items: [Rn('chaque électeur trouvé est enregistré dans le fichier de la campagne, avec son accord, par le membre qui l\'a trouvé ;'), Rn('il reçoit régulièrement des nouvelles du candidat et des invitations ;'), Rn('il est invité aux rencontres de quartier et peut y exprimer ses attentes ;'), Rn('pendant la révision de la liste électorale, on vérifie qu\'il est bien inscrit ;'), Rn('la veille et le jour du vote, le membre qui l\'a trouvé le rappelle et s\'assure qu\'il vote.')] });
+  M.push({ t: 'p', r: Rn('Le fichier des membres et des électeurs fidélisés est confidentiel. Chaque personne y figure avec son accord écrit, et le fichier est déclaré à l\'ARTCI, comme l\'exige la loi n° 2013-450 sur la protection des données personnelles.') });
+  const n2 = PT ? 7 : 6;
+  M.push({ t: 'h2', x: `2.${n2} L'organisation de campagne` });
+  M.push({ t: 'table', head: ['Fonction', 'Rôle'], rows: [['Le candidat', 'Porte le projet, rencontre les leaders de quartier, les communautés et les associations, anime les grands rendez-vous.'], ['Le directeur de campagne', 'Pilote l\'ensemble chaque semaine : réseau, contrôle, communication, finances. Rend compte au candidat.'], ['Le coordonnateur des cellules', `Recrute et forme les ${F(D.cel)} responsables, suit la constitution des cellules lieu par lieu.`], ['Le chef de l\'équipe technique', `Dirige les ${F(D.ctrl)} contrôleurs, consolide les rapports de visite, signale les cellules en retard.`], ['Les responsables femmes et jeunes', 'Veillent à la parité des cellules et aux actions vers les femmes, les étudiants et les jeunes.'], ['Le responsable du fichier', 'Tient le fichier des membres et des électeurs fidélisés, dans le respect des règles de l\'ARTCI.'], ['Communication', 'Messages du candidat, supports, réseaux sociaux, relations avec la presse.'], ['Finances et logistique', 'Budget, dépenses, déplacements, matériel, dans le respect des règles de financement.'], ['Jour du vote', 'Représentants dans les bureaux de vote, collecte des procès-verbaux, recours éventuels dans le cadre légal.']], w: [2700, 6326] });
+  M.push({ t: 'h2', x: `2.${n2 + 1} Le calendrier jusqu'au vote` });
+  M.push({ t: 'p', r: Rn(`La date du scrutin de ${annee} sera fixée par décret. Le calendrier part d'aujourd'hui et sera ajusté dès que la date sera connue.`) });
+  M.push({ t: 'table', head: ['Période', 'Ce que l\'on fait', 'Résultat attendu'], rows: [['Les 4 premiers mois', `Nommer le directeur de campagne et l'équipe de direction ; déclarer le fichier à l'ARTCI ; repérer les ${D.n} lieux de vote et leurs quartiers ; recruter les responsables des ${D.coeur.length} lieux prioritaires`, `Équipe de direction en place ; ${F(celCoeur)} responsables des lieux prioritaires recrutés`], ['Les 9 mois suivants', `Recruter et former tous les responsables ; constituer les ${F(D.cel)} cellules ; lancer l'équipe technique et les cycles de visites`, `${F(D.cel)} responsables formés ; ${F(D.base)} personnes dans la base`], ['Jusqu\'à un mois avant le vote', `Chaque membre trouve ses ${F(D.aTrouver)} électeur(s) ; enregistrement et fidélisation ; vérification des inscriptions pendant la révision de la liste électorale ; rencontres de quartier`, `${F(fid)} électeurs fidélisés et inscrits`], ['Campagne officielle et jour du vote', 'Rappels aux électeurs (une semaine avant, la veille, le matin) ; représentants dans tous les bureaux ; collecte des procès-verbaux', `${F(D.O.objectif)} voix ou plus`]], w: [2300, 4426, 2300] });
+  M.push({ t: 'h2', x: `2.${n2 + 2} Les risques et nos parades` });
+  M.push({ t: 'table', head: ['Risque', 'Parade'], rows: [['Des cellules qui existent sur le papier mais ne travaillent pas', 'Visites systématiques de l\'équipe technique ; remplacement rapide des responsables inactifs'], ['Des électeurs trouvés qui ne votent pas', 'Fidélisation continue ; vérification des inscriptions ; trois rappels avant le vote'], ['Une participation plus forte que prévu', `Prévoir une marge : viser ${F(ceil(D.scen[2][3]))} électeurs par membre dans les lieux prioritaires`], ['Un démarrage trop tardif', 'Équipe de direction en place dans les 4 premiers mois'], ['Une faute qui ferait annuler l\'élection ou ternirait l\'image', 'Aucune pression sur les électeurs, aucun achat de voix, aucune désinformation ; respect du code électoral, de la CEI et de la HACA']], w: [4000, 5026] });
+
+  /* ===== PARTIE 3 ===== */
+  M.push({ t: 'h1', x: 'Partie 3 — Suivi et évaluation' });
+  M.push({ t: 'h2', x: '3.1 Le contrôle par l\'équipe technique' });
   M.push({ t: 'p', r: Rn(`Le contrôle distingue un réseau réel d'un réseau sur le papier. Les ${F(D.ctrl)} contrôleurs suivent chacun ${STRAT.ctrlCel} cellules. À raison de ${STRAT.visitesSem} visites par contrôleur et par semaine, l'ensemble des membres est visité en ${F(D.tour)} semaine(s), puis le cycle recommence. À chaque visite, le contrôleur vérifie quatre points :`) });
   M.push({ t: 'ul', items: [Rn('le membre connaît le candidat et son projet ;'), Rn('il a reçu le dernier message de son responsable de cellule ;'), Rn(`il a commencé à trouver ses ${F(D.aTrouver)} électeur(s), et lesquels ;`), Rn('il est inscrit sur la liste électorale et sait où il vote.')] });
   M.push({ t: 'p', r: Rn('Le contrôleur remonte chaque semaine un court rapport à la direction de campagne. Une cellule qui ne progresse pas reçoit une visite du coordonnateur dans la semaine.') });
-  M.push({ t: 'h2', x: 'La fidélisation des électeurs' });
-  M.push({ t: 'ul', items: [Rn('chaque électeur trouvé est enregistré dans le fichier de la campagne, avec son accord, par le membre qui l\'a trouvé ;'), Rn('il reçoit régulièrement des nouvelles du candidat et des invitations ;'), Rn('il est invité aux rencontres de quartier et peut y exprimer ses attentes ;'), Rn('pendant la révision de la liste électorale, on vérifie qu\'il est bien inscrit ;'), Rn('la veille et le jour du vote, le membre qui l\'a trouvé le rappelle et s\'assure qu\'il vote.')] });
-  M.push({ t: 'p', r: Rn('Le fichier des membres et des électeurs fidélisés est confidentiel. Chaque personne y figure avec son accord écrit, et le fichier est déclaré à l\'ARTCI, comme l\'exige la loi n° 2013-450 sur la protection des données personnelles.') });
-  M.push({ t: 'h1', x: '6. L\'organisation de campagne' });
-  M.push({ t: 'table', head: ['Fonction', 'Rôle'], rows: [['Le candidat', 'Porte le projet, rencontre les leaders de quartier, les communautés et les associations, anime les grands rendez-vous.'], ['Le directeur de campagne', 'Pilote l\'ensemble chaque semaine : réseau, contrôle, communication, finances. Rend compte au candidat.'], ['Le coordonnateur des cellules', `Recrute et forme les ${F(D.cel)} responsables, suit la constitution des cellules lieu par lieu.`], ['Le chef de l\'équipe technique', `Dirige les ${F(D.ctrl)} contrôleurs, consolide les rapports de visite, signale les cellules en retard.`], ['Les responsables femmes et jeunes', 'Veillent à la parité des cellules et aux actions vers les femmes, les étudiants et les jeunes.'], ['Le responsable du fichier', 'Tient le fichier des membres et des électeurs fidélisés, dans le respect des règles de l\'ARTCI.'], ['Communication', 'Messages du candidat, supports, réseaux sociaux, relations avec la presse.'], ['Finances et logistique', 'Budget, dépenses, déplacements, matériel, dans le respect des règles de financement.'], ['Jour du vote', 'Représentants dans les bureaux de vote, collecte des procès-verbaux, recours éventuels dans le cadre légal.']], w: [2700, 6326] });
-  M.push({ t: 'h1', x: '7. Le calendrier jusqu\'au vote' });
-  M.push({ t: 'p', r: Rn(`La date du scrutin de ${annee} sera fixée par décret. Le calendrier part d'aujourd'hui et sera ajusté dès que la date sera connue.`) });
-  M.push({ t: 'table', head: ['Période', 'Ce que l\'on fait', 'Résultat attendu'], rows: [['Les 4 premiers mois', `Nommer le directeur de campagne et l'équipe de direction ; déclarer le fichier à l'ARTCI ; repérer les ${D.n} lieux de vote et leurs quartiers ; recruter les responsables des ${D.coeur.length} lieux prioritaires`, `Équipe de direction en place ; ${F(celCoeur)} responsables des lieux prioritaires recrutés`], ['Les 9 mois suivants', `Recruter et former tous les responsables ; constituer les ${F(D.cel)} cellules ; lancer l'équipe technique et les cycles de visites`, `${F(D.cel)} responsables formés ; ${F(D.base)} personnes dans la base`], ['Jusqu\'à un mois avant le vote', `Chaque membre trouve ses ${F(D.aTrouver)} électeur(s) ; enregistrement et fidélisation ; vérification des inscriptions pendant la révision de la liste électorale ; rencontres de quartier`, `${F(D.base * D.aTrouver)} électeurs fidélisés et inscrits`], ['Campagne officielle et jour du vote', 'Rappels aux électeurs (une semaine avant, la veille, le matin) ; représentants dans tous les bureaux ; collecte des procès-verbaux', `${F(D.O.objectif)} voix ou plus`]], w: [2300, 4426, 2300] });
-  M.push({ t: 'h2', x: 'Le suivi chaque semaine' });
-  M.push({ t: 'table', head: ['Indicateur', 'Objectif', 'Vert', 'Rouge'], rows: [['Responsables formés', F(D.cel), `${F(ceil(D.cel * 0.9))} ou plus`, `moins de ${F(ceil(D.cel * 0.7))}`], [`Cellules complètes (${STRAT.membres} membres)`, F(D.cel), '90 % ou plus', 'moins de 70 %'], ['Membres visités par l\'équipe technique', F(D.base), 'dans les temps', 'plus de 25 % de retard'], ['Électeurs trouvés et enregistrés', F(D.base * D.aTrouver), 'dans les temps', 'plus de 25 % de retard'], ['Lieux de vote couverts', F(D.n), `${F(ceil(D.n * 0.9))} ou plus`, `moins de ${F(ceil(D.n * 0.7))}`]], w: [3526, 1500, 2000, 2000] });
+  M.push({ t: 'h2', x: '3.2 Le tableau de bord hebdomadaire' });
+  M.push({ t: 'table', head: ['Indicateur', 'Objectif', 'Vert', 'Orange', 'Rouge'], rows: [['Responsables formés', F(D.cel), `${F(ceil(D.cel * 0.9))} ou plus`, `${F(ceil(D.cel * 0.7))} à ${F(ceil(D.cel * 0.9) - 1)}`, `moins de ${F(ceil(D.cel * 0.7))}`], [`Cellules complètes (${STRAT.membres} membres)`, F(D.cel), '90 % ou plus', '70 à 89 %', 'moins de 70 %'], ['Membres visités par l\'équipe technique', F(D.base), 'dans les temps', '10 à 25 % de retard', 'plus de 25 % de retard'], ['Électeurs trouvés et enregistrés', F(fid), 'dans les temps', '10 à 25 % de retard', 'plus de 25 % de retard'], ['Lieux de vote couverts', F(D.n), `${F(ceil(D.n * 0.9))} ou plus`, `${F(ceil(D.n * 0.7))} à ${F(ceil(D.n * 0.9) - 1)}`, `moins de ${F(ceil(D.n * 0.7))}`]], w: [2926, 1300, 1600, 1600, 1600] });
   M.push({ t: 'p', r: Rn('Deux indicateurs au rouge deux semaines de suite entraînent une réunion de correction avec le candidat.') });
-  M.push({ t: 'h1', x: '8. Les risques et nos parades' });
-  M.push({ t: 'table', head: ['Risque', 'Parade'], rows: [['Des cellules qui existent sur le papier mais ne travaillent pas', 'Visites systématiques de l\'équipe technique ; remplacement rapide des responsables inactifs'], ['Des électeurs trouvés qui ne votent pas', 'Fidélisation continue ; vérification des inscriptions ; trois rappels avant le vote'], ['Une participation plus forte que prévu', `Prévoir une marge : viser ${F(ceil(D.scen[2][3]))} électeurs par membre dans les lieux prioritaires`], ['Un démarrage trop tardif', 'Équipe de direction en place dans les 4 premiers mois'], ['Une faute qui ferait annuler l\'élection ou ternirait l\'image', 'Aucune pression sur les électeurs, aucun achat de voix, aucune désinformation ; respect du code électoral, de la CEI et de la HACA']], w: [4000, 5026] });
-  M.push({ t: 'h1', x: '9. Vos décisions pour les 30 prochains jours' });
+  M.push({ t: 'h2', x: '3.3 Le suivi par profil : sexe, âge et métier' });
+  const sp = [['Membres : femmes · hommes', `${F(D.fem * taille)} · ${F(D.hom * taille)} (parité)`, 'Fichier des membres, colonne « Sexe »']];
+  if (PT){ sp.push(['Membres par tranche d\'âge', ages.map(a => `${a[0].replace(' ans', '')} : ${F(Math.round(D.base * (a[1] + a[2]) / PT))}`).join(' · '), 'Fichier des membres, colonne « Tranche d\'âge »']); sp.push(['Électeurs trouvés : femmes · hommes', `${F(Math.round(fid * fem / PT))} · ${F(Math.round(fid * hom / PT))}`, 'Fichier de fidélisation, colonne « Sexe »']); sp.push(['Électeurs trouvés par tranche d\'âge', ages.map(a => `${a[0].replace(' ans', '')} : ${F(Math.round(fid * (a[1] + a[2]) / PT))}`).join(' · '), 'Fichier de fidélisation, colonne « Tranche d\'âge »']); }
+  sp.push(['Métiers des membres et des électeurs trouvés', 'répartition relevée ; viser la diversité des métiers du territoire (commerce, enseignement, transport, agriculture, administration, artisanat, étudiants…)', 'Colonnes « Métier » ; onglet « Suivi par profil » du fichier Excel']);
+  M.push({ t: 'table', head: ['Indicateur', 'Cible', 'Où le suivre'], rows: sp, w: [2826, 3600, 2600] });
+  M.push({ t: 'p', r: Rn('Un groupe (sexe, tranche d\'âge ou métier) qui s\'écarte de plus de 10 points de sa cible déclenche un recrutement ciblé. Le sexe, la tranche d\'âge et le métier ne sont recueillis qu\'avec l\'accord écrit de la personne.') });
+  M.push({ t: 'h2', x: '3.4 L\'évaluation à chaque étape' });
+  M.push({ t: 'table', head: ['Étape', 'Critère pour passer à l\'étape suivante'], rows: [['1. Direction et lieux prioritaires', `Directeur de campagne nommé ; fichier déclaré à l'ARTCI ; responsables des ${D.coeur.length} lieux prioritaires recrutés`], ['2. Constitution du réseau', `90 % des ${F(D.cel)} cellules complètes ; parité respectée dans chaque lieu de vote`], ['3. Contrôle', `Chaque membre visité au moins une fois ; moins de 10 % de cellules inactives`], ['4. Recherche et fidélisation', `90 % des ${F(fid)} électeurs à trouver enregistrés et inscrits sur la liste ; profils conformes aux cibles`], ['5. Jour du vote', 'Un représentant dans chaque bureau de vote ; procès-verbaux collectés partout']], w: [3026, 6000] });
+  M.push({ t: 'h2', x: '3.5 L\'évaluation après le scrutin' });
+  M.push({ t: 'table', head: ['Indicateur', 'Calcul'], rows: [['Résultat global', `voix obtenues ÷ objectif de ${F(D.O.objectif)} voix`], ['Réalisation par lieu de vote', 'voix obtenues (procès-verbaux) ÷ voix à obtenir dans le lieu'], ['Vote des électeurs fidélisés', 'électeurs fidélisés ayant voté ÷ électeurs fidélisés'], ['Participation réelle', `participation observée comparée à l'hypothèse de ${P1(d.part)}`], ['Efficacité des cellules', 'voix obtenues dans le lieu ÷ base électorale du lieu']], w: [3026, 6000] });
+  M.push({ t: 'p', r: Rn('Les procès-verbaux se saisissent bureau par bureau dans le fichier « Bureaux de vote » d\'IGC Gestion. Les écarts par lieu de vote orientent la préparation du scrutin suivant.') });
+  M.push({ t: 'h2', x: '3.6 La consolidation des données' });
+  M.push({ t: 'ul', items: [Rn(`à la publication de la liste électorale applicable en ${annee} : mettre à jour les inscrits, les codes des lieux et bureaux de vote et les limites des circonscriptions, puis recalculer les scénarios et l'objectif ;`), Rn('intégrer les résultats des scrutins antérieurs à 2020 pour allonger l\'historique ;'), Rn('vérifier les affiliations politiques par des références datées ;'), Rn('toute observation de terrain suit un protocole identique dans tous les territoires et porte sur des éléments vérifiables (sites, accessibilité) ;'), Rn('une analyse des perceptions demanderait une enquête représentative, avec méthode, période de collecte et marge d\'incertitude publiées.')] });
+
+  /* ===== CONCLUSION ===== */
+  const s40 = A.scen.find(s => Math.abs(s.p - 40) < 0.005), s60 = A.scen.find(s => Math.abs(s.p - 60) < 0.005);
+  M.push({ t: 'h1', x: 'Conclusion générale' });
+  M.push({ t: 'p', r: Rn(`${zone} compte ${F(D.tot)} électeurs dans la liste 2025. ${comparables.length ? `Aux scrutins analysés, la participation a varié de ${P1(Math.min(...comparables.map(g => g.part)))} à ${P1(Math.max(...comparables.map(g => g.part)))}. ` : ''}${s40 && s60 ? `À fichier constant, une participation comprise entre 40 et 60 % représenterait de ${F(s40.vot)} à ${F(s60.vot)} votants, soit un objectif de ${F(s40.obj)} à ${F(s60.obj)} voix. ` : ''}Ces volumes sont des simulations, pas des prévisions.`) });
+  M.push({ t: 'p', r: Rn(`La stratégie retenue fixe un objectif estimé de **${F(D.O.objectif)} voix** (participation de ${P1(d.part)}) et l'atteint par un réseau de **${F(D.cel)} cellules à parité** dans les ${D.n} lieux de vote : ${F(D.base)} personnes qui trouvent et fidélisent chacune ${F(D.aTrouver)} électeur(s), sous le contrôle de ${F(D.ctrl)} contrôleurs. Le suivi hebdomadaire et l'évaluation par étape permettent de corriger la trajectoire avant le scrutin.`) });
+  M.push({ t: 'h1', x: 'Annexe — Vos décisions pour les 30 prochains jours' });
   M.push({ t: 'ol', items: [Rn('**Votre positionnement politique.** Partez-vous sous l\'étiquette d\'un parti, en indépendant ou au sein d\'une alliance ? C\'est ce qui fixe votre électorat de départ.'), Rn(`**Votre directeur de campagne.** Une personne respectée à ${zone}, disponible jusqu'au scrutin, rigoureuse.`), Rn('**Le budget de la première phase** : équipe de direction, formation des premiers responsables, déplacements. IGC le chiffre avec vous dès que les deux premières décisions sont prises.')] });
-  M.push({ t: 'small', x: `Sources : CEI — ${D.lies.map(o => ELEC.E[o.u[0]]).join(', ')} ; liste électorale définitive 2025 ; répertoire des lieux et bureaux de vote 2025. ${t[0] === 0 ? 'Résultats 2025 provisoires. ' : ''}Calculs automatiques IGC Gestion, ${dfr(today())}.` });
-  return { M, nom: `Strategie_${titreCas(t[4]).replace(/[^A-Za-z0-9]+/g, '_').slice(0, 40)}_${annee}`, titre: `${zone} ${annee} — Stratégie pour gagner ${enjeu}` };
+  M.push({ t: 'small', x: `Sources : CEI — ${evo.map(g => g.lab).join(', ')} ; liste électorale définitive 2025 (statistiques par sexe et par âge) ; répertoire des lieux et bureaux de vote 2025. ${evo.some(g => g.e === 0) ? 'Résultats des législatives 2025 provisoires. ' : ''}Calculs automatiques IGC Gestion, ${dfr(today())}.` });
+  return { M, nom: `Strategie_${titreCas(t[4]).replace(/[^A-Za-z0-9]+/g, '_').slice(0, 40)}_${annee}`, titre: `${zone} ${annee} — Analyse et stratégie électorales` };
 }
+
 function candHTML(i){
   const { M, titre } = candModele(i), h = s => esc(s);
   const runs = r => r.map(([x, b]) => b ? `<b>${h(x)}</b>` : h(x)).join('');
@@ -1629,6 +1794,7 @@ function candHTML(i){
     if (b.t === 'p') return `<p>${runs(b.r)}</p>`; if (b.t === 'small') return `<p class="note">${h(b.x)}</p>`;
     if (b.t === 'box') return `<div class="box"><b class="bt">${h(b.titre)}</b><br>${runs(b.r)}</div>`;
     if (b.t === 'ul' || b.t === 'ol') return `<${b.t}>${b.items.map(it => `<li>${runs(it)}</li>`).join('')}</${b.t}>`;
+    if (b.t === 'bars'){ const mx = Math.max(1, ...b.rows.map(r => r[1])); return `<table class="bars">${b.rows.map(r => `<tr><td class="bl">${h(r[0])}</td><td class="bb"><div style="background:#${r[2] || '1B2A4A'};height:12px;width:${Math.max(1, r[1] / mx * 100).toFixed(1)}%"></div></td><td class="n">${F(r[1])}</td></tr>`).join('')}</table>`; }
     if (b.t === 'table') return `<table><tr>${b.head.map(x => `<th>${h(x)}</th>`).join('')}</tr>${b.rows.map((r, k) => `<tr${(b.bold || []).includes(k) ? ' class="g"' : ''}>${r.map((c, j) => `<td${(b.right || []).includes(j) ? ' class="n"' : ''}>${h(c)}</td>`).join('')}</tr>`).join('')}</table>`;
     return '';
   }).join('\n');
@@ -1639,6 +1805,7 @@ function candHTML(i){
   p{margin:0 0 8px}ul,ol{margin:0 0 8px;padding-left:22px}li{margin-bottom:4px}
   table{width:100%;border-collapse:collapse;margin:6px 0 12px;page-break-inside:avoid}th{background:#1b2a4a;color:#fff;text-align:left;font-size:9.5pt;padding:5px 7px}td{border:1px solid #d0d5dd;padding:5px 7px;font-size:9.5pt;vertical-align:top}td.n{text-align:right;white-space:nowrap}tr.g td{background:#f2f4f8;font-weight:700}
   .box{border:1px solid #c9a227;border-left:6px solid #c9a227;background:#fff8e1;padding:10px 14px;margin:8px 0 12px}.bt{color:#1b2a4a}.note{font-size:8.5pt;color:#666;font-style:italic;margin-top:14px}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}.bars td{border:none;padding:2px 6px;font-size:9pt}.bars td.bl{width:38%}.bars td.n{width:14%;font-weight:700}
   </style></head><body>${html}</body></html>`;
 }
 function candDocx(i){
@@ -1664,6 +1831,13 @@ function candDocx(i){
     else if (b.t === 'box'){
       const inner = para(run(b.titre, { b: 1, c: '1B2A4A' }), { after: 80 }) + para(R(b.r), { after: 40 });
       out.push(`<w:tbl><w:tblPr><w:tblW w:w="9026" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="9026"/></w:tblGrid><w:tr>${cell(9026, inner, 'FFF8E1', `<w:top w:val="single" w:sz="4" w:color="C9A227"/><w:left w:val="single" w:sz="36" w:color="C9A227"/><w:bottom w:val="single" w:sz="4" w:color="C9A227"/><w:right w:val="single" w:sz="4" w:color="C9A227"/>`)}</w:tr></w:tbl>`, para('', { after: 60 }));
+    }
+    else if (b.t === 'bars'){
+      const mx = Math.max(1, ...b.rows.map(r => r[1])), W = 4900;
+      const ligne = r => { const wf = Math.max(40, Math.round(W * r[1] / mx)), wr = W - wf;
+        const barre = `<w:tbl><w:tblPr><w:tblW w:w="${W}" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="${wf}"/>${wr > 0 ? `<w:gridCol w:w="${wr}"/>` : ''}</w:tblGrid><w:tr><w:trPr><w:trHeight w:val="220" w:hRule="exact"/></w:trPr><w:tc><w:tcPr><w:tcW w:w="${wf}" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="${r[2] || '1B2A4A'}"/></w:tcPr><w:p><w:pPr><w:spacing w:after="0" w:line="200" w:lineRule="exact"/></w:pPr></w:p></w:tc>${wr > 0 ? `<w:tc><w:tcPr><w:tcW w:w="${wr}" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:spacing w:after="0" w:line="200" w:lineRule="exact"/></w:pPr></w:p></w:tc>` : ''}</w:tr></w:tbl><w:p><w:pPr><w:spacing w:after="0" w:line="20" w:lineRule="exact"/></w:pPr></w:p>`;
+        return `<w:tr><w:trPr><w:cantSplit/></w:trPr>${cell(2706, para(run(r[0], { s: 17 }), { after: 0, line: 240 }))}${cell(W + 220, barre)}${cell(1200, para(run(F(r[1]), { s: 17, b: 1 }), { after: 0, line: 240, jc: 'right' }))}</w:tr>`; };
+      out.push(`<w:tbl><w:tblPr><w:tblW w:w="${2706 + W + 220 + 1200}" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="2706"/><w:gridCol w:w="${W + 220}"/><w:gridCol w:w="1200"/></w:tblGrid>${b.rows.map(ligne).join('')}</w:tbl>`, para('', { after: 80 }));
     }
     else if (b.t === 'table'){
       const w = b.w, tot = w.reduce((s, v) => s + v, 0);
@@ -1730,7 +1904,7 @@ function saveSociete(){
 
 /* ----- aide ----- */
 VIEWS.aide = () => `<div class="card"><h3>Mode d'emploi en 6 gestes</h3><ol>
-  <li><b>Base électorale → stratégie</b> : choisissez l'onglet du scrutin (législatives ou municipales), touchez la circonscription ou la commune, puis <b>📊 Stratégie de réseau</b>. Méthode IGC des cellules par lieu de vote : 2 cellules pour 1 000 électeurs, toujours à parité (autant de cellules de femmes que d'hommes, au moins 1 de chaque par lieu), cellule = 1 responsable + 25 membres, objectif = 50 % des exprimés + 1 voix, électeurs à trouver par membre = objectif ÷ base électorale. Indiquez la participation attendue : tout se calcule seul. Indiquez le nom du candidat et l'année du scrutin : 📝 Word et 📄 PDF produisent automatiquement le document de stratégie du candidat (choisir « Enregistrer en PDF » dans la fenêtre d'impression) ; 📊 Excel donne le classeur de terrain (cellules numérotées, membres, électeurs fidélisés, visites) ; 🖨 Fiche technique imprime l'écran.</li>
+  <li><b>Base électorale → stratégie</b> : choisissez l'onglet du scrutin (législatives ou municipales), touchez la circonscription ou la commune, puis <b>📊 Stratégie de réseau</b>. Méthode IGC des cellules par lieu de vote : 2 cellules pour 1 000 électeurs, toujours à parité (autant de cellules de femmes que d'hommes, au moins 1 de chaque par lieu), cellule = 1 responsable + 25 membres, objectif = 50 % des exprimés + 1 voix, électeurs à trouver par membre = objectif ÷ base électorale. Indiquez la participation attendue : tout se calcule seul. Indiquez le nom du candidat et l'année du scrutin : 📝 Word et 📄 PDF produisent automatiquement le document du candidat en trois parties (1. analyse électorale : évolution, résultats, territoires, femmes / hommes et âges, acteurs, scénarios de participation ; 2. stratégie électorale ; 3. suivi et évaluation) — l'origine politique des candidats se saisit dans « Hypothèses » (choisir « Enregistrer en PDF » dans la fenêtre d'impression) ; 📊 Excel donne le classeur de terrain (cellules numérotées, membres, électeurs fidélisés, visites) ; 🖨 Fiche technique imprime l'écran.</li>
   <li><b>ATLAS IA — Commandement</b> : « + Nouvelle mission » (ou un modèle), choisissez les agents, touchez « Copier l'ordre de mission » et collez-le dans Claude (Projet IGC). Collez ensuite le rapport, faites le contrôle qualité, puis validez ou renvoyez « À reprendre ». Les indicateurs (missions, reprises, coût, valeur) se calculent seuls.</li>
   <li><b>Paramètres</b> : remplissez une fois les informations du cabinet (RCCM, compte contribuable, banque). Changez les codes PIN.</li>
   <li><b>Trésorerie</b> : saisissez ce qu'il y a aujourd'hui en banque, en caisse et sur mobile.</li>
