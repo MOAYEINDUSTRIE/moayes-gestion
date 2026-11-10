@@ -154,7 +154,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  IGC Gestion  ===================== */
-const VERSION = 'V1.6';
+const VERSION = 'V1.7';
 const KEY = 'igc_gestion_v1';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -1006,7 +1006,7 @@ const P1 = x => (Math.round(num(x) * 10) / 10).toLocaleString('fr-FR') + ' %';
 const elPart = t => t[6] ? t[7] / t[6] * 100 : 0;
 const elNorm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
 const elNom = t => (t[3] ? t[3] + ' · ' : '') + t[4];
-const elNiv = t => t[0] < 2 ? 'Circonscription' : t[0] === 2 ? 'Commune' : t[0] === 3 ? 'Région' : t[1] ? 'Département' : 'Région';
+const elNiv = t => t[0] < 2 ? 'Circonscription' : t[0] === 2 ? 'Commune' : t[0] === 3 ? 'Région' : t[1] ? 'Département' : /^DISTRICT AUTONOME/.test(t[4]) ? 'District autonome' : /^DIASPORA/.test(t[4]) ? 'Diaspora' : 'Région';
 const elVainq = i => { const cs = elC(i), w = cs.find(c => c[5]) || cs[0], s = cs.find(c => c !== w); return { w, s, ecart: w && s ? w[4] - s[4] : null }; };
 const elAlertes = i => { const t = elT(i), E = ELEC.E[t[0]]; const a = ELEC.A.filter(x => x[0] === E && x[2] === t[4]).map(x => x[3]); if (t[11] && t[11] !== 'OK' && !a.length) a.push(t[11]); return a; };
 const EL_PRES = e => e >= 4;
@@ -1034,7 +1034,7 @@ VIEWS.elec = () => {
     <div class="card kpi gold"><div class="l">${EL_PRES(e) ? 'Niveau détaillé' : 'Victoires serrées'}</div><div class="v">${EL_PRES(e) ? tous.length - base.length : serres}</div><div class="s">${EL_PRES(e) ? 'départements, communes d\'Abidjan, pays' : 'écart de moins de 5 points'}</div></div></div>
   ${Object.keys(gains).length ? `<div class="card" style="margin-bottom:12px"><h3>Territoires gagnés par parti</h3><div class="chips">${Object.entries(gains).sort((a, b) => b[1] - a[1]).map(([p, n]) => `<span class="tag b">${esc(p)} <b>${n}</b></span>`).join(' ')}</div></div>` : ''}
   <div class="card">${tbl([[elNiv(tous[0] ? tous[0][0] : [e])], ['Inscrits','n'], ['Participation','n'], ['Vainqueur'], ['Écart','n']], L.slice(0, 400).map(([t, i]) => { const v = elVainq(i), al = elAlertes(i).length;
-      return `<tr class="click" onclick="go('circo',${i})"><td><b>${esc(elNom(t))}</b>${EL_PRES(e) ? ` <span class="tag">${t[1] ? 'Département' : 'Région'}</span>` : ''}${al ? ' <span class="tag w">à vérifier</span>' : ''}<div class="small muted">${esc(t[2])}</div></td><td class="n">${F(t[6])}</td><td class="n">${P1(elPart(t))}</td><td>${v.w ? `<b>${esc(v.w[1])}</b> ${P1(v.w[4])}` : '—'}</td><td class="n">${v.ecart === null ? '—' : (v.ecart < 5 ? '<span class="tag r">' + P1(v.ecart).replace(' %', ' pt') + '</span>' : P1(v.ecart).replace(' %', ' pt'))}</td></tr>`; }), 'Aucun territoire ne correspond à cette recherche.')}
+      return `<tr class="click" onclick="go('circo',${i})"><td><b>${esc(elNom(t))}</b>${EL_PRES(e) ? ` <span class="tag">${elNiv(t)}</span>` : ''}${al ? ' <span class="tag w">à vérifier</span>' : ''}<div class="small muted">${esc(t[2])}</div></td><td class="n">${F(t[6])}</td><td class="n">${P1(elPart(t))}</td><td>${v.w ? `<b>${esc(v.w[1])}</b> ${P1(v.w[4])}` : '—'}</td><td class="n">${v.ecart === null ? '—' : (v.ecart < 5 ? '<span class="tag r">' + P1(v.ecart).replace(' %', ' pt') + '</span>' : P1(v.ecart).replace(' %', ' pt'))}</td></tr>`; }), 'Aucun territoire ne correspond à cette recherche.')}
   ${L.length > 400 ? `<p class="small muted">400 premières lignes affichées sur ${L.length} : précisez la recherche.</p>` : ''}</div>
   <p class="small muted" style="margin-top:10px">${esc(ELEC.src)}. Données publiques agrégées : aucune donnée personnelle d'électeur.</p>`;
 };
@@ -1104,7 +1104,7 @@ VIEWS.circo = a => {
     <div class="card kpi"><div class="l">Suffrages exprimés</div><div class="v">${F(t[9])}</div><div class="s">${F(t[8])} nuls · ${F(t[10])} blancs</div></div>
     <div class="card kpi gold"><div class="l">Écart 1er – 2e</div><div class="v">${ecartVoix === null ? '—' : F(ecartVoix) + ' voix'}</div><div class="s">${v.ecart === null ? '' : P1(v.ecart).replace(' %', ' point(s)')}</div></div></div>
   <div class="card" style="margin-bottom:12px"><h3>Résultats</h3>${elBarres(i)}</div>
-  ${lies.length ? `<div class="card" style="margin-bottom:12px"><h3>${t[0] < 2 ? 'La même zone dans les autres scrutins' : 'Circonscriptions législatives liées'}</h3>${tbl([['Élection'], ['Territoire'], ['Participation','n'], ['Vainqueur'], ['Second']], lies.map(j => { const u = elT(j), w = elVainq(j); return `<tr class="click" onclick="go('circo',${j})"><td><b>${esc(ELEC.E[u[0]])}</b></td><td>${esc(elNom(u))}${EL_PRES(u[0]) ? ` <span class="tag">${u[1] ? 'Département' : 'Région'}</span>` : ''}</td><td class="n">${P1(elPart(u))}</td><td>${w.w ? esc(w.w[1]) + ' ' + P1(w.w[4]) : '—'}</td><td>${w.s ? esc(w.s[1]) + ' ' + P1(w.s[4]) : '—'}</td></tr>`; }))}<p class="small muted">Rapprochement par le nom des communes et de la région : un département ou une région couvre souvent plus large que la circonscription.</p></div>` : ''}
+  ${lies.length ? `<div class="card" style="margin-bottom:12px"><h3>${t[0] < 2 ? 'La même zone dans les autres scrutins' : 'Circonscriptions législatives liées'}</h3>${tbl([['Élection'], ['Territoire'], ['Participation','n'], ['Vainqueur'], ['Second']], lies.map(j => { const u = elT(j), w = elVainq(j); return `<tr class="click" onclick="go('circo',${j})"><td><b>${esc(ELEC.E[u[0]])}</b></td><td>${esc(elNom(u))}${EL_PRES(u[0]) ? ` <span class="tag">${elNiv(u)}</span>` : ''}</td><td class="n">${P1(elPart(u))}</td><td>${w.w ? esc(w.w[1]) + ' ' + P1(w.w[4]) : '—'}</td><td>${w.s ? esc(w.s[1]) + ' ' + P1(w.s[4]) : '—'}</td></tr>`; }))}<p class="small muted">Rapprochement par le nom des communes et de la région : un département ou une région couvre souvent plus large que la circonscription.</p></div>` : ''}
   <div class="card"><h3>Diagnostic de gagnabilité (méthode ATLAS)</h3><div id="diag">${diagHTML(i)}</div></div>
   ${lvCarte(i)}`;
 };
