@@ -179,7 +179,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  IGC Gestion  ===================== */
-const VERSION = 'V1.14';
+const VERSION = 'V1.15';
 const KEY = 'igc_gestion_v1';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -1260,7 +1260,9 @@ function missionFiche(i){
 }
 
 /* ---------- V1.9 — Stratégie de réseau automatique (par circonscription ou commune) ---------- */
-const STRAT = { parMille: 2, membres: 25, ctrlCel: 10, visitesSem: 50, candidat: '', annee: 0 };
+const STRAT = { parMille: 2, membres: 25, ctrlCel: 10, visitesSem: 50, candidat: '', annee: 0, hausse: 30 };
+/* participation estimée = participation du scrutin de référence augmentée au maximum de STRAT.hausse % (règle fixée par Moaye) */
+const partEstimee = i => Math.round(elPart(elT(i)) * (1 + STRAT.hausse / 100) * 10) / 10;
 let STRAT_DOC = false;
 let STRAT_I = null;
 const ceil = x => Math.ceil(x);
@@ -1305,23 +1307,26 @@ function stratCorps(i){
     <p style="margin:.2em 0 .6em"><b>${esc(cibleDe(t).Scrutin)} — pour gagner ${esc(elNom(t))}, il faut environ ${F(O.objectif)} voix</b> : 50 % des suffrages exprimés + 1 voix. <b>C'est une estimation fondée sur les élections antérieures</b> (référence : ${esc(E)}), avec ${P1(d.part)} de participation sur les ${F(D.tot)} électeurs de la liste 2025. Le réseau repose sur <b>${F(D.cel)} cellules</b> réparties dans les ${D.n} lieux de vote : elles forment une base électorale de <b>${F(D.base)} personnes</b>. Pour atteindre l'objectif, <b>chaque membre doit trouver ${F(D.aTrouver)} électeur(s)</b> et les fidéliser.</p>
     ${blocKpi}</div>
 
-  <h2 class="partie" style="margin:18px 0 8px;font-size:17px;color:#1b2a4a;border-bottom:3px solid #c9a227;padding-bottom:3px">Partie 1 — Analyse électorale</h2>
+  <h2 class="partie" style="margin:18px 0 8px;font-size:17px;color:#1b2a4a;border-bottom:3px solid #c9a227;padding-bottom:3px">I/ Analyse du fichier électoral</h2>
 
-  <div class="card" style="margin-bottom:12px"><h3>1.1 Ce que disent les scrutins de la zone</h3>
+  <div class="card" style="margin-bottom:12px"><h3>a/ Élections antérieures</h3>
     ${(() => { const A = analyseData(i); return tbl([['Scrutin'], ['Inscrits','n'], ['Votants','n'], ['Participation','n'], ['Non-votants','n']], A.evo.map(g => `<tr><td><b>${esc(g.lab)}</b>${g.ref ? ' <span class="tag">référence</span>' : ''}${g.partiel ? ' <span class="tag w">autre périmètre</span>' : ''}</td><td class="n">${F(g.ins)}</td><td class="n">${F(g.vot)}</td><td class="n">${P1(g.part)}</td><td class="n">${F(g.non)}</td></tr>`).concat([`<tr><td><b>Liste électorale 2025</b></td><td class="n">${F(D.tot)}</td><td></td><td></td><td></td></tr>`])); })()}
     <p class="small muted">Résultats par liste :</p>
     ${tbl([['Scrutin'], ['Inscrits','n'], ['Participation','n'], ['1er'], ['2e'], ['3e']], D.lies.map(o => `<tr><td><b>${esc(ELEC.E[o.u[0]])}</b><div class="small muted">${esc(elNom(o.u))}</div></td><td class="n">${F(o.u[6])}</td><td class="n">${P1(elPart(o.u))}</td>${top(o).map(x => `<td class="small">${x}</td>`).join('')}</tr>`))}
     ${D.camp && D.histo.length && d.campChoisi ? `<p class="small" style="margin-top:8px"><b>Voix du camp ${esc(D.camp[1])} dans la zone :</b> ${D.histo.map(h => `${esc(ELEC.E[h.o.u[0]])} : ${h.voix ? F(h.voix) : '—'}`).join(' · ')}. Objectif : ${F(O.objectif)} voix.</p>` : ''}
     ${lvProfil(D.L)}</div>
 
-  <div class="card" style="margin-bottom:12px"><h3>1.2 Objectif selon la participation (estimation)</h3>
+  <h2 class="partie" style="margin:18px 0 8px;font-size:17px;color:#1b2a4a;border-bottom:3px solid #c9a227;padding-bottom:3px">II/ Estimations : participation et voix à obtenir</h2>
+
+  <div class="card" style="margin-bottom:12px"><h3>Taux de participation estimé et électorat pour gagner (50 % + 1 voix)</h3>
+    <p class="small">Participation observée en ${esc(E)} : <b>${P1(elPart(t))}</b>. Augmentation maximale prévue : <b>${P1(STRAT.hausse).replace(' %', '')} %</b>. Participation estimée retenue : <b>${P1(d.part)}</b>.</p>
     <p class="small">Objectif = 50 % des suffrages exprimés + 1 voix, estimé à partir des élections antérieures : participation appliquée aux électeurs de la liste 2025, bulletins nuls au taux observé en ${esc(E)}. Les scénarios complets (40 à 60 % et taux réels des scrutins passés) figurent dans le document Word / PDF.</p>
     ${tbl([['Participation','n'], ['Votants','n'], ['Objectif (50 % + 1)','n'], ['À trouver par membre','n']], D.scen.map(s => `<tr${s[0] === num(d.part) ? ' style="font-weight:700"' : ''}><td class="n">${P1(s[0])}</td><td class="n">${F(s[1])}</td><td class="n">${F(s[2])}</td><td class="n">${F(ceil(s[3]))} (${s[3].toFixed(2).replace('.', ',')})</td></tr>`))}
     <p class="small muted">La participation se modifie dans « Hypothèses ». Par défaut : celle du scrutin de la fiche (${P1(elPart(t))}).</p></div>
 
-  <h2 class="partie" style="margin:18px 0 8px;font-size:17px;color:#1b2a4a;border-bottom:3px solid #c9a227;padding-bottom:3px">Partie 2 — Stratégie électorale</h2>
+  <h2 class="partie" style="margin:18px 0 8px;font-size:17px;color:#1b2a4a;border-bottom:3px solid #c9a227;padding-bottom:3px">III/ Stratégie électorale : système de réseautage</h2>
 
-  <div class="card" style="margin-bottom:12px"><h3>2.1 La méthode</h3>
+  <div class="card" style="margin-bottom:12px"><h3>a/ La méthode</h3>
     <ol class="small" style="padding-left:18px;margin:.3em 0">
       <li><b>On travaille lieu de vote par lieu de vote.</b></li>
       <li><b>Dans chaque lieu : ${STRAT.parMille} cellules pour 1 000 électeurs, toujours à parité</b> : autant de cellules de femmes que de cellules d'hommes. Quel que soit l'effectif, chaque lieu a au moins 1 cellule de femmes et 1 cellule d'hommes.</li>
@@ -1330,14 +1335,14 @@ function stratCorps(i){
       <li><b>Le taux de participation fixe l'objectif :</b> votants attendus, suffrages exprimés, puis 50 % + 1 voix.</li>
       <li><b>Les membres des cellules forment la base électorale.</b> Objectif ÷ base = nombre d'électeurs que chaque membre doit trouver. Ces électeurs sont enregistrés dans un fichier pour les fidéliser au projet du candidat.</li></ol></div>
 
-  <div class="card" style="margin-bottom:12px"><h3>2.2 Les cellules, lieu par lieu</h3>
+  <div class="card" style="margin-bottom:12px"><h3>b/ Les cellules, lieu par lieu</h3>
     <p class="small">${D.n} lieux de vote · ${F(D.tot)} électeurs · <b>${F(D.cel)} cellules</b> (${F(D.fem)} de femmes, ${F(D.hom)} d'hommes) · <b>${F(D.cel)} responsables</b> · <b>${F(D.cel * STRAT.membres)} membres</b>. Les ${D.coeur.length} lieux « cœur » réunissent la moitié des électeurs : on y installe les cellules en premier.</p>
     ${tbl([['Lieu de vote'], ['Électeurs','n'], ['Cellules','n'], ['Femmes · hommes','n'], ['Base','n'], ['Voix à obtenir','n']], lignesLieux)}${D.lieux.length > 300 ? `<p class="small muted">Les 300 plus grands lieux sont affichés sur ${F(D.lieux.length)} : la liste complète est dans le fichier Excel.</p>` : ''}</div>
 
-  <div class="card" style="margin-bottom:12px"><h3>2.3 La fidélisation</h3>
+  <div class="card" style="margin-bottom:12px"><h3>c/ La fidélisation</h3>
     <p class="small">Fichier à constituer : <b>${F(D.base * D.aTrouver)} électeurs trouvés</b> (${F(D.base)} membres × ${F(D.aTrouver)}). Pour chacun : lieu de vote, membre qui l'a trouvé, téléphone, date de son accord. On les fait vivre dans le projet : réunions de quartier, messages du candidat, invitations, remontée de leurs attentes. Le fichier est confidentiel, chaque personne y figure avec son accord écrit, et il est déclaré à l'ARTCI (loi n° 2013-450).</p></div>
 
-  <div class="card" style="margin-bottom:12px"><h3>2.4 Le plan</h3>
+  <div class="card" style="margin-bottom:12px"><h3>d/ Le plan</h3>
     ${tbl([['Étape'], ['Ce qu\'on fait'], ['Résultat attendu']], [
       ['1. Les responsables', `Recruter et former les ${F(D.cel)} responsables (${F(D.fem)} femmes, ${F(D.hom)} hommes), en commençant par les ${D.coeur.length} lieux cœur ; constituer l'équipe technique (${F(D.ctrl)} contrôleurs) ; déclarer le fichier à l'ARTCI`, `${F(D.cel)} responsables formés`],
       ['2. Les cellules', `Chaque responsable constitue sa cellule de ${STRAT.membres} membres et leur transmet le message du candidat`, `${F(D.cel * STRAT.membres)} membres, base de ${F(D.base)} personnes`],
@@ -1345,12 +1350,12 @@ function stratCorps(i){
       ['4. La recherche et la fidélisation', `Chaque membre trouve ${F(D.aTrouver)} électeur(s), vérifie leur inscription pendant la révision de la liste électorale et les enregistre`, `${F(D.base * D.aTrouver)} électeurs fidélisés`],
       ['5. Le jour du vote', 'Chaque membre fait voter ses électeurs ; des représentants surveillent les bureaux et récupèrent les procès-verbaux', `${F(O.objectif)} voix`]].map(x => `<tr><td><b>${x[0]}</b></td><td class="small">${x[1]}</td><td class="small">${x[2]}</td></tr>`))}</div>
 
-  <h2 class="partie" style="margin:18px 0 8px;font-size:17px;color:#1b2a4a;border-bottom:3px solid #c9a227;padding-bottom:3px">Partie 3 — Suivi et évaluation</h2>
+  <h2 class="partie" style="margin:18px 0 8px;font-size:17px;color:#1b2a4a;border-bottom:3px solid #c9a227;padding-bottom:3px">III/ (suite) Suivi et évaluation</h2>
 
-  <div class="card" style="margin-bottom:12px"><h3>3.1 Le contrôle par l'équipe technique</h3>
+  <div class="card" style="margin-bottom:12px"><h3>e/ Le contrôle par l'équipe technique</h3>
     <p class="small">Avec 1 contrôleur pour ${STRAT.ctrlCel} cellules, il faut <b>${F(D.ctrl)} contrôleurs</b>. À ${STRAT.visitesSem} membres visités par contrôleur et par semaine, un tour complet des ${F(D.base)} membres prend <b>${F(D.tour)} semaine(s)</b>. À chaque visite, le contrôleur vérifie : le membre connaît le candidat et son projet ; il a reçu le message de son responsable ; il a commencé à trouver ses ${F(D.aTrouver)} électeur(s) ; il est inscrit sur la liste électorale et sait où il vote.</p></div>
 
-  <div class="card" style="margin-bottom:12px"><h3>3.2 Tableau de bord hebdomadaire</h3>
+  <div class="card" style="margin-bottom:12px"><h3>f/ Tableau de bord hebdomadaire</h3>
     ${tbl([['Indicateur'], ['Objectif'], ['Vert'], ['Orange'], ['Rouge']], [
       ['Responsables formés', F(D.cel), `${F(ceil(D.cel * 0.9))} ou plus`, `${F(ceil(D.cel * 0.7))} à ${F(ceil(D.cel * 0.9) - 1)}`, `moins de ${F(ceil(D.cel * 0.7))}`],
       ['Cellules complètes (25 membres)', F(D.cel), '90 % ou plus', '70 à 89 %', 'moins de 70 %'],
@@ -1358,7 +1363,7 @@ function stratCorps(i){
       ['Électeurs trouvés et enregistrés', F(D.base * D.aTrouver), 'dans les temps', '10 à 25 % de retard', 'plus de 25 % de retard'],
       ['Lieux de vote couverts', F(D.n), `${F(ceil(D.n * 0.9))} ou plus`, `${F(ceil(D.n * 0.7))} à ${F(ceil(D.n * 0.9) - 1)}`, `moins de ${F(ceil(D.n * 0.7))}`]].map(x => `<tr>${x.map((v, k) => `<td${k ? ' class="small"' : ''}>${k ? v : '<b>' + v + '</b>'}</td>`).join('')}</tr>`))}</div>
 
-  <div class="card"><h3>3.3 Règles et points de vigilance</h3>
+  <div class="card"><h3>g/ Règles et points de vigilance</h3>
     <ul class="small">
       <li>Si la participation monte de 5 points, l'objectif passe à ${F(D.scen[2][2])} voix : chaque membre devra trouver ${F(ceil(D.scen[2][3]))} électeur(s).</li>
       <li>On compte les électeurs qui votent, pas ceux qui promettent : le fichier de fidélisation sert à les faire voter le jour J.</li>
@@ -1373,15 +1378,16 @@ VIEWS.strategie = a => {
   const i = +a, t = elT(i); if (!t) return VIEWS.elec();
   STRAT_I = i; LV_I = null; if (!LV) chargeLV();
   const d = diagEtat(i), cs = elC(i);
+  if (!d.estInit){ d.estInit = 1; d.part = partEstimee(i); }
   const champ = (k, lab) => `<div><label>${lab}</label><input inputmode="decimal" value="${STRAT[k]}" oninput="STRAT.${k}=Math.max(1,num(this.value)||1);majStrat(${i})"></div>`;
   return `<div class="bar no-print" style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" onclick="go('circo',${i})">← Fiche</button><span style="flex:1"></span>
     <button class="btn sm" onclick="copierStrat(${i})">📋 Copier</button><button class="btn sm p" onclick="exportCandWord(${i})">📝 Word</button><button class="btn sm p" onclick="exportCandPDF(${i})">📄 PDF</button><button class="btn sm p" onclick="exportStratExcel(${i})">📊 Excel</button><button class="btn sm" onclick="lvExport(${i})">⬇ Lieux de vote</button><button class="btn sm" onclick="bvExport(${i})">⬇ Bureaux de vote</button><button class="btn sm" onclick="imprimerStrat(${i})">🖨 Fiche technique</button><button class="btn sm g" onclick="missionStrat(${i})">🧭 Mission ATLAS</button></div>
   <div class="card" style="margin-bottom:12px"><div class="small muted">${esc(ELEC.E[t[0]])} · ${esc(elNiv(t))} · ${esc(t[2])}</div><h2 style="margin:4px 0 6px;font-size:19px">Stratégie de réseau — ${esc(elNom(t))}</h2>
-    <div class="f" style="margin:8px 0"><div><label>Nom du candidat (pour le document Word / PDF)</label><input value="${esc(STRAT.candidat)}" placeholder="Nom et prénoms" oninput="STRAT.candidat=this.value"></div><div><label>Année du scrutin</label><input inputmode="numeric" value="${STRAT.annee || (t[0] === 2 || t[0] === 3 ? 2028 : 2030)}" oninput="STRAT.annee=Math.round(num(this.value))||0"></div></div>
+    <div class="f" style="margin:8px 0"><div><label>Augmentation maximale de la participation (%)</label><input inputmode="decimal" value="${STRAT.hausse}" oninput="STRAT.hausse=Math.max(0,num(this.value)||0);diagEtat(${i}).part=partEstimee(${i});const e=document.getElementById('stratpart');if(e)e.value=diagEtat(${i}).part;majStrat(${i})"></div><div><label>Année du scrutin</label><input inputmode="numeric" value="${STRAT.annee || (t[0] === 2 || t[0] === 3 ? 2028 : 2030)}" oninput="STRAT.annee=Math.round(num(this.value))||0"></div></div>
     <p class="small">Méthode IGC des cellules par lieu de vote. Tout se recalcule dès que vous changez une hypothèse.</p>
     <details><summary id="stratsum" style="cursor:pointer;font-weight:700;margin:6px 0">${stratResume(i)}</summary>
       <div class="f" style="margin-top:8px">
-        <div><label>Participation attendue (%)</label><input inputmode="decimal" value="${esc(d.part)}" oninput="diagEtat(${i}).part=num(this.value)||1;majStrat(${i})"></div>
+        <div><label>Participation estimée (%) — calculée, modifiable</label><input id="stratpart" inputmode="decimal" value="${esc(d.part)}" oninput="diagEtat(${i}).part=num(this.value)||1;majStrat(${i})"></div>
         ${cs.length ? `<div><label>Camp du candidat (pour l'historique)</label><select onchange="diagEtat(${i}).camp=+this.value;diagEtat(${i}).campChoisi=1;majStrat(${i})">${cs.map((c, k) => `<option value="${k}" ${d.camp === k ? 'selected' : ''}>${esc(c[1])} — ${esc(c[2])}</option>`).join('')}<option value="-1" ${d.camp === -1 ? 'selected' : ''}>Nouveau candidat</option></select></div>` : ''}
         ${champ('parMille', 'Cellules pour 1 000 électeurs')}${champ('membres', 'Membres par cellule (en plus du responsable)')}${champ('ctrlCel', 'Cellules suivies par contrôleur')}${champ('visitesSem', 'Visites par contrôleur et par semaine')}
         ${cs.length ? `<div class="full"><label>Origine politique des candidats (lecture des acteurs dans le document ; laisser vide si identique à l'étiquette)</label>${cs.slice(0, 8).map((c, k) => `<div style="display:flex;gap:6px;align-items:center;margin:4px 0;flex-wrap:wrap"><span class="small" style="flex:1 1 160px">${esc(c[1])} — ${esc(c[2])}</span><input style="flex:1 1 140px" value="${esc((d.orig || {})[k] || '')}" placeholder="ex. PDCI-RDA" oninput="(diagEtat(${i}).orig=diagEtat(${i}).orig||{})[${k}]=this.value"></div>`).join('')}</div>` : ''}</div></details></div>
@@ -1620,7 +1626,6 @@ function candModele(i){
   const C = cibleDe(t), { muni, reg, presid, annee, scrutin } = C;
   const zone = titreCas(String(t[4]).replace(/\s*\(.*?\)/g, ''));
   const enjeu = muni ? 'la mairie' : reg ? 'le conseil régional' : presid ? 'la présidentielle dans ce territoire' : 'le siège de député';
-  const cand = (STRAT.candidat || '').trim() || '[Nom du candidat]';
   const abst = t[6] - t[7], plus = Math.floor(abst / 1000) * 1000;
   const v = elVainq(i), elu = v.w;
   const pct = (a, b) => P1(a / (b || 1) * 100);
@@ -1641,13 +1646,14 @@ function candModele(i){
   const comparables = evo.filter(g => !g.partiel);
   const M = [];
   /* couverture */
-  M.push({ t: 'cover', titre: `${zone.toUpperCase()} ${annee}`, sous: `Analyse électorale et stratégie pour gagner ${enjeu}`, ligne: `${C.Scrutin} — ${muni ? 'commune de ' + zone : reg ? 'région ' + zone : presid ? elNiv(t).toLowerCase() + ' : ' + zone : 'circonscription ' + t[3] + ', ' + zone}${reg || (presid && !t[1]) ? '' : ' (' + titreCas(t[2]) + ')'}`, infos: [['Remis à', cand], ['Préparé par', 'Impact Global Consulting'], ['Scrutin visé', C.Scrutin], ['Données de référence', `${E} (résultats officiels de la CEI) et liste électorale définitive 2025`], ['Date', dfr(today())], ['Statut', 'document strictement confidentiel']], note: 'Toutes les données chiffrées proviennent des publications officielles de la Commission électorale indépendante (CEI) : résultats officiels des scrutins, liste électorale définitive 2025 (statistiques par sexe et par âge) et répertoire des lieux et bureaux de vote 2025. Les objectifs de voix sont des estimations fondées sur les élections antérieures.' });
+  const deScr = presid ? `de l'élection présidentielle ${annee}` : `des élections ${scrutin}`;
+  M.push({ t: 'cover', titre: 'DOCUMENT D\'ORIENTATION STRATÉGIQUE', sous: `${deScr} — ${zone.toUpperCase()}`, ligne: 'élaboré par IGC (Impact Global Consulting)', infos: [['Territoire', `${muni ? 'commune de ' + zone : reg ? 'région ' + zone : presid ? elNiv(t).toLowerCase() + ' : ' + zone : 'circonscription ' + t[3] + ', ' + zone}${reg || (presid && !t[1]) ? '' : ' (' + titreCas(t[2]) + ')'}`], ['Scrutin visé', C.Scrutin], ['Données de référence', `${E} (résultats officiels de la CEI) et liste électorale définitive 2025`], ['Date', dfr(today())], ['Statut', 'document strictement confidentiel']], note: 'Toutes les données chiffrées proviennent des publications officielles de la Commission électorale indépendante (CEI) : résultats officiels des scrutins, liste électorale définitive 2025 (statistiques par sexe et par âge) et répertoire des lieux et bureaux de vote 2025. Les objectifs de voix sont des estimations fondées sur les élections antérieures.' });
   /* l'essentiel */
   M.push({ t: 'h1', x: 'L\'essentiel' });
   M.push({ t: 'p', r: Rn(`${zone} compte ${F(D.tot)} électeurs inscrits sur la liste 2025, répartis dans ${D.n} lieux de vote et ${F(D.bv)} bureaux. Au scrutin de référence (${E}), ${pct(t[7], t[6])} des inscrits ont voté${elu ? ` et ${elu[1]} l'a emporté avec ${F(elu[3])} voix` : ''}. La victoire aux ${scrutin} ira au candidat qui aura construit le réseau le plus solide pour faire voter ses propres soutiens.`) });
   M.push({ t: 'box', titre: 'Votre objectif (estimation)', r: Rn(`**Environ ${F(D.O.objectif)} voix**, soit 50 % des suffrages exprimés plus une voix. C'est une estimation fondée sur les élections antérieures : participation retenue de ${P1(d.part)} sur les ${F(D.tot)} électeurs de la liste 2025, et ${P1(nuls * 100)} de bulletins nuls comme en ${E}. Elle sera recalculée avec la liste électorale applicable en ${annee}.`) });
   M.push({ t: 'ul', items: [Rn(`**${F(D.cel)} cellules** à parité (${F(D.fem)} de femmes, ${F(D.hom)} d'hommes) dans les ${D.n} lieux de vote, soit **${F(D.cel)} responsables** à former.`), Rn(`**${F(D.base)} personnes** dans la base électorale ; **${F(D.aTrouver)} électeur(s)** à trouver et fidéliser par membre.`), Rn(`**${F(D.ctrl)} contrôleurs** dans l'équipe technique pour vérifier que le travail est fait.`)] });
-  M.push({ t: 'p', r: Rn('Le document comporte trois parties : **1. l\'analyse électorale** (ce que disent les chiffres), **2. la stratégie électorale** (comment gagner) et **3. le suivi et l\'évaluation** (comment vérifier que la stratégie avance).') });
+  M.push({ t: 'p', r: Rn('Le document comporte trois parties : **I. l\'analyse du fichier électoral** (élections antérieures, lieux de vote, tranches d\'âge, secteurs d\'activité), **II. les estimations** (taux de participation et voix à obtenir) et **III. la stratégie électorale** (système de réseautage autour des lieux de vote, avec son suivi et son évaluation).') });
 
   /* ===== PARTIE 1 ===== */
   M.push({ t: 'h1', x: 'Partie 1 — Analyse électorale' });
@@ -1657,7 +1663,7 @@ function candModele(i){
   evo.forEach(g => ind.push([`Participation — ${g.lab}`, P1(g.part) + (g.partiel ? ' (autre périmètre)' : '')]));
   M.push({ t: 'table', head: ['Indicateur', 'Valeur'], rows: ind, w: [5526, 3500], right: [1] });
   M.push({ t: 'h2', x: '1.2 Périmètre et sources' });
-  M.push({ t: 'p', r: Rn(`Analyse à l'horizon des ${scrutin}, sur la base des ${F(D.tot)} électeurs de la liste électorale définitive 2025. Le millésime 2025 désigne le fichier électoral et non une élection : les chiffres seront actualisés avec la liste applicable au scrutin de ${annee}. Scrutins analysés : ${evo.map(g => g.lab).join(', ')}. Les résultats antérieurs à 2020 (municipales et régionales 2018, législatives 2016) ne sont pas encore intégrés.`) });
+  M.push({ t: 'p', r: Rn(`Analyse à l'horizon des ${scrutin}, sur la base des ${F(D.tot)} électeurs de la liste électorale définitive 2025. Le millésime 2025 désigne le fichier électoral et non une élection : les chiffres seront actualisés avec la liste applicable au scrutin de ${annee}. Scrutins analysés : ${evo.map(g => g.lab).join(', ')}. Les scrutins de 2013 à 2018 (municipales et régionales 2013 et 2018, présidentielle 2015, législatives 2016) seront ajoutés à l'analyse dès leur intégration dans la base.`) });
   const part = evo.filter(g => g.partiel);
   if (part.length) M.push({ t: 'p', r: Rn(`Attention : le territoire de ${part.length === 1 ? 'ce scrutin' : 'ces scrutins'} ne coïncide pas avec la zone étudiée (circonscriptions ou niveau de publication différents) : ${part.map(g => `${g.lab} (${F(g.ins)} inscrits)`).join(', ')}. ${part.length === 1 ? 'Ses chiffres sont donnés' : 'Leurs chiffres sont donnés'} pour information et ne servent pas aux scénarios.`) });
   M.push({ t: 'h2', x: '1.3 Évolution du corps électoral et de la participation' });
@@ -1696,7 +1702,7 @@ function candModele(i){
     const jeunes = P[0] + P[3], dom = ages.slice().sort((a, b) => (b[1] + b[2]) - (a[1] + a[2]))[0];
     M.push({ t: 'p', r: Rn(`Les ${fem >= hom ? 'femmes' : 'hommes'} sont majoritaires (${pct(Math.max(fem, hom), PT)} des électeurs). Les ${dom[0].toLowerCase()} forment le groupe le plus nombreux (${pct(dom[1] + dom[2], PT)}) ; les jeunes de 18 à 34 ans représentent ${pct(jeunes, PT)} de l'électorat.${Math.abs(PT - D.tot) > D.tot * 0.02 ? ` Ces statistiques sont publiées par la CEI au niveau du département (ou de la commune à Abidjan) : elles portent sur ${F(PT)} électeurs, une zone plus large que la zone étudiée ; les parts restent indicatives.` : ''}`) });
   } else M.push({ t: 'p', r: Rn('La CEI ne publie pas de statistiques par sexe et par âge pour ce territoire.') });
-  M.push({ t: 'p', r: Rn('**Métiers :** la CEI ne publie aucune statistique des électeurs par profession. La répartition par métier sera établie à partir des fiches des membres des cellules et des électeurs fidélisés, recueillies avec leur accord (voir partie 3).') });
+  M.push({ t: 'p', r: Rn('**Métiers :** la CEI ne publie aucune statistique des électeurs par profession. La répartition par métier sera établie à partir des fiches des membres des cellules et des électeurs fidélisés, recueillies avec leur accord (voir partie III, suivi et évaluation).') });
   M.push({ t: 'h2', x: '1.7 Lecture des acteurs' });
   M.push({ t: 'table', head: ['Candidat ou liste', `Étiquette (${E})`, 'Origine politique', 'Voix', 'Part'], rows: A.acteurs.slice(0, 8).map(a => [titreCas(a.c[2]) + (a.c[5] ? ' (élu)' : ''), a.c[1], a.orig || 'à préciser', F(a.c[3]), P1(a.c[4])]), w: [2726, 1700, 1800, 1400, 1400], right: [3, 4] });
   if (A.saisie){
@@ -1723,7 +1729,8 @@ function candModele(i){
   /* ===== PARTIE 2 ===== */
   M.push({ t: 'h1', x: 'Partie 2 — Stratégie électorale' });
   M.push({ t: 'h2', x: '2.1 L\'objectif de voix retenu' });
-  M.push({ t: 'p', r: Rn(`Pour être élu sans dépendre des autres candidats, vous visez la majorité absolue : 50 % des suffrages exprimés plus une voix. **Avec ${P1(d.part)} de participation, l'estimation est de ${F(D.O.objectif)} voix.** Cette hypothèse est tirée des élections antérieures (partie 1.8) ; nous préparons le réseau pour le cas où la participation monterait.`) });
+  const pRef = elPart(t), objRef = Math.floor(D.tot * pRef / 100 * (1 - nuls) / 2) + 1;
+  M.push({ t: 'p', r: Rn(`Pour gagner sans dépendre des autres candidats, il faut la majorité absolue : **50 % des suffrages exprimés + 1 voix**. Avec la participation observée en ${E} (${P1(pRef)}), cela représente ${F(objRef)} voix. **Avec la participation estimée pour ${annee} (${P1(d.part)}), l'électorat à réunir pour gagner est estimé à ${F(D.O.objectif)} voix.** C'est cet objectif que retient la stratégie.`) });
   M.push({ t: 'table', head: ['Participation', 'Votants', 'Objectif de voix', 'Électeurs à trouver par membre'], rows: D.scen.map(s => [P1(s[0]) + (s[0] === num(d.part) ? ' (hypothèse retenue)' : ''), F(s[1]), F(s[2]), F(ceil(s[3]))]), w: [2826, 1800, 2000, 2400], right: [1, 2, 3], bold: [1] });
   M.push({ t: 'h2', x: '2.2 La méthode des cellules' });
   M.push({ t: 'p', r: Rn('Le lieu de vote (l\'école ou le centre où l\'on vote) est la base de toute l\'organisation : les électeurs le connaissent, l\'équipe peut s\'y retrouver et les résultats s\'y comptent.') });
@@ -1782,7 +1789,32 @@ function candModele(i){
   M.push({ t: 'h1', x: 'Annexe — Vos décisions pour les 30 prochains jours' });
   M.push({ t: 'ol', items: [Rn('**Votre positionnement politique.** Partez-vous sous l\'étiquette d\'un parti, en indépendant ou au sein d\'une alliance ? C\'est ce qui fixe votre électorat de départ.'), Rn(`**Votre directeur de campagne.** Une personne respectée à ${zone}, disponible jusqu'au scrutin, rigoureuse.`), Rn('**Le budget de la première phase** : équipe de direction, formation des premiers responsables, déplacements. IGC le chiffre avec vous dès que les deux premières décisions sont prises.')] });
   M.push({ t: 'small', x: `Sources : CEI — ${evo.map(g => g.lab).join(', ')} ; liste électorale définitive 2025 (statistiques par sexe et par âge) ; répertoire des lieux et bureaux de vote 2025. ${evo.some(g => g.e === 0) ? 'Résultats des législatives 2025 provisoires. ' : ''}Calculs automatiques IGC Gestion, ${dfr(today())}.` });
-  return { M, nom: `Strategie_${titreCas(t[4]).replace(/[^A-Za-z0-9]+/g, '_').slice(0, 40)}_${annee}`, titre: `${zone} ${annee} — Analyse et stratégie électorales` };
+  /* Plan demandé par Moaye (10/11/2026) : I/ Analyse du fichier électoral — II/ Estimations — III/ Stratégie électorale : système de réseautage */
+  const seg = {}; let cur = 'cover'; M.forEach(bl => { if (bl.t === 'h1' || bl.t === 'h2'){ cur = bl.x; seg[cur] = []; return; } (seg[cur] = seg[cur] || []).push(bl); });
+  const S = sub => { const k = Object.keys(seg).find(k => k.includes(sub)); return k ? seg[k] : []; };
+  const H3 = (x, sub) => { const c = S(sub); return c.length ? [{ t: 'h3', x }].concat(c) : []; };
+  const profil = S('Profil des électeurs').slice(), metier = profil.pop();
+  const pEst = num(d.part), hausse = Math.abs(pEst - partEstimee(i)) < 0.06 ? STRAT.hausse : pRef ? (pEst / pRef - 1) * 100 : 0, gainIns = refg ? D.tot - refg.ins : 0;
+  const N = [].concat(seg.cover || [], [{ t: 'h1', x: 'L\'essentiel' }], S('L\'essentiel'),
+    [{ t: 'h1', x: 'I/ ANALYSE DU FICHIER ÉLECTORAL' }, { t: 'h2', x: 'a/ Élections antérieures' }],
+    H3('Évolution du corps électoral et de la participation', 'Évolution du corps'), H3('Résultats des scrutins', 'Résultats historiques'), H3('Lecture des acteurs', 'Lecture des acteurs'), H3('Enseignements des élections antérieures', 'Enseignements'),
+    [{ t: 'h2', x: 'b/ Analyse du fichier électoral' }], H3('Indicateurs clés', 'Indicateurs clés'), S('Périmètre'),
+    H3('Analyse des lieux de vote', 'Répartition territoriale'),
+    [{ t: 'table', head: ['Les 10 plus grands lieux de vote', 'Électeurs 2025', 'Bureaux', 'Part'], rows: ex.slice(0, 10).map(l => [l.x[6], F(l.x[8]), F(l.x[7]), pct(l.x[8], D.tot)]), w: [4526, 1600, 1300, 1600], right: [1, 2, 3] }],
+    [{ t: 'h3', x: 'Analyse par sexe et par tranche d\'âge' }], profil,
+    [{ t: 'h3', x: 'Analyse du secteur d\'activité' }, metier],
+    [{ t: 'h1', x: `II/ ESTIMATIONS POUR ${annee} : PARTICIPATION ET VOIX À OBTENIR` }, { t: 'h2', x: 'a/ Estimation du taux de participation' },
+      { t: 'p', r: Rn(`Vu les élections antérieures et l'augmentation du fichier électoral${refg && gainIns > 0 ? ` (${sgn(gainIns)} inscrits entre ${E} et la liste 2025)` : ''}, nous prévoyons une augmentation maximale de ${P1(hausse).replace(' %', '')} % du taux de participation : de ${P1(pRef)} en ${E} à **${P1(pEst)} au maximum** pour ${annee}.`) },
+      { t: 'table', head: ['Élément', 'Valeur'], rows: [[`Taux de participation observé (${E})`, P1(pRef)], ['Augmentation maximale prévue', `${sgnP(hausse)} %`], [`Taux de participation estimé pour ${annee}`, P1(pEst)], ['Électeurs (liste 2025)', F(D.tot)], ['Votants estimés', F(D.O.votants)]], w: [5526, 3500], right: [1], bold: [2] }],
+    S('Scénarios de participation'),
+    [{ t: 'h2', x: 'b/ Estimation de l\'électorat pour gagner les élections : 50 % + 1 voix' }], S('objectif de voix retenu'),
+    [{ t: 'h1', x: 'III/ STRATÉGIE ÉLECTORALE : SYSTÈME DE RÉSEAUTAGE' }, { t: 'p', r: Rn('**Notre stratégie tourne autour des lieux de vote.** Dans chaque lieu de vote, des cellules à parité (femmes et hommes) forment la base électorale ; chaque membre trouve et fidélise des électeurs ; une équipe technique contrôle le travail.') },
+      { t: 'h2', x: 'a/ Le système des cellules' }],
+    H3('La méthode', 'méthode des cellules'), H3(`Le réseau à ${zone}`, 'Le réseau à'), H3('Où commencer', 'Où commencer'), H3('Cibles par sexe et par âge', 'Cibles par sexe'), H3('La fidélisation des électeurs', 'fidélisation des électeurs'),
+    [{ t: 'h2', x: 'b/ Organisation, calendrier et risques' }], H3('L\'organisation de campagne', 'organisation de campagne'), H3('Le calendrier jusqu\'au vote', 'calendrier'), H3('Les risques et nos parades', 'risques'),
+    [{ t: 'h2', x: 'c/ Suivi et évaluation' }], H3('Le contrôle par l\'équipe technique', 'contrôle par'), H3('Le tableau de bord hebdomadaire', 'tableau de bord'), H3('Le suivi par profil : sexe, âge et métier', 'suivi par profil'), H3('L\'évaluation à chaque étape', 'évaluation à chaque'), H3('L\'évaluation après le scrutin', 'après le scrutin'), H3('La consolidation des données', 'consolidation'),
+    [{ t: 'h1', x: 'Conclusion générale' }], S('Conclusion'), [{ t: 'h1', x: 'Annexe — Décisions à prendre dans les 30 prochains jours' }], S('Annexe'));
+  return { M: N, nom: `Orientation_strategique_${titreCas(t[4]).replace(/[^A-Za-z0-9]+/g, '_').slice(0, 40)}_${annee}`, titre: `Document d'orientation stratégique ${deScr} — ${zone}` };
 }
 
 function candHTML(i){
@@ -1790,7 +1822,7 @@ function candHTML(i){
   const runs = r => r.map(([x, b]) => b ? `<b>${h(x)}</b>` : h(x)).join('');
   const html = M.map(b => {
     if (b.t === 'cover') return `<div class="cover"><div class="ct">${h(b.titre)}</div><div class="cs">${h(b.sous)}</div><div class="cl">${h(b.ligne)}</div>${b.infos.map(x => `<p><b>${h(x[0])} :</b> ${h(x[1])}</p>`).join('')}<p class="note">${h(b.note)}</p></div>`;
-    if (b.t === 'h1') return `<h1>${h(b.x)}</h1>`; if (b.t === 'h2') return `<h2>${h(b.x)}</h2>`;
+    if (b.t === 'h1') return `<h1>${h(b.x)}</h1>`; if (b.t === 'h2') return `<h2>${h(b.x)}</h2>`; if (b.t === 'h3') return `<h3 style="font-size:11.5pt;color:#1b2a4a;margin:14px 0 6px">${h(b.x)}</h3>`;
     if (b.t === 'p') return `<p>${runs(b.r)}</p>`; if (b.t === 'small') return `<p class="note">${h(b.x)}</p>`;
     if (b.t === 'box') return `<div class="box"><b class="bt">${h(b.titre)}</b><br>${runs(b.r)}</div>`;
     if (b.t === 'ul' || b.t === 'ol') return `<${b.t}>${b.items.map(it => `<li>${runs(it)}</li>`).join('')}</${b.t}>`;
@@ -1824,6 +1856,7 @@ function candDocx(i){
     }
     else if (b.t === 'h1') out.push(para(run(b.x, { b: 1, s: 32, c: '1B2A4A' }), { style: 'Heading1', before: 360, after: 160, keep: 1 }));
     else if (b.t === 'h2') out.push(para(run(b.x, { b: 1, s: 25, c: '1B2A4A' }), { style: 'Heading2', before: 220, after: 100, keep: 1 }));
+    else if (b.t === 'h3') out.push(para(run(b.x, { b: 1, s: 22, c: '1B2A4A' }), { before: 180, after: 80, keep: 1 }));
     else if (b.t === 'p') out.push(para(R(b.r)));
     else if (b.t === 'small') out.push(para(run(b.x, { i: 1, s: 17, c: '666666' }), { before: 240 }));
     else if (b.t === 'ul') b.items.forEach(it => out.push(para(run('•\t') + R(it), { ind: 540, after: 80 })));
@@ -1904,7 +1937,7 @@ function saveSociete(){
 
 /* ----- aide ----- */
 VIEWS.aide = () => `<div class="card"><h3>Mode d'emploi en 6 gestes</h3><ol>
-  <li><b>Base électorale → stratégie</b> : choisissez l'onglet du scrutin (législatives ou municipales), touchez la circonscription ou la commune, puis <b>📊 Stratégie de réseau</b>. Méthode IGC des cellules par lieu de vote : 2 cellules pour 1 000 électeurs, toujours à parité (autant de cellules de femmes que d'hommes, au moins 1 de chaque par lieu), cellule = 1 responsable + 25 membres, objectif = 50 % des exprimés + 1 voix, électeurs à trouver par membre = objectif ÷ base électorale. Indiquez la participation attendue : tout se calcule seul. Indiquez le nom du candidat et l'année du scrutin : 📝 Word et 📄 PDF produisent automatiquement le document du candidat en trois parties (1. analyse électorale : évolution, résultats, territoires, femmes / hommes et âges, acteurs, scénarios de participation ; 2. stratégie électorale ; 3. suivi et évaluation) — l'origine politique des candidats se saisit dans « Hypothèses » (choisir « Enregistrer en PDF » dans la fenêtre d'impression) ; 📊 Excel donne le classeur de terrain (cellules numérotées, membres, électeurs fidélisés, visites) ; 🖨 Fiche technique imprime l'écran.</li>
+  <li><b>Base électorale → stratégie</b> : choisissez l'onglet du scrutin (législatives ou municipales), touchez la circonscription ou la commune, puis <b>📊 Stratégie de réseau</b>. Méthode IGC des cellules par lieu de vote : 2 cellules pour 1 000 électeurs, toujours à parité (autant de cellules de femmes que d'hommes, au moins 1 de chaque par lieu), cellule = 1 responsable + 25 membres, objectif = 50 % des exprimés + 1 voix, électeurs à trouver par membre = objectif ÷ base électorale. Indiquez la participation attendue : tout se calcule seul. Indiquez le nom du candidat et l'année du scrutin : 📝 Word et 📄 PDF produisent automatiquement le « Document d'orientation stratégique » en trois parties (I/ analyse du fichier électoral : élections antérieures, lieux de vote, tranches d'âge, secteurs d'activité ; II/ estimations : taux de participation — augmentation maximale de 30 % modifiable — et voix à obtenir, 50 % + 1 ; III/ stratégie électorale : système de réseautage autour des lieux de vote, avec suivi et évaluation) — l'origine politique des candidats se saisit dans « Hypothèses » (choisir « Enregistrer en PDF » dans la fenêtre d'impression) ; 📊 Excel donne le classeur de terrain (cellules numérotées, membres, électeurs fidélisés, visites) ; 🖨 Fiche technique imprime l'écran.</li>
   <li><b>ATLAS IA — Commandement</b> : « + Nouvelle mission » (ou un modèle), choisissez les agents, touchez « Copier l'ordre de mission » et collez-le dans Claude (Projet IGC). Collez ensuite le rapport, faites le contrôle qualité, puis validez ou renvoyez « À reprendre ». Les indicateurs (missions, reprises, coût, valeur) se calculent seuls.</li>
   <li><b>Paramètres</b> : remplissez une fois les informations du cabinet (RCCM, compte contribuable, banque). Changez les codes PIN.</li>
   <li><b>Trésorerie</b> : saisissez ce qu'il y a aujourd'hui en banque, en caisse et sur mobile.</li>
