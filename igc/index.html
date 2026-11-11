@@ -179,7 +179,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  IGC Gestion  ===================== */
-const VERSION = 'V1.16';
+const VERSION = 'V1.17';
 const KEY = 'igc_gestion_v1';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -375,7 +375,67 @@ function fbInit(){
   try {
     fb = firebase.apps.length ? firebase.app() : firebase.initializeApp(FB_CFG);
     setFb('w', 'Connexion…');
-    firebase.auth().signInAnonymously().then(() => {
+    fbSession().then(u => {
+      if (u && !u.isAnonymous) return fbAttach();
+      FB_PROPOSER = true; if (SESSION) render();
+      // accès provisoire, tant que la base n'est pas verrouillée sur le compte du cabinet
+      (u ? Promise.resolve() : firebase.auth().signInAnonymously()).then(fbAttach).catch(e => setFb('r', 'Connexion refusée'));
+    });
+  } catch(e){ setFb('r', 'Erreur'); }
+}
+/* ---------- compte du cabinet (connexion e-mail + mot de passe) ---------- */
+let _fbSessionP = null, FB_PROPOSER = false;
+function fbSession(){
+  if (!_fbSessionP) _fbSessionP = new Promise(r => { const st = firebase.auth().onAuthStateChanged(u => { st(); r(u); }); });
+  return _fbSessionP;
+}
+function fbCompteTxt(){ try { const u = firebase.auth().currentUser; return u && !u.isAnonymous ? u.email : ''; } catch(e){ return ''; } }
+function fbCompte(msg){
+  const em = fbCompteTxt();
+  if (em){
+    modal(`<h3>🔐 Compte du cabinet</h3><p>Connecté avec <b>${esc(em)}</b>. La synchronisation utilise ce compte.</p>
+      <p class="small muted">Se déconnecter arrête la synchronisation sur cet appareil. Les données déjà saisies restent sur l'appareil.</p>
+      <div class="act"><button class="btn" onclick="closeModal()">Fermer</button><button class="btn" onclick="fbDeconnexion()">Se déconnecter</button></div>`);
+    return;
+  }
+  modal(`<h3>🔐 Connexion au compte du cabinet</h3>
+    <p class="small">Pour protéger vos données, la synchronisation se fait désormais avec le compte du cabinet. Tapez l'e-mail et le mot de passe une seule fois : l'appareil reste connecté.</p>
+    ${msg ? `<p class="small" style="color:#b42318"><b>${esc(msg)}</b></p>` : ''}
+    <div class="f"><div class="full"><label>E-mail</label><input id="fb_e" type="email" autocomplete="username"></div>
+    <div class="full"><label>Mot de passe</label><input id="fb_p" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')fbConnexion()"></div></div>
+    <p class="small"><a style="cursor:pointer;text-decoration:underline" onclick="fbOubli()">Mot de passe oublié ?</a></p>
+    <div class="act"><button class="btn" onclick="closeModal()">Plus tard</button><button class="btn p" onclick="fbConnexion()">Se connecter</button></div>`);
+}
+function fbAuthErr(e){
+  const c = String(e && e.code || '');
+  if (/wrong-password|invalid-credential|invalid-login|user-not-found|invalid-email/.test(c)) return 'E-mail ou mot de passe incorrect.';
+  if (/too-many-requests/.test(c)) return 'Trop d\'essais. Attendez quelques minutes.';
+  if (/network/.test(c)) return 'Pas de connexion internet.';
+  return 'Connexion impossible (' + (c || 'erreur') + ').';
+}
+async function fbConnexion(){
+  const e = ($('#fb_e').value || '').trim(), pw = $('#fb_p').value || '';
+  if (!e || !pw){ toast('E-mail et mot de passe obligatoires'); return; }
+  try {
+    if (typeof firebase === 'undefined') throw { code:'network' };
+    if (!firebase.apps.length) firebase.initializeApp(FB_CFG);
+    if (fbRef){ fbRef.off(); fbRef = null; }
+    await firebase.auth().signInWithEmailAndPassword(e, pw);
+    _fbSessionP = Promise.resolve(firebase.auth().currentUser);
+    closeModal(); toast('🔐 Connecté : ' + e); fbAttach(); render();
+  } catch(err){ fbCompte(fbAuthErr(err)); const i = $('#fb_e'); if (i) i.value = e; }
+}
+async function fbOubli(){
+  const e = ($('#fb_e').value || '').trim();
+  if (!e){ toast('Écrivez d\'abord l\'e-mail'); return; }
+  try { await firebase.auth().sendPasswordResetEmail(e); toast('E-mail envoyé à ' + e + ' (regardez aussi les spams)'); } catch(err){ toast(fbAuthErr(err)); }
+}
+async function fbDeconnexion(){
+  try { if (fbRef){ fbRef.off(); fbRef = null; } await firebase.auth().signOut(); } catch(e){}
+  _fbSessionP = null; setFb('', 'Déconnecté'); closeModal(); toast('Déconnecté'); render();
+}
+function fbAttach(){
+  try {
       fbRef = firebase.database().ref(FB_PATH);
       fbRef.on('value', snap => {
         const r = snap.val();
@@ -386,8 +446,11 @@ function fbInit(){
           const localNewer = JSON.stringify(stripForCompare(DATA)) !== JSON.stringify(stripForCompare(sanitize(r)));
           if (localNewer) fbPush(true); else { DIRTY = false; setFb('g', 'Synchronisé'); }
         } else fbPush(true);
-      }, err => setFb('r', err && err.code === 'PERMISSION_DENIED' ? 'Accès refusé' : 'Erreur'));
-    }).catch(e => setFb('r', 'Connexion refusée'));
+      }, err => {
+        const refus = err && err.code === 'PERMISSION_DENIED';
+        setFb('r', refus ? 'Accès refusé' : 'Erreur'); fbRef = null;
+        if (refus && !fbCompteTxt() && SESSION && !document.querySelector('.modal-bg')) fbCompte('La base est réservée au compte du cabinet.');
+      });
   } catch(e){ setFb('r', 'Erreur'); }
 }
 function stripForCompare(d){ const o = {}; for (const c of COLS) o[c] = d[c].map(x => x.id + ':' + x.u).sort(); o.del = Object.keys(d._del || {}).sort(); return o; }
@@ -418,6 +481,7 @@ window.__back = () => { if ($('.modal-bg')){ closeModal(); return true; } if (VI
 function render(){
   const root = $('#root');
   if (!SESSION){ root.innerHTML = loginHTML(); return; }
+  if (FB_PROPOSER && !fbCompteTxt()){ FB_PROPOSER = false; setTimeout(() => { if (!document.querySelector('.modal-bg') && !fbCompteTxt()) fbCompte(); }, 1200); }
   const titre = VIEW === 'ordre' ? 'Mission ATLAS IA' : VIEW === 'circo' ? 'Fiche électorale' : VIEW === 'strategie' ? 'Stratégie de réseau' : (MENU.flatMap(g => g[1]).find(m => m[0] === VIEW) || [,,'Fiche'])[2];
   const body = (VIEWS[VIEW] || VIEWS.tableau)(ARG);
   root.innerHTML = `<div class="app">
@@ -1929,6 +1993,7 @@ VIEWS.parametres = () => {
     <div class="act"><button class="btn p" onclick="saveSociete()">Enregistrer</button></div></div>
   <div class="grid g2"><div class="card"><h3>🔐 Codes PIN</h3>${pinForm(true)}</div>
   <div class="card"><h3>☁ Synchronisation</h3><p class="small">État : <span class="pill ${FBST.c}">${esc(FBST.t)}</span><br>Les données sont partagées entre tous les appareils connectés (Firebase, dossier « ${FB_PATH} »), et restent sur l'appareil sans internet.</p>
+    <p class="small">🔐 Compte : ${fbCompteTxt() ? '<b>' + esc(fbCompteTxt()) + '</b>' : '<b>non connecté</b> (accès provisoire)'} <button class="btn sm" onclick="fbCompte()">${fbCompteTxt() ? 'Gérer' : 'Se connecter'}</button></p>
     <h3 style="margin-top:14px">💾 Sauvegardes</h3><div class="act" style="justify-content:flex-start"><button class="btn" onclick="exportJSON()">⬇ Sauvegarder (fichier)</button><label class="btn">⬆ Restaurer<input type="file" accept=".json" style="display:none" onchange="importJSON(this.files[0])"></label></div>
     <h3 style="margin-top:14px">🕘 Journal</h3><div class="small" style="max-height:220px;overflow:auto">${DATA.audit.slice(0, 60).map(a => `<div>${new Date(a.t).toLocaleString('fr-FR')} — ${esc(ROLES[a.u] ? ROLES[a.u].nom : a.u)} : ${esc(a.a)}</div>`).join('') || '<span class="muted">Vide.</span>'}</div></div></div>`;
 };

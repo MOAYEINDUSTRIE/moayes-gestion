@@ -259,7 +259,7 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-b
    charges, ajustements). Aucun solde saisi à la main.
    Format de données identique aux sauvegardes V30.
    ========================================================= */
-const VERSION = 'V2.12';
+const VERSION = 'V2.13';
 const LS_DATA = 'moayes_v2_data', LS_CFG = 'moayes_v2_cfg', LS_PIN = 'moayes_v2_pins', LS_TS = 'moayes_v2_ts';
 const FIREBASE_CONFIG = {
   apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
@@ -1804,6 +1804,7 @@ VIEWS.params = () => {
       <option value="moayes/v2_data" ${CFG.fbPath==='moayes/v2_data'?'selected':''}>moayes/v2_data — emplacement de l'application</option>
     </select>
     <label class="row small" style="margin-bottom:12px"><input type="checkbox" ${CFG.fbAuto?'checked':''} onchange="CFG.fbAuto=this.checked;saveCfg();if(this.checked)fbListen()"> Synchronisation automatique en temps réel (recommandé : tous les téléphones voient les mêmes chiffres)</label>
+    <div class="alert ${fbCompteTxt()?'g':''}" style="margin-bottom:10px">🔐 Compte : ${fbCompteTxt() ? '<b>' + esc(fbCompteTxt()) + '</b>' : '<b>non connecté</b> (accès provisoire)'} <button class="btn sm" style="margin-left:6px" onclick="fbCompte()">${fbCompteTxt()?'Gérer':'Se connecter'}</button></div>
     <div class="row"><button class="btn p" onclick="fbHelp();setTimeout(fbDiag,100)">🩺 Diagnostic Firebase</button><button class="btn" onclick="fbPush()">☁ Envoyer maintenant</button><button class="btn" onclick="fbPull(CFG.fbPath)">Récupérer depuis l'emplacement</button></div>
   </div>
   <div class="card"><h3>Hypothèses de production & calculateur de rentabilité</h3>
@@ -1953,17 +1954,16 @@ function fbHelp(){
     <p>État actuel : <b>${esc(st)}</b>${err ? `<br><span class="small muted">Détail technique : ${esc(err)}</span>` : ''}</p>
     <table style="margin:10px 0"><tr><td><b>☁ En ligne / Synchronisé</b></td><td class="small">Tout va bien.</td></tr>
     <tr><td><b>Hors ligne</b></td><td class="small">Pas d'internet. Les saisies restent sur ce téléphone et partent au retour du réseau.</td></tr>
-    <tr><td><b>Accès refusé</b></td><td class="small">Les règles de la base n'autorisent pas cet appareil → étape 2 ci-dessous.</td></tr>
+    <tr><td><b>Accès refusé</b></td><td class="small">Connectez-vous avec le compte de l'entreprise → étape 1 ci-dessous.</td></tr>
     <tr><td><b>Connexion anonyme désactivée</b></td><td class="small">→ étape 1 ci-dessous.</td></tr>
     <tr><td><b>Local</b></td><td class="small">Synchronisation désactivée (Paramètres).</td></tr></table>
     <h3 style="margin-top:12px">Réparer en 3 étapes (sur ordinateur, une seule fois)</h3>
-    ${box(1, 'Ouvrez <b>console.firebase.google.com</b> → projet <b>moayes-industrie</b> → <b>Authentication</b> → onglet <b>Sign-in method</b> → <b>Anonyme</b> → <b>Activer</b> → Enregistrer.')}
-    ${box(2, 'Menu <b>Realtime Database</b> → onglet <b>Règles</b> → effacez tout, collez le texte ci-dessous → <b>Publier</b>. Il autorise tous vos appareils (V30 et V2) au lieu d\'un seul.')}
-    <pre style="font-size:11px;background:#16241d;color:#e3efe8;padding:10px;border-radius:8px;white-space:pre-wrap;user-select:all">${esc(FB_RULES)}</pre>
-    <button class="btn sm" onclick="navigator.clipboard&&navigator.clipboard.writeText(FB_RULES).then(()=>toast('Règles copiées'))">Copier les règles</button>
+    ${box(1, 'Touchez <b>🔐 Se connecter</b> ci-dessous et entrez l\'e-mail et le mot de passe du compte de l\'entreprise. Une seule fois par appareil.')}
+    <button class="btn sm" onclick="fbCompte()">🔐 ${fbCompteTxt() ? 'Compte : ' + esc(fbCompteTxt()) : 'Se connecter'}</button>
+    ${box(2, 'Si l\'accès reste refusé alors que vous êtes connecté : les règles de la base sont gérées par l\'administrateur (fichier <b>end/regles-firebase.json</b> du dépôt, publié automatiquement). <b>Ne collez pas de règles dans la console</b> : cela effacerait aussi celles de l\'application END.')}
     ${box(3, 'Revenez ici et touchez <b>Lancer le diagnostic</b>. Chaque étape doit être ✓.')}
     <div id="fbDiag" style="margin-top:10px"></div>
-    <p class="small muted" style="margin-top:10px">Sécurité : ces règles exigent une connexion à l'application. Pour verrouiller davantage plus tard (un compte par employé), demandez la version « comptes nominatifs ».</p>
+    <p class="small muted" style="margin-top:10px">Sécurité : la base est réservée au compte de l'entreprise. Ne partagez le mot de passe qu'avec les personnes autorisées.</p>
     <div class="act"><button class="btn" onclick="closeModal()">Fermer</button><button class="btn p" onclick="fbDiag()">Lancer le diagnostic</button></div>`);
 }
 async function fbDiag(){
@@ -1972,7 +1972,7 @@ async function fbDiag(){
   const step = async (label, fn, fix) => { L.push([null, label]); show(); try { const r = await fn(); L[L.length-1] = [true, label + (r ? ' — ' + r : '')]; show(); return true; } catch(e){ FB_ERR = e; L[L.length-1] = [false, `${label} — ${esc(String(e.code||e.message||e))}<br><b>À faire :</b> ${fix}`]; show(); return false; } };
   const tmo = (p, ms) => Promise.race([p, new Promise((_, ko) => setTimeout(() => ko(new Error('délai dépassé (réseau trop lent ou bloqué)')), ms))]);
   if (!await step('Internet et bibliothèque Firebase', async () => { if (typeof firebase === 'undefined') throw new Error('bibliothèque Firebase non chargée'); }, 'vérifiez la connexion internet puis rechargez la page.')) return;
-  if (!await step('Connexion anonyme', async () => { await tmo(fbReady(), 25000); return 'identifiant ' + _auth.currentUser.uid.slice(0,8) + '…'; }, 'étape 1 : activer « Anonyme » dans Authentication → Sign-in method.')) { setFb('err', fbShort(FB_ERR)); return; }
+  if (!await step('Connexion', async () => { await tmo(fbReady(), 25000); return fbCompteTxt() ? 'compte ' + fbCompteTxt() : 'accès provisoire sans compte (identifiant ' + _auth.currentUser.uid.slice(0,8) + '…) — connectez-vous avec le compte de l\'entreprise'; }, 'connectez-vous avec le compte de l\'entreprise (Paramètres → 🔐 Compte).')) { setFb('err', fbShort(FB_ERR)); return; }
   const isPerm = e => /PERMISSION|permission/i.test(String((e && (e.code || e.message)) || ''));
   // test léger : on lit seulement l'horodatage de la dernière synchronisation, pas toutes les données
   if (!await step('Lecture de ' + CFG.fbPath, async () => { const sn = await tmo(_db.ref(CFG.fbPath + '/_lastSaved').once('value'), 25000); const t = sn.val(); return t ? 'dernière synchronisation le ' + new Date(t).toLocaleString('fr-FR') : 'emplacement vide (normal la première fois)'; },
@@ -2011,14 +2011,85 @@ function fbReady(){
       if (typeof firebase === 'undefined') return ko(new Error('SDK Firebase indisponible (hors ligne ?)'));
       if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
       _db = firebase.database(); _auth = firebase.auth();
-      if (_auth.currentUser) return ok();
-      _auth.signInAnonymously().then(() => ok()).catch(ko);
+      fbSession().then(u => {
+        if (u && !u.isAnonymous) return ok();
+        fbProposerCompte();
+        if (u) return ok();
+        // accès provisoire, tant que la base n'est pas verrouillée sur le compte de l'entreprise
+        _auth.signInAnonymously().then(() => ok()).catch(ko);
+      });
     } catch(e){ ko(e); }
   });
 }
+/* ---------- compte de l'entreprise (connexion e-mail + mot de passe) ---------- */
+let _fbSessionP = null, _fbPropose = false;
+function fbSession(){
+  // la session enregistrée sur l'appareil n'est connue qu'après le premier avis de Firebase
+  if (!_fbSessionP) _fbSessionP = new Promise(r => { const st = _auth.onAuthStateChanged(u => { st(); r(u); }); });
+  return _fbSessionP;
+}
+function fbCompteTxt(){
+  const u = _auth && _auth.currentUser;
+  return u && !u.isAnonymous ? u.email : '';
+}
+function fbProposerCompte(){
+  if (_fbPropose || !CFG.fbAuto) return; _fbPropose = true;
+  // attendre que l'écran du code PIN et les autres fenêtres soient fermés
+  let n = 0; const t = setInterval(() => { if (fbCompteTxt() || ++n > 120){ clearInterval(t); return; } if (USER && !$('#layer').innerHTML){ clearInterval(t); fbCompte(); } }, 2500);
+}
+function fbCompte(msg){
+  const em = fbCompteTxt();
+  if (em){
+    modal(`<h2>🔐 Compte de l'entreprise</h2>
+      <div class="alert g">Connecté avec <b>${esc(em)}</b>. La synchronisation utilise ce compte.</div>
+      <p class="small muted">Se déconnecter arrête la synchronisation sur cet appareil. Les données déjà saisies restent sur le téléphone.</p>
+      <div class="act"><button class="btn" onclick="closeModal()">Fermer</button><button class="btn" onclick="fbDeconnexion()">Se déconnecter</button></div>`);
+    return;
+  }
+  modal(`<h2>🔐 Connexion au compte de l'entreprise</h2>
+    <p class="small">Pour protéger vos données, la synchronisation se fait désormais avec le compte de l'entreprise. Tapez l'e-mail et le mot de passe une seule fois : l'appareil reste connecté.</p>
+    ${msg ? `<div class="alert r">${esc(msg)}</div>` : ''}
+    <label class="f">E-mail</label><input class="inp" id="fb_e" type="email" autocomplete="username" style="margin-bottom:8px">
+    <label class="f">Mot de passe</label><input class="inp" id="fb_p" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')fbConnexion()">
+    <p class="small"><a style="cursor:pointer;text-decoration:underline" onclick="fbOubli()">Mot de passe oublié ?</a></p>
+    <div class="act"><button class="btn" onclick="closeModal()">Plus tard</button><button class="btn p" onclick="fbConnexion()">Se connecter</button></div>`);
+  setTimeout(() => { const i = $('#fb_e'); if (i) i.focus(); }, 50);
+}
+function fbAuthErr(e){
+  const c = String(e && e.code || '');
+  if (/wrong-password|invalid-credential|invalid-login|user-not-found|invalid-email/.test(c)) return 'E-mail ou mot de passe incorrect.';
+  if (/too-many-requests/.test(c)) return 'Trop d\'essais. Attendez quelques minutes.';
+  if (/network/.test(c)) return 'Pas de connexion internet.';
+  return 'Connexion impossible (' + (c || 'erreur') + ').';
+}
+async function fbConnexion(){
+  const e = ($('#fb_e').value || '').trim(), pw = $('#fb_p').value || '';
+  if (!e || !pw){ toast('E-mail et mot de passe obligatoires'); return; }
+  try {
+    if (typeof firebase === 'undefined') throw {code:'network'};
+    if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    _db = firebase.database(); _auth = firebase.auth();
+    if (LISTEN_PATH) _db.ref(LISTEN_PATH).off();
+    await _auth.signInWithEmailAndPassword(e, pw);
+    _fbSessionP = Promise.resolve(_auth.currentUser);
+    closeModal(); toast('🔐 Connecté : ' + e);
+    FB_ERR = null; REMOTE_SEEN = false; LISTEN_PATH = ''; if (CFG.fbAuto) fbListen();
+    render();
+  } catch(err){ fbCompte(fbAuthErr(err)); const i = $('#fb_e'); if (i) i.value = e; }
+}
+async function fbOubli(){
+  const e = ($('#fb_e').value || '').trim();
+  if (!e){ toast('Écrivez d\'abord l\'e-mail'); return; }
+  try { await firebase.auth().sendPasswordResetEmail(e); toast('E-mail envoyé à ' + e + ' (regardez aussi les spams)'); } catch(err){ toast(fbAuthErr(err)); }
+}
+async function fbDeconnexion(){
+  try { if (LISTEN_PATH) _db.ref(LISTEN_PATH).off(); await _auth.signOut(); } catch(e){}
+  LISTEN_PATH = ''; REMOTE_SEEN = false; _fbSessionP = null; setFb('off', 'Déconnecté');
+  closeModal(); toast('Déconnecté'); render();
+}
 function fbErr(e){
   const m = String(e && (e.code || e.message) || '');
-  if (/PERMISSION|permission/.test(m)) return 'Firebase refuse l\'accès (règles de sécurité de la base). Voir Mode d\'emploi → Synchronisation.';
+  if (/PERMISSION|permission/.test(m)) return fbCompteTxt() ? 'Firebase refuse l\'accès à ce compte (règles de sécurité de la base).' : 'Connectez-vous avec le compte de l\'entreprise : Paramètres → Synchronisation Firebase → 🔐 Compte.';
   if (/SDK|network|offline/i.test(m)) return 'Pas de connexion internet : les données restent sur ce téléphone et partiront au retour du réseau.';
   return m || 'Firebase indisponible';
 }
@@ -2045,6 +2116,7 @@ function fbListen(){
       setFb('', '☁ En ligne');
     }, e => {
       FB_ERR = e; setFb('err', fbShort(e)); LISTEN_PATH = '';
+      if (fbShort(e) === 'Accès refusé' && !fbCompteTxt() && !$('#layer').innerHTML) fbCompte('La base est réservée au compte de l\'entreprise.');
       // règles V30 limitées au dossier « moayes » : bascule automatique vers moayes/v2_data (V30 intacte)
       if (fbShort(e) === 'Accès refusé' && CFG.fbPath === 'moayes_v2/data' && !window._fbAlt){
         window._fbAlt = 1;
