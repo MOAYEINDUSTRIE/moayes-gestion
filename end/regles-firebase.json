@@ -6,6 +6,14 @@
       "igc_data": {
         ".read": "auth != null && auth.provider == 'password' && auth.token.email == 'impactglobalconsulting11@gmail.com'",
         ".write": "auth != null && auth.provider == 'password' && auth.token.email == 'impactglobalconsulting11@gmail.com'"
+      },
+      "v2_data": {
+        ".read": "auth != null && auth.provider == 'password' && auth.token.email == 'moayepos@gmail.com'",
+        ".write": "auth != null && auth.provider == 'password' && auth.token.email == 'moayepos@gmail.com'"
+      },
+      "ping": {
+        ".read": "auth != null && auth.provider == 'password' && auth.token.email == 'moayepos@gmail.com'",
+        ".write": "auth != null && auth.provider == 'password' && auth.token.email == 'moayepos@gmail.com'"
       }
     },
     "end": {
