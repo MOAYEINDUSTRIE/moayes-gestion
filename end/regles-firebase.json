@@ -2,7 +2,11 @@
   "rules": {
     "moayes": {
       ".read": "auth != null && auth.provider == 'anonymous'",
-      ".write": "auth != null && auth.provider == 'anonymous'"
+      ".write": "auth != null && auth.provider == 'anonymous'",
+      "igc_data": {
+        ".read": "auth != null && auth.provider == 'password' && auth.token.email == 'impactglobalconsulting11@gmail.com'",
+        ".write": "auth != null && auth.provider == 'password' && auth.token.email == 'impactglobalconsulting11@gmail.com'"
+      }
     },
     "end": {
       "roles": {
