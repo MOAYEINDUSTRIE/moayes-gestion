@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Paris Pro</title>
+<meta name="theme-color" content="#14231c">
+<style>
+:root{--bg:#f3f1ea;--card:#fff;--ink:#16211c;--muted:#6b7570;--line:#e4e1d8;--brand:#1f5c43;--brand2:#e8f1ec;--red:#b42318;--red2:#fdecea;--amber:#9a6200;--amber2:#fff4dc;--green:#167a45;--green2:#e3f5ea}
+@media (prefers-color-scheme:dark){:root{--bg:#101613;--card:#18211c;--ink:#e6ece8;--muted:#9aa6a0;--line:#2a3530;--brand:#5fbf93;--brand2:#1d2e26;--red:#ff8a80;--red2:#3a1f1d;--amber:#ffc65c;--amber2:#33290f;--green:#6fdc9f;--green2:#173326}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:12px 16px 0}
+h1{margin:0;font-size:20px}
+.sub{color:var(--muted);font-size:13px}
+nav{display:flex;gap:4px;overflow-x:auto;margin-top:10px;scrollbar-width:none}
+nav button{border:0;background:none;color:var(--muted);padding:9px 12px;font:600 14px system-ui;border-bottom:3px solid transparent;white-space:nowrap;cursor:pointer}
+nav button.on{color:var(--brand);border-color:var(--brand)}
+main{max-width:1080px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+.card h3{margin:0 0 8px;font-size:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+.kpi b{display:block;font-size:22px}
+.kpi span{color:var(--muted);font-size:12px}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 12px;border-radius:10px;font:600 14px system-ui;cursor:pointer}
+.btn.p{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.sm{padding:5px 9px;font-size:13px}
+.btn:disabled{opacity:.5}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+input,select,textarea{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:15px system-ui}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;color:var(--muted);font-weight:600;font-size:12px;padding:6px;border-bottom:1px solid var(--line)}
+td{padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+td.n,th.n{text-align:right;white-space:nowrap}
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:600}
+.tag.g{background:var(--green2);color:var(--green)}.tag.r{background:var(--red2);color:var(--red)}.tag.a{background:var(--amber2);color:var(--amber)}.tag.b{background:var(--brand2);color:var(--brand)}
+.alert{padding:10px 12px;border-radius:10px;margin-bottom:12px;font-size:14px}
+.alert.a{background:var(--amber2);color:var(--amber)}.alert.r{background:var(--red2);color:var(--red)}.alert.g{background:var(--green2);color:var(--green)}.alert.b{background:var(--brand2);color:var(--brand)}
+.muted{color:var(--muted)}.small{font-size:13px}
+.match{border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:10px}
+.match.val{border-color:var(--green);box-shadow:0 0 0 1px var(--green) inset}
+.odds{display:grid;grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:6px;margin-top:8px}
+.odd{border:1px solid var(--line);border-radius:10px;padding:6px 8px;cursor:pointer;background:var(--card);text-align:left;color:var(--ink);font:13px system-ui}
+.odd b{font-size:16px}
+.odd.val{background:var(--green2);border-color:var(--green)}
+.rep{white-space:pre-wrap;font-size:13px;max-height:420px;overflow:auto;background:var(--bg);padding:10px;border-radius:10px}
+#layer:empty{display:none}
+#layer{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:20}
+.md{background:var(--card);width:100%;max-width:520px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px}
+@media(min-width:700px){#layer{align-items:center}.md{border-radius:16px}}
+.act{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#16211c;color:#fff;padding:9px 14px;border-radius:10px;font-size:14px;z-index:30;display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>⚽ Paris Pro</h1>
+  <div class="sub">Usage personnel · analyse des cotes, suivi des paris · aucun gain n'est garanti</div>
+  <nav id="nav"></nav>
+</header>
+<main id="app"></main>
+<div id="layer"></div>
+<div id="toast"></div>
+<script>
+'use strict';
+const VERSION = 'V1.0';
+const REPO_RAW = 'https://raw.githubusercontent.com/MOAYEINDUSTRIE/moayes-gestion/registre-paris/';
+const ODDS = 'https://api.the-odds-api.com/v4';
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const F = (n, d = 0) => (isFinite(n) ? Number(n) : 0).toLocaleString('fr-FR', {minimumFractionDigits: d, maximumFractionDigits: d});
+const P = x => isFinite(x) ? F(x * 100, 1) + ' %' : '—';
+const today = () => new Date().toISOString().slice(0, 10);
+const mois = d => (d || '').slice(0, 7);
+function toast(m){ const t = $('#toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 2600); }
+function modal(h){ $('#layer').innerHTML = `<div class="md" onclick="event.stopPropagation()">${h}</div>`; }
+function closeModal(){ $('#layer').innerHTML = ''; }
+$('#layer').onclick = closeModal;
+
+/* ---------- stockage (sur l'appareil uniquement) ---------- */
+const KEY = 'paris_pro_v1';
+const DEF = { paris: [], cfg: { cle: '', regions: 'eu', ligues: ['soccer_epl', 'soccer_france_ligue_one', 'soccer_spain_la_liga', 'soccer_uefa_champs_league'], budget: 20000, miseMax: 1000, seuil: 0.70, valeurMin: 0.03, bookmaker: '', notif: false }, cache: {} };
+let D;
+function load(){ try { D = JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e){ D = {}; } D = { ...DEF, ...D, cfg: { ...DEF.cfg, ...(D.cfg || {}) }, cache: D.cache || {} }; }
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(D)); } catch(e){ toast('Mémoire de l\'appareil pleine'); } }
+load();
+
+/* ---------- navigation ---------- */
+const PAGES = [['jour','📅 Aujourd\'hui'], ['cotes','📈 Cotes'], ['paris','📒 Mes paris'], ['bilan','📊 Bilan'], ['params','⚙ Paramètres']];
+let PAGE = 'jour';
+function go(p){ PAGE = p; render(); scrollTo(0, 0); }
+function render(){
+  $('#nav').innerHTML = PAGES.map(([k, t]) => `<button class="${k === PAGE ? 'on' : ''}" onclick="go('${k}')">${t}</button>`).join('');
+  $('#app').innerHTML = VIEWS[PAGE]();
+}
+const VIEWS = {};
+
+/* ---------- budget et jeu responsable ---------- */
+const miseMois = (m = mois(today())) => D.paris.filter(p => mois(p.date) === m).reduce((s, p) => s + (+p.mise || 0), 0);
+const resteBudget = () => (+D.cfg.budget || 0) - miseMois();
+function bandeauBudget(){
+  const r = resteBudget(), b = +D.cfg.budget || 0;
+  if (!b) return '<div class="alert a">Fixez un budget mensuel dans ⚙ Paramètres : c\'est la règle n° 1 pour ne pas perdre le contrôle.</div>';
+  if (r <= 0) return `<div class="alert r">⛔ Budget du mois atteint (${F(b)} F). Arrêtez les paris jusqu'au mois prochain.</div>`;
+  if (r < b * 0.25) return `<div class="alert a">⚠️ Il reste ${F(r)} F sur votre budget du mois (${F(b)} F).</div>`;
+  return `<div class="alert b">Budget du mois : ${F(miseMois())} F misés sur ${F(b)} F · reste <b>${F(r)} F</b></div>`;
+}
+
+/* ---------- agent : registre et rapport du jour ---------- */
+let AGENT = null; // {reg:[], sites:[], journal:'', jdate:''}
+function csv(t){
+  const L = t.trim().split(/\r?\n/); const h = L.shift().split(';');
+  return L.filter(x => x.trim()).map(l => { const v = l.split(';'); const o = {}; h.forEach((k, i) => o[k] = v[i] || ''); return o; });
+}
+async function chargerAgent(force){
+  if (AGENT && !force) return;
+  AGENT = { charge: true, reg: [], sites: [], journal: '', jdate: '' };
+  const nc = '?t=' + Date.now();
+  try { AGENT.reg = csv(await (await fetch(REPO_RAW + 'registre.csv' + nc)).text()); } catch(e){ AGENT.err = 'registre'; }
+  try { AGENT.sites = csv(await (await fetch(REPO_RAW + 'suivi_sites.csv' + nc)).text()); } catch(e){}
+  for (let i = 0; i < 4; i++){
+    const d = new Date(Date.now() - i * 864e5).toISOString().slice(0, 10);
+    try { const r = await fetch(REPO_RAW + 'journal/' + d + '.md' + nc); if (r.ok){ AGENT.journal = await r.text(); AGENT.jdate = d; break; } } catch(e){}
+  }
+  AGENT.charge = false; render();
+}
+VIEWS.jour = () => {
+  if (!AGENT){ chargerAgent(); }
+  const h = bandeauBudget();
+  if (!AGENT || AGENT.charge) return h + '<div class="card">Chargement du rapport de l\'agent…</div>';
+  const sel = AGENT.reg.filter(r => r.date_emission === today());
+  const att = AGENT.reg.filter(r => r.issue === 'EN_ATTENTE' && r.date_emission !== today());
+  const jr = AGENT.jdate === today() ? '' : `<div class="alert a">Le rapport du jour n'est pas encore publié (l'agent passe vers 8 h). Dernier rapport : ${esc(AGENT.jdate || 'aucun')}.</div>`;
+  return h + `<div class="card"><div class="row" style="justify-content:space-between"><h3>Sélections de l'agent — ${new Date().toLocaleDateString('fr-FR')}</h3><button class="btn sm" onclick="chargerAgent(true)">↻ Actualiser</button></div>
+    ${sel.length ? sel.map(carteSel).join('') : '<div class="alert b">Aucun pari recommandé aujourd\'hui. Ne pas parier est aussi une décision gagnante.</div>'}
+    ${att.length ? `<h3 style="margin-top:12px">En attente de résultat</h3>${att.map(carteSel).join('')}` : ''}</div>
+    <div class="card"><h3>Rapport de l'agent ${AGENT.jdate ? '(' + esc(AGENT.jdate) + ')' : ''}</h3>${jr}<div class="rep">${esc(AGENT.journal || 'Aucun rapport disponible.')}</div></div>`;
+};
+function carteSel(r){
+  return `<div class="match"><div class="row" style="justify-content:space-between"><b>${esc(r.match)}</b><span class="tag ${r.issue === 'GAGNÉ' ? 'g' : r.issue === 'PERDU' ? 'r' : 'a'}">${esc(r.issue || 'EN_ATTENTE')}</span></div>
+  <div class="small muted">${esc(r.competition)} · ${esc(r.coup_envoi_local)} ${esc(r.fuseau)}</div>
+  <div class="row small" style="margin-top:6px"><span class="tag b">${esc(r.marche)}</span> cote <b>${esc(r.cote)}</b> (${esc(r.bookmaker_source_cote)}) · probabilité ${esc(r.proba_estimee)} · confiance ${esc(r.confiance_100)}/100 · valeur ${esc(r.valeur_attendue)}</div>
+  <div class="small muted" style="margin-top:4px">${esc(r.methode)}</div>
+  ${r.issue === 'EN_ATTENTE' || !r.issue ? `<div class="act" style="margin-top:8px"><button class="btn sm p" onclick='parier(${JSON.stringify({match: r.match, competition: r.competition, marche: r.marche, cote: parseFloat(String(r.cote).replace(',', '.')) || '', proba: parseFloat(String(r.proba_estimee).replace(',', '.')) || '', source: 'Agent'}).replace(/'/g, '&#39;')})'>Parier</button></div>` : ''}</div>`;
+}
+
+/* ---------- cotes en temps réel (The Odds API) ---------- */
+let COTES = null, SPORTS = null;
+async function api(path){
+  if (!D.cfg.cle) throw new Error('cle');
+  const r = await fetch(ODDS + path + (path.includes('?') ? '&' : '?') + 'apiKey=' + encodeURIComponent(D.cfg.cle));
+  const reste = r.headers.get('x-requests-remaining'); if (reste != null){ D.cache.restant = reste; save(); }
+  if (r.status === 401) throw new Error('Clé API refusée');
+  if (r.status === 429) throw new Error('Quota de la clé épuisé pour ce mois');
+  if (!r.ok) throw new Error('Erreur ' + r.status);
+  return r.json();
+}
+async function chargerCotes(){
+  COTES = { charge: true, matchs: [], err: '' }; render();
+  const fin = new Date(Date.now() + 36 * 3600e3).toISOString().slice(0, 19) + 'Z';
+  for (const lg of D.cfg.ligues){
+    try {
+      const L = await api(`/sports/${lg}/odds/?regions=${D.cfg.regions}&markets=h2h,totals&oddsFormat=decimal&dateFormat=iso&commenceTimeTo=${fin}`);
+      L.forEach(m => COTES.matchs.push(analyser(m)));
+    } catch(e){ COTES.err = e.message === 'cle' ? 'cle' : e.message; if (/Clé|Quota/.test(e.message)) break; }
+  }
+  COTES.matchs = COTES.matchs.filter(m => new Date(m.debut) > new Date()).sort((a, b) => a.debut.localeCompare(b.debut));
+  COTES.charge = false; COTES.heure = new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'});
+  D.cache.cotes = { heure: COTES.heure, date: today(), matchs: COTES.matchs }; save();
+  notifier(); render();
+}
+// Prédiction = probabilité du marché sans marge, moyenne de tous les bookmakers ; valeur = meilleure cote × probabilité − 1
+function analyser(m){
+  const issues = {};
+  const ajout = (k, nom, cote, prob, bk) => { const o = issues[k] || (issues[k] = { nom, probs: [], best: 0, bk: '' }); o.probs.push(prob); if (cote > o.best){ o.best = cote; o.bk = bk; } };
+  (m.bookmakers || []).forEach(b => (b.markets || []).forEach(mk => {
+    const out = mk.outcomes || []; const inv = out.reduce((s, o) => s + 1 / o.price, 0); if (!inv) return;
+    out.forEach(o => {
+      const prob = (1 / o.price) / inv;
+      if (mk.key === 'h2h') ajout('h2h:' + o.name, o.name === m.home_team ? '1 · ' + o.name : o.name === m.away_team ? '2 · ' + o.name : 'X · Nul', o.price, prob, b.title);
+      else if (mk.key === 'totals') ajout('tot:' + o.name + o.point, (o.name === 'Over' ? 'Plus de ' : 'Moins de ') + String(o.point).replace('.', ','), o.price, prob, b.title);
+    });
+  }));
+  const L = Object.entries(issues).map(([k, o]) => { const p = o.probs.reduce((s, x) => s + x, 0) / o.probs.length; return { k, nom: o.nom, p, best: o.best, bk: o.bk, n: o.probs.length, val: p * o.best - 1 }; });
+  // doubles chances déduites des probabilités 1X2
+  const g = n => L.find(x => x.k === 'h2h:' + n);
+  const h = g(m.home_team), a = g(m.away_team), x = g('Draw');
+  if (h && a && x){ L.push({ k: 'dc:1X', nom: '1X · ' + m.home_team + ' ou nul', p: h.p + x.p, best: 0, n: h.n }); L.push({ k: 'dc:X2', nom: 'X2 · nul ou ' + m.away_team, p: a.p + x.p, best: 0, n: a.n }); }
+  return { id: m.id, ligue: m.sport_title, debut: m.commence_time, dom: m.home_team, ext: m.away_team, issues: L, nbk: (m.bookmakers || []).length };
+}
+function notifier(){
+  if (!D.cfg.notif || !('Notification' in window) || Notification.permission !== 'granted') return;
+  const fortes = (COTES.matchs || []).flatMap(m => m.issues.filter(i => i.best && i.p >= D.cfg.seuil && i.val >= D.cfg.valeurMin).map(i => m.dom + ' – ' + m.ext + ' : ' + i.nom));
+  if (fortes.length) try { new Notification('Paris Pro — ' + fortes.length + ' opportunité(s)', { body: fortes.slice(0, 3).join('\n') }); } catch(e){}
+}
+VIEWS.cotes = () => {
+  const h = bandeauBudget();
+  if (!D.cfg.cle) return h + `<div class="card"><h3>Clé API nécessaire</h3><p class="small">Les cotes viennent de <b>The Odds API</b> (formule gratuite : 500 requêtes par mois, sans carte bancaire). Créez votre clé sur the-odds-api.com, puis collez-la dans ⚙ Paramètres. Elle reste uniquement sur cet appareil.</p><button class="btn p" onclick="go('params')">Aller aux paramètres</button></div>`;
+  if (!COTES && D.cache.cotes && D.cache.cotes.date === today()) COTES = { matchs: D.cache.cotes.matchs, heure: D.cache.cotes.heure };
+  const tete = `<div class="card"><div class="row" style="justify-content:space-between"><div><h3 style="margin:0">Matchs des 36 prochaines heures</h3><div class="small muted">${COTES && COTES.heure ? 'Cotes relevées à ' + COTES.heure : 'Pas encore chargées'} · ${D.cfg.ligues.length} ligue(s) · requêtes restantes : ${esc(D.cache.restant ?? '?')}</div></div><button class="btn p" ${COTES && COTES.charge ? 'disabled' : ''} onclick="chargerCotes()">${COTES && COTES.charge ? 'Chargement…' : '↻ Charger les cotes'}</button></div>
+    <p class="small muted" style="margin:8px 0 0">« Probabilité » = avis du marché sans la marge des bookmakers (moyenne de tous). <span class="tag g">valeur</span> = la meilleure cote paie plus que cette probabilité. Ce n'est jamais une certitude.</p></div>`;
+  if (!COTES) return h + tete;
+  if (COTES.err === 'cle') return h + tete;
+  const err = COTES.err ? `<div class="alert r">${esc(COTES.err)}</div>` : '';
+  if (!COTES.matchs.length) return h + tete + err + '<div class="card muted">Aucun match trouvé pour vos ligues dans les 36 prochaines heures.</div>';
+  return h + tete + err + COTES.matchs.map(m => {
+    const fort = m.issues.some(i => i.best && i.p >= D.cfg.seuil && i.val >= D.cfg.valeurMin);
+    return `<div class="match ${fort ? 'val' : ''}"><div class="row" style="justify-content:space-between"><b>${esc(m.dom)} – ${esc(m.ext)}</b>${fort ? '<span class="tag g">⭐ à étudier</span>' : ''}</div>
+    <div class="small muted">${esc(m.ligue)} · ${new Date(m.debut).toLocaleString('fr-FR', {weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'})} (heure de l'appareil) · ${m.nbk} bookmakers</div>
+    <div class="odds">${m.issues.filter(i => !/^tot:/.test(i.k) || /2\.5$/.test(i.k)).map(i => `<button class="odd ${i.best && i.val >= D.cfg.valeurMin ? 'val' : ''}" ${i.best ? `onclick='parier(${JSON.stringify({match: m.dom + ' – ' + m.ext, competition: m.ligue, marche: i.nom, cote: i.best, proba: +i.p.toFixed(3), source: 'Cotes (' + i.bk + ')'}).replace(/'/g, '&#39;')})'` : 'disabled'}><div class="small">${esc(i.nom)}</div><b>${i.best ? F(i.best, 2) : '—'}</b> <span class="small muted">${P(i.p)}</span>${i.best ? `<div class="small ${i.val >= 0 ? '' : 'muted'}">valeur ${i.val >= 0 ? '+' : ''}${F(i.val * 100, 1)} %</div>` : '<div class="small muted">probabilité</div>'}</button>`).join('')}</div></div>`;
+  }).join('');
+};
+
+/* ---------- enregistrer un pari ---------- */
+function parier(o){
+  const r = resteBudget(), mx = +D.cfg.miseMax || 0;
+  const conseil = mx ? Math.min(mx, Math.max(r, 0)) : Math.max(r, 0);
+  modal(`<h3>Enregistrer un pari</h3>
+    ${r <= 0 ? '<div class="alert r">⛔ Votre budget du mois est atteint. Le plus sage est de ne pas parier.</div>' : ''}
+    <div class="small muted">${esc(o.competition || '')}</div><b>${esc(o.match)}</b>
+    <label>Marché</label><input id="p_mar" value="${esc(o.marche)}">
+    <div class="row"><div style="flex:1"><label>Cote</label><input id="p_cote" type="number" step="0.01" min="1.01" value="${esc(o.cote)}"></div>
+    <div style="flex:1"><label>Mise (F CFA)</label><input id="p_mise" type="number" step="100" min="0" value="${conseil ? Math.min(conseil, 1000) : ''}"></div></div>
+    <div class="small muted" style="margin-top:6px">Probabilité estimée : ${o.proba ? P(o.proba) : '—'} · source : ${esc(o.source || 'manuel')}${mx ? ' · mise maximale fixée : ' + F(mx) + ' F' : ''}</div>
+    <label>Note (facultatif)</label><input id="p_note">
+    <div class="act">${D.cfg.bookmaker ? `<a class="btn" href="${esc(D.cfg.bookmaker)}" target="_blank" rel="noopener">Ouvrir le site du bookmaker ↗</a>` : ''}<button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" onclick='enregistrer(${JSON.stringify(o).replace(/'/g, '&#39;')})'>J'ai parié — enregistrer</button></div>`);
+}
+function enregistrer(o){
+  const cote = parseFloat($('#p_cote').value), mise = parseFloat($('#p_mise').value);
+  if (!(cote > 1) || !(mise > 0)) return toast('Cote et mise obligatoires');
+  if (D.cfg.miseMax && mise > D.cfg.miseMax) return toast('Mise supérieure à votre maximum (' + F(D.cfg.miseMax) + ' F)');
+  D.paris.unshift({ id: Date.now().toString(36), date: today(), match: o.match, competition: o.competition || '', marche: $('#p_mar').value.trim(), cote, mise, proba: o.proba || '', source: o.source || 'manuel', note: $('#p_note').value.trim(), issue: 'EN_ATTENTE' });
+  save(); closeModal(); toast('Pari enregistré'); render();
+}
+const gain = p => p.issue === 'GAGNÉ' ? p.mise * (p.cote - 1) : p.issue === 'PERDU' ? -p.mise : 0;
+VIEWS.paris = () => {
+  const L = D.paris;
+  return bandeauBudget() + `<div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Mes paris (${L.length})</h3><button class="btn sm" onclick="parierManuel()">+ Pari manuel</button></div>
+  <div class="tw"><table><tr><th>Date</th><th>Match / marché</th><th class="n">Cote</th><th class="n">Mise</th><th>Résultat</th><th class="n">Gain</th></tr>
+  ${L.map(p => `<tr><td class="small">${esc(p.date.split('-').reverse().join('/'))}</td><td><b>${esc(p.match)}</b><div class="small muted">${esc(p.marche)} · ${esc(p.source)}</div></td><td class="n">${F(p.cote, 2)}</td><td class="n">${F(p.mise)}</td>
+  <td>${p.issue === 'EN_ATTENTE' ? `<div class="row"><button class="btn sm" onclick="regler('${p.id}','GAGNÉ')">✅</button><button class="btn sm" onclick="regler('${p.id}','PERDU')">❌</button><button class="btn sm" onclick="regler('${p.id}','REMBOURSÉ')">↩</button></div>` : `<span class="tag ${p.issue === 'GAGNÉ' ? 'g' : p.issue === 'PERDU' ? 'r' : 'a'}">${esc(p.issue)}</span> <button class="btn sm" title="Annuler le résultat" onclick="regler('${p.id}','EN_ATTENTE')">↺</button>`}</td>
+  <td class="n ${gain(p) > 0 ? '' : 'muted'}">${p.issue === 'EN_ATTENTE' ? '—' : (gain(p) > 0 ? '+' : '') + F(gain(p))}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Aucun pari enregistré.</td></tr>'}
+  </table></div><p class="small muted">✅ gagné · ❌ perdu · ↩ remboursé (match annulé).</p></div>`;
+};
+function parierManuel(){
+  modal(`<h3>Pari manuel</h3><label>Match</label><input id="m_match" placeholder="Équipe A – Équipe B"><label>Compétition</label><input id="m_comp">
+    <div class="act"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" onclick="const m=$('#m_match').value.trim();if(!m)return toast('Match obligatoire');parier({match:m,competition:$('#m_comp').value.trim(),marche:'',cote:'',proba:'',source:'manuel'})">Continuer</button></div>`);
+}
+function regler(id, issue){ const p = D.paris.find(x => x.id === id); if (!p) return; p.issue = issue; p.regle = issue === 'EN_ATTENTE' ? '' : today(); save(); render(); }
+
+/* ---------- bilan ---------- */
+function stats(L){
+  const r = L.filter(p => p.issue === 'GAGNÉ' || p.issue === 'PERDU');
+  const mise = r.reduce((s, p) => s + p.mise, 0), res = r.reduce((s, p) => s + gain(p), 0);
+  return { n: L.length, reg: r.length, g: r.filter(p => p.issue === 'GAGNÉ').length, mise, res, roi: mise ? res / mise : NaN };
+}
+VIEWS.bilan = () => {
+  const s = stats(D.paris), ms = [...new Set(D.paris.map(p => mois(p.date)))].sort().reverse();
+  const tr = [[.5, .6], [.6, .7], [.7, .8], [.8, .9], [.9, 1.01]].map(([a, b]) => { const L = D.paris.filter(p => p.proba >= a && p.proba < b && (p.issue === 'GAGNÉ' || p.issue === 'PERDU')); return { a, b, n: L.length, ok: L.filter(p => p.issue === 'GAGNÉ').length }; });
+  let ag = '';
+  if (AGENT && !AGENT.charge){
+    const r = AGENT.reg.filter(x => x.issue === 'GAGNÉ' || x.issue === 'PERDU'), u = r.reduce((t, x) => t + (parseFloat(String(x.gain_perte_unites).replace(',', '.')) || 0), 0);
+    const sites = {}; AGENT.sites.filter(x => x.issue === 'JUSTE' || x.issue === 'FAUX').forEach(x => { const o = sites[x.site] || (sites[x.site] = { n: 0, ok: 0 }); o.n++; if (x.issue === 'JUSTE') o.ok++; });
+    ag = `<div class="card"><h3>Agent d'analyse (registre)</h3><p class="small">${AGENT.reg.length} sélection(s) émise(s) · ${r.length} réglée(s) · ${r.filter(x => x.issue === 'GAGNÉ').length} gagnée(s) · résultat ${u >= 0 ? '+' : ''}${F(u, 2)} unité(s)${r.length < 100 ? ' · <i>échantillon insuffisant pour juger la méthode</i>' : ''}</p>
+    <div class="tw"><table><tr><th>Source des pronostics</th><th class="n">Réglés</th><th class="n">Justes</th><th class="n">Réussite</th></tr>${Object.entries(sites).sort((a, b) => b[1].ok / b[1].n - a[1].ok / a[1].n).map(([k, o]) => `<tr><td>${esc(k)}</td><td class="n">${o.n}</td><td class="n">${o.ok}</td><td class="n">${P(o.ok / o.n)}${o.n < 50 ? ' <span class="tag a">peu de données</span>' : ''}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">Pas encore de pronostic réglé.</td></tr>'}</table></div></div>`;
+  } else { chargerAgent(); }
+  return bandeauBudget() + `<div class="grid"><div class="kpi"><span>Paris</span><b>${s.n}</b><span>${s.reg} réglés</span></div><div class="kpi"><span>Réussite</span><b>${s.reg ? P(s.g / s.reg) : '—'}</b><span>${s.g} gagnés</span></div><div class="kpi"><span>Total misé (réglés)</span><b>${F(s.mise)} F</b></div><div class="kpi"><span>Bénéfice / perte</span><b style="color:${s.res >= 0 ? 'var(--green)' : 'var(--red)'}">${s.res >= 0 ? '+' : ''}${F(s.res)} F</b><span>rentabilité ${isFinite(s.roi) ? (s.roi >= 0 ? '+' : '') + F(s.roi * 100, 1) + ' %' : '—'}</span></div></div>
+  ${s.reg && s.reg < 100 ? '<div class="alert a">Moins de 100 paris réglés : trop peu pour savoir si la méthode est vraiment gagnante.</div>' : ''}
+  <div class="card"><h3>Par mois</h3><div class="tw"><table><tr><th>Mois</th><th class="n">Paris</th><th class="n">Misé</th><th class="n">Résultat</th><th class="n">Budget</th></tr>${ms.map(m => { const x = stats(D.paris.filter(p => mois(p.date) === m)); return `<tr><td>${m}</td><td class="n">${x.n}</td><td class="n">${F(miseMois(m))}</td><td class="n">${x.res >= 0 ? '+' : ''}${F(x.res)}</td><td class="n">${F(D.cfg.budget)}</td></tr>`; }).join('') || '<tr><td colspan="5" class="muted">Aucun pari.</td></tr>'}</table></div></div>
+  <div class="card"><h3>Vos probabilités sont-elles justes ?</h3><p class="small muted">Si les paris estimés à 70–80 % gagnent nettement moins de 70 % du temps, les estimations sont trop optimistes.</p><div class="tw"><table><tr><th>Probabilité estimée</th><th class="n">Paris réglés</th><th class="n">Réussite réelle</th></tr>${tr.map(t => `<tr><td>${t.a * 100}–${Math.min(t.b, 1) * 100} %</td><td class="n">${t.n}</td><td class="n">${t.n ? P(t.ok / t.n) : '—'}</td></tr>`).join('')}</table></div></div>${ag}`;
+};
+
+/* ---------- paramètres ---------- */
+VIEWS.params = () => `<div class="card"><h3>Cotes en temps réel</h3>
+  <label>Clé The Odds API (gratuite sur the-odds-api.com, reste sur cet appareil)</label><input id="s_cle" type="password" value="${esc(D.cfg.cle)}" autocomplete="off">
+  <label>Région des bookmakers</label><select id="s_reg">${[['eu','Europe'],['uk','Royaume-Uni'],['us','États-Unis'],['au','Australie']].map(([k, t]) => `<option value="${k}" ${D.cfg.regions === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
+  <label>Ligues suivies</label><div id="s_lig" class="small">${SPORTS ? SPORTS.filter(s => s.group === 'Soccer').map(s => `<label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:4px 0"><input type="checkbox" style="width:auto" value="${esc(s.key)}" ${D.cfg.ligues.includes(s.key) ? 'checked' : ''}> ${esc(s.title)}</label>`).join('') : esc(D.cfg.ligues.join(', ')) + ` <button class="btn sm" onclick="chargerSports()">Choisir les ligues</button>`}</div>
+  <p class="small muted">Chaque ligue chargée consomme 2 requêtes (résultat et buts). Avec 4 ligues : environ 60 chargements par mois en formule gratuite.</p></div>
+  <div class="card"><h3>Jeu responsable</h3>
+  <div class="row"><div style="flex:1;min-width:140px"><label>Budget mensuel (F)</label><input id="s_bud" type="number" step="1000" value="${esc(D.cfg.budget)}"></div><div style="flex:1;min-width:140px"><label>Mise maximale par pari (F)</label><input id="s_max" type="number" step="100" value="${esc(D.cfg.miseMax)}"></div></div>
+  <p class="small muted">Ne jouez que l'argent que vous acceptez de perdre, jamais celui du ménage ou des entreprises. Pas de martingale, pas de « récupération » des pertes.</p></div>
+  <div class="card"><h3>Alertes et bookmaker</h3>
+  <div class="row"><div style="flex:1;min-width:140px"><label>Probabilité minimale d'une alerte (%)</label><input id="s_seuil" type="number" min="50" max="99" value="${Math.round(D.cfg.seuil * 100)}"></div><div style="flex:1;min-width:140px"><label>Valeur minimale (%)</label><input id="s_val" type="number" step="0.5" value="${F(D.cfg.valeurMin * 100, 1).replace(',', '.')}"></div></div>
+  <label style="display:flex;gap:8px;align-items:center;color:var(--ink)"><input id="s_notif" type="checkbox" style="width:auto" ${D.cfg.notif ? 'checked' : ''}> Notification quand une opportunité dépasse ces seuils (au chargement des cotes)</label>
+  <label>Adresse du site de votre bookmaker (bouton « Ouvrir le site »)</label><input id="s_bk" placeholder="https://..." value="${esc(D.cfg.bookmaker)}">
+  <div class="act"><button class="btn p" onclick="enregistrerParams()">Enregistrer</button></div></div>
+  <div class="card"><h3>Sauvegarde</h3><p class="small muted">Vos paris sont enregistrés uniquement sur cet appareil.</p><div class="row"><button class="btn" onclick="exporter()">⬇ Télécharger une sauvegarde</button><label class="btn" style="margin:0;color:var(--ink)">⬆ Restaurer<input type="file" accept=".json" style="display:none" onchange="importer(this.files[0])"></label></div></div>
+  <p class="small muted">Paris Pro ${VERSION} · usage personnel · aucun pari n'est placé automatiquement.</p>`;
+async function chargerSports(){
+  if (!D.cfg.cle){ const c = $('#s_cle').value.trim(); if (!c) return toast('Collez d\'abord la clé API'); D.cfg.cle = c; save(); }
+  try { SPORTS = (await api('/sports/')).filter(s => s.active); render(); } catch(e){ toast(e.message === 'cle' ? 'Clé manquante' : e.message); }
+}
+function enregistrerParams(){
+  const c = D.cfg;
+  c.cle = $('#s_cle').value.trim(); c.regions = $('#s_reg').value;
+  const cb = [...document.querySelectorAll('#s_lig input[type=checkbox]')]; if (cb.length) c.ligues = cb.filter(x => x.checked).map(x => x.value);
+  c.budget = Math.max(0, +$('#s_bud').value || 0); c.miseMax = Math.max(0, +$('#s_max').value || 0);
+  c.seuil = Math.min(.99, Math.max(.5, (+$('#s_seuil').value || 70) / 100)); c.valeurMin = (+$('#s_val').value || 0) / 100;
+  c.bookmaker = $('#s_bk').value.trim(); c.notif = $('#s_notif').checked;
+  if (c.notif && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+  COTES = null; D.cache.cotes = null; save(); toast('Paramètres enregistrés'); render();
+}
+function exporter(){
+  const b = new Blob([JSON.stringify({ paris: D.paris, cfg: { ...D.cfg, cle: '' } }, null, 1)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'ParisPro_sauvegarde_' + today() + '.json'; a.click();
+}
+async function importer(f){
+  if (!f) return;
+  try { const x = JSON.parse(await f.text()); if (!Array.isArray(x.paris)) throw 0; D.paris = x.paris; D.cfg = { ...D.cfg, ...x.cfg, cle: D.cfg.cle }; save(); toast('Sauvegarde restaurée'); render(); } catch(e){ toast('Fichier invalide'); }
+}
+render();
+</script>
+</body>
+</html>
