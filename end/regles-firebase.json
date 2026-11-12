@@ -6,20 +6,28 @@
         ".write": "auth != null && auth.provider == 'password' && auth.token.email == 'impactglobalconsulting11@gmail.com'"
       },
       "v2_data": {
-        ".read": "auth != null && auth.provider == 'password' && auth.token.email == 'moayepos@gmail.com'",
-        ".write": "auth != null && auth.provider == 'password' && auth.token.email == 'moayepos@gmail.com'"
+        ".read": "(auth != null && auth.provider == 'password' && auth.token.email == 'moayepos@gmail.com') || (auth != null && auth.provider == 'password' && root.child('moayes/v2_comptes/'+auth.uid+'/actif').val() === true)",
+        ".write": "(auth != null && auth.provider == 'password' && auth.token.email == 'moayepos@gmail.com') || (auth != null && auth.provider == 'password' && root.child('moayes/v2_comptes/'+auth.uid+'/actif').val() === true)"
       },
       "ping": {
-        ".read": "auth != null && auth.provider == 'password' && auth.token.email == 'moayepos@gmail.com'",
-        ".write": "auth != null && auth.provider == 'password' && auth.token.email == 'moayepos@gmail.com'"
+        ".read": "(auth != null && auth.provider == 'password' && auth.token.email == 'moayepos@gmail.com') || (auth != null && auth.provider == 'password' && root.child('moayes/v2_comptes/'+auth.uid+'/actif').val() === true)",
+        ".write": "(auth != null && auth.provider == 'password' && auth.token.email == 'moayepos@gmail.com') || (auth != null && auth.provider == 'password' && root.child('moayes/v2_comptes/'+auth.uid+'/actif').val() === true)"
       },
       "v2_ping": {
-        ".read": "auth != null && auth.provider == 'password' && auth.token.email == 'moayepos@gmail.com'",
-        ".write": "auth != null && auth.provider == 'password' && auth.token.email == 'moayepos@gmail.com'"
+        ".read": "(auth != null && auth.provider == 'password' && auth.token.email == 'moayepos@gmail.com') || (auth != null && auth.provider == 'password' && root.child('moayes/v2_comptes/'+auth.uid+'/actif').val() === true)",
+        ".write": "(auth != null && auth.provider == 'password' && auth.token.email == 'moayepos@gmail.com') || (auth != null && auth.provider == 'password' && root.child('moayes/v2_comptes/'+auth.uid+'/actif').val() === true)"
       },
       "data": {
         ".read": "auth != null && auth.provider == 'password' && auth.token.email == 'moayepos@gmail.com'",
         ".write": false
+      },
+      "v2_comptes": {
+        ".read": "auth != null && auth.provider == 'password' && auth.token.email == 'moayepos@gmail.com'",
+        "$uid": {
+          ".read": "(auth != null && auth.provider == 'password' && auth.token.email == 'moayepos@gmail.com') || (auth != null && auth.uid === $uid)",
+          ".write": "auth != null && auth.provider == 'password' && auth.token.email == 'moayepos@gmail.com'",
+          ".validate": "newData.hasChildren(['nom','email','role','actif']) && newData.child('actif').isBoolean() && newData.child('role').isString() && newData.child('role').val().matches(/^(directrice|vendeur|comptable|producteur)$/)"
+        }
       }
     },
     "end": {

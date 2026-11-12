@@ -259,7 +259,7 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-b
    charges, ajustements). Aucun solde saisi à la main.
    Format de données identique aux sauvegardes V30.
    ========================================================= */
-const VERSION = 'V2.13';
+const VERSION = 'V2.14';
 const LS_DATA = 'moayes_v2_data', LS_CFG = 'moayes_v2_cfg', LS_PIN = 'moayes_v2_pins', LS_TS = 'moayes_v2_ts';
 const FIREBASE_CONFIG = {
   apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
@@ -352,7 +352,7 @@ function save(){
 function saveCfg(){ localStorage.setItem(LS_CFG, JSON.stringify(CFG)); }
 function audit(module, action, ancien, nouveau, id){
   const n = (DATA.audit.reduce((m,a) => Math.max(m, a.num||0), 0)) + 1;
-  DATA.audit.push({num:n, date:today(), heure:nowH(), user:USER ? 'GOLI — '+ROLES[USER].name : '', module, action,
+  DATA.audit.push({num:n, date:today(), heure:nowH(), user:USER ? (compteLocal().nom || 'GOLI')+' — '+ROLES[USER].name : '', module, action,
     ancien: typeof ancien==='string' ? ancien : JSON.stringify(ancien||''), nouveau: typeof nouveau==='string' ? nouveau : JSON.stringify(nouveau||''), id:id||'', commentaire:'V2'});
 }
 function archive(collection, idx){
@@ -485,14 +485,14 @@ const ICONS = {
   logout:'<path d="M15 4h4v16h-4"/><path d="M10 8l-4 4 4 4M6 12h10"/>'
 };
 const ico = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]||ICONS.more}</svg>`;
-const SHORT = {home:'Accueil', tournee:'Tournée', clients:'Clients', reglements:'Règlements', ventes:'Ventes', production:'Production', achats:'Achats', charges:'Charges', stock:'Stock', tresorerie:'Caisse', rh:'Salaires', rapports:'Rapports', etats:'États', previsions:'Prévisions', journal:'Journal', guide:'Aide', params:'Réglages'};
+const SHORT = {home:'Accueil', tournee:'Tournée', clients:'Clients', reglements:'Règlements', ventes:'Ventes', production:'Production', achats:'Achats', charges:'Charges', stock:'Stock', tresorerie:'Caisse', rh:'Salaires', rapports:'Rapports', etats:'États', previsions:'Prévisions', journal:'Journal', comptes:'Comptes', guide:'Aide', params:'Réglages'};
 
 /* ---------- navigation ---------- */
 const PAGES = [
   ['home','◉','Accueil'], ['tournee','✚','Tournée du jour'], ['clients','◎','Clients & crédits'], ['reglements','✓','Règlements'],
   ['ventes','▤','Ventes'], ['production','▣','Production'], ['achats','▥','Achats manioc'],
   ['charges','▦','Charges'], ['stock','▧','Stock'], ['tresorerie','◈','Trésorerie'], ['rh','☺','Salaires & RH'], ['rapports','▲','Rapports'],
-  ['etats','≡','États financiers'], ['previsions','➚','Prévisions & conseils'], ['journal','⌚','Journal & contrôle'], ['guide','?','Mode d\'emploi'], ['params','⚙','Paramètres']
+  ['etats','≡','États financiers'], ['previsions','➚','Prévisions & conseils'], ['journal','⌚','Journal & contrôle'], ['comptes','🔐','Comptes utilisateurs'], ['guide','?','Mode d\'emploi'], ['params','⚙','Paramètres']
 ];
 function allowed(p){ const r = ROLES[USER]; return r.pages === '*' || r.pages.includes(p); }
 function go(p, param){ if (!allowed(p)) p = homeOf(); PAGE = p; PARAM = param ?? null; render(); window.scrollTo(0,0); }
@@ -1213,6 +1213,7 @@ VIEWS.guide = () => {
     ${st(4,'Clôture', 'Accueil → <b>Bilan du jour</b> : le résumé part sur WhatsApp. Vérifiez que la trésorerie affichée = l\'argent réellement en caisse.')}
   </div>
   <div class="card"><h3>📅 Chaque semaine / chaque mois</h3>
+    ${st('S','Donner un accès à une personne', 'Propriétaire connecté avec moayepos@gmail.com : menu <b>🔐 Comptes utilisateurs</b> → <b>+ Nouveau compte</b> (nom, rôle, e-mail). Envoyez les identifiants par WhatsApp et donnez le code PIN du rôle de vive voix.')}
     ${st('S','Relancer les dettes', 'Clients & crédits → filtre « Doivent » → ouvrez le client → <b>Relancer</b> (message WhatsApp prêt) ou <b>Encaisser une dette</b>.')}
     ${st('!','Une perte (sac pourri, volé, attiéké avarié)', 'Stock → <b>Déclarer une perte</b> (ou Production → <b>Perte de manioc</b>) : choisissez l\'article, la quantité (0,5 = demi-sac) et la cause. Le stock baisse, la valeur perdue est calculée et apparaît dans les rapports.')}
     ${st('S','Compter le stock', 'Stock → <b>Saisir un inventaire</b> : entrez ce que vous comptez réellement. L\'écart est enregistré et justifié.')}
@@ -2011,8 +2012,8 @@ function fbReady(){
       if (typeof firebase === 'undefined') return ko(new Error('SDK Firebase indisponible (hors ligne ?)'));
       if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
       _db = firebase.database(); _auth = firebase.auth();
-      fbSession().then(u => {
-        if (u && !u.isAnonymous) return ok();
+      fbSession().then(async u => {
+        if (u && !u.isAnonymous){ if (!await fbChargerCompte(u)) return ko({code:'compte-inactif'}); return ok(); }
         fbProposerCompte();
         if (u) return ok();
         // accès provisoire, tant que la base n'est pas verrouillée sur le compte de l'entreprise
@@ -2041,7 +2042,9 @@ function fbCompte(msg){
   const em = fbCompteTxt();
   if (em){
     modal(`<h2>🔐 Compte de l'entreprise</h2>
-      <div class="alert g">Connecté avec <b>${esc(em)}</b>. La synchronisation utilise ce compte.</div>
+      <div class="alert g">Connecté avec <b>${esc(em)}</b>${compteLocal().role ? ` — ${esc(compteLocal().nom)}, rôle <b>${esc(ROLES[compteLocal().role] ? ROLES[compteLocal().role].name : compteLocal().role)}</b>` : ' (propriétaire)'}. La synchronisation utilise ce compte.</div>
+      ${msg ? `<div class="alert r">${esc(msg)}</div>` : ''}
+      <label class="f">Changer mon mot de passe (8 caractères minimum)</label><div class="row"><input class="inp" id="fb_np" type="password" autocomplete="new-password" style="max-width:240px"><button class="btn" onclick="fbNouveauMdp()">Changer</button></div>
       <p class="small muted">Se déconnecter arrête la synchronisation sur cet appareil. Les données déjà saisies restent sur le téléphone.</p>
       <div class="act"><button class="btn" onclick="closeModal()">Fermer</button><button class="btn" onclick="fbDeconnexion()">Se déconnecter</button></div>`);
     return;
@@ -2055,11 +2058,107 @@ function fbCompte(msg){
     <div class="act"><button class="btn" onclick="closeModal()">Plus tard</button><button class="btn p" onclick="fbConnexion()">Se connecter</button></div>`);
   setTimeout(() => { const i = $('#fb_e'); if (i) i.focus(); }, 50);
 }
+/* ---------- comptes utilisateurs (créés par le propriétaire, comme dans END) ---------- */
+const PROPRIO_EMAIL = 'moayepos@gmail.com', COMPTES_PATH = 'moayes/v2_comptes';
+const ROLES_COMPTE = ['directrice', 'vendeur', 'comptable', 'producteur'];
+function compteLocal(v){
+  if (v !== undefined){ try { v ? localStorage.setItem('moayes_v2_compte', JSON.stringify(v)) : localStorage.removeItem('moayes_v2_compte'); } catch(e){} return v || {}; }
+  try { return JSON.parse(localStorage.getItem('moayes_v2_compte')) || {}; } catch(e){ return {}; }
+}
+const estProprio = () => (fbCompteTxt() || '').toLowerCase() === PROPRIO_EMAIL;
+async function fbChargerCompte(u){
+  if (!u || u.isAnonymous) return true;
+  if ((u.email || '').toLowerCase() === PROPRIO_EMAIL){ compteLocal(null); return true; }
+  try {
+    const c = (await firebase.database().ref(COMPTES_PATH + '/' + u.uid).once('value')).val();
+    if (!c || !c.actif) { compteLocal(null); return false; }
+    compteLocal({ nom: c.nom, role: c.role, email: c.email });
+    if (USER && USER !== c.role){ toast('Ce compte est limité au rôle ' + (ROLES[c.role] || {}).name); logout(); }
+    return true;
+  } catch(e){ return !!compteLocal().role; }   // hors ligne : on garde le dernier compte connu
+}
+async function fbNouveauMdp(){
+  const pw = $('#fb_np').value || '';
+  if (pw.length < 8) return toast('8 caractères minimum');
+  try { await _auth.currentUser.updatePassword(pw); toast('✅ Mot de passe changé'); closeModal(); } catch(err){ fbCompte(fbAuthErr(err)); }
+}
+let COMPTES = null;
+async function chargerComptes(){
+  try { COMPTES = (await firebase.database().ref(COMPTES_PATH).once('value')).val() || {}; }
+  catch(e){ COMPTES = { _err: (e && e.code) || 'erreur' }; }
+  if (PAGE === 'comptes') render();
+}
+VIEWS.comptes = () => {
+  const h = header('Comptes utilisateurs', 'Chaque personne a son e-mail et son mot de passe ; son rôle limite ce qu\'elle voit');
+  if (!fbCompteTxt()) return h + `<div class="card"><div class="empty">Connectez-vous d'abord avec le compte propriétaire (${PROPRIO_EMAIL}) : <button class="btn sm" onclick="fbCompte()">🔐 Se connecter</button></div></div>`;
+  if (!estProprio()) return h + '<div class="card"><div class="empty">Réservé au propriétaire.</div></div>';
+  if (COMPTES === null){ chargerComptes(); return h + '<div class="card"><div class="empty">Chargement…</div></div>'; }
+  if (COMPTES._err) return h + `<div class="card"><div class="alert r">Lecture des comptes refusée (${esc(COMPTES._err)}). Les règles de la base doivent être mises à jour.</div><button class="btn" onclick="COMPTES=null;render()">Réessayer</button></div>`;
+  const L = Object.entries(COMPTES).sort((a, b) => (a[1].nom || '').localeCompare(b[1].nom || ''));
+  return h + `<div class="row" style="margin-bottom:12px"><span class="small muted" style="flex:1">Le propriétaire (${PROPRIO_EMAIL}) a accès à tout. Un compte désactivé ne peut plus rien voir ni saisir.</span><button class="btn p" onclick="nouveauCompte()">+ Nouveau compte</button></div>
+  <div class="card"><div class="tw"><table><tr><th>Nom</th><th>E-mail</th><th>Rôle</th><th>État</th><th></th></tr>
+  ${L.map(([uid, u]) => `<tr><td><b>${esc(u.nom)}</b></td><td class="small">${esc(u.email)}</td><td><select class="inp" style="min-width:120px" onchange="roleCompte('${uid}',this.value)">${ROLES_COMPTE.map(r => `<option value="${r}" ${r === u.role ? 'selected' : ''}>${ROLES[r].name}</option>`).join('')}</select></td><td><span class="tag ${u.actif ? 'g' : 'r'}">${u.actif ? 'Actif' : 'Désactivé'}</span></td><td class="n" style="white-space:nowrap"><button class="btn sm" onclick="mdpCompte('${uid}')">🔑 Mot de passe</button> <button class="btn sm" onclick="actifCompte('${uid}')">${u.actif ? 'Désactiver' : 'Réactiver'}</button></td></tr>`).join('') || '<tr><td colspan="5" class="empty">Aucun compte pour l\'instant.</td></tr>'}
+  </table></div></div>
+  <div class="card" style="margin-top:14px"><h3>Comment ça marche</h3><ol class="small"><li>Créez le compte : nom, rôle, e-mail, mot de passe provisoire.</li><li>Envoyez les identifiants à la personne (bouton WhatsApp).</li><li>Sur son téléphone : elle ouvre l'application, choisit son rôle et entre le code PIN de ce rôle, puis Paramètres → 🔐 Se connecter avec son e-mail.</li><li>Elle change son mot de passe dans 🔐 Compte → « Changer mon mot de passe ».</li></ol></div>`;
+};
+function nouveauCompte(){
+  const pw = Math.random().toString(36).slice(2, 6).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6);
+  modal(`<h2>Nouveau compte</h2>
+    <label class="f">Nom affiché</label><input class="inp" id="c_nom" style="margin-bottom:8px">
+    <label class="f">Rôle</label><select class="inp" id="c_role" style="margin-bottom:8px">${ROLES_COMPTE.map(r => `<option value="${r}" ${r === 'vendeur' ? 'selected' : ''}>${ROLES[r].name} — ${ROLES[r].pages.filter(x => x !== 'guide' && x !== 'client').map(x => SHORT[x] || x).join(', ')}</option>`).join('')}</select>
+    <label class="f">E-mail</label><input class="inp" id="c_mail" type="email" style="margin-bottom:8px">
+    <label class="f">Mot de passe provisoire (8 caractères minimum)</label><input class="inp" id="c_pw" value="${pw}">
+    <p class="small muted">Elle le changera elle-même à sa première connexion.</p>
+    <div class="act"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" id="c_ok" onclick="creerCompte()">Créer le compte</button></div>`);
+}
+async function creerCompte(){
+  const nom = $('#c_nom').value.trim(), role = $('#c_role').value, email = $('#c_mail').value.trim().toLowerCase(), pw = $('#c_pw').value;
+  if (!nom || !email) return toast('Nom et e-mail obligatoires');
+  if (pw.length < 8) return toast('Mot de passe : 8 caractères minimum');
+  if (email === PROPRIO_EMAIL) return toast('Adresse réservée au propriétaire');
+  $('#c_ok').disabled = true;
+  const sec = firebase.apps.find(a => a.name === 'creation') || firebase.initializeApp(FIREBASE_CONFIG, 'creation');
+  try {
+    const cr = await sec.auth().createUserWithEmailAndPassword(email, pw);
+    const u = { nom, email, role, actif: true, cree: Date.now() };
+    await firebase.database().ref(COMPTES_PATH + '/' + cr.user.uid).set(u);
+    await sec.auth().signOut();
+    audit('comptes', 'création d\'un compte', '', nom + ' (' + ROLES[role].name + ', ' + email + ')', cr.user.uid); save();
+    COMPTES = null; identifiantsCompte(nom, role, email, pw);
+  } catch(e){ const b = $('#c_ok'); if (b) b.disabled = false; toast(fbAuthErr(e)); }
+}
+function identifiantsCompte(nom, role, email, pw){
+  const msg = `Bonjour ${nom},\n\nVotre accès à MOAYÉ'S Gestion Pro (rôle ${ROLES[role].name}) :\n\nLien : https://moayeindustrie.github.io/moayes-gestion/\nApplication Android : https://github.com/MOAYEINDUSTRIE/moayes-gestion/releases/download/apk/MOAYES-Gestion.apk\nE-mail : ${email}\nMot de passe provisoire : ${pw}\nCode PIN du rôle ${ROLES[role].name} : je vous le donne de vive voix.\n\nÀ la première ouverture : choisissez « ${ROLES[role].name} », entrez le code PIN, puis Paramètres → 🔐 Se connecter avec l'e-mail et le mot de passe. Changez ensuite le mot de passe (🔐 Compte). Ne le communiquez à personne.`;
+  window._idmsg = msg;
+  modal(`<h2>✅ Compte créé</h2><div class="alert w">Notez ou envoyez ces identifiants <b>maintenant</b> : le mot de passe ne sera plus affiché.</div>
+    <table><tr><td class="small muted">Nom</td><td><b>${esc(nom)}</b> — ${esc(ROLES[role].name)}</td></tr><tr><td class="small muted">E-mail</td><td>${esc(email)}</td></tr><tr><td class="small muted">Mot de passe provisoire</td><td style="font-size:18px"><b>${esc(pw)}</b></td></tr></table>
+    <p class="small muted">Le code PIN du rôle n'est pas dans le message : donnez-le de vive voix.</p>
+    <div class="act"><button class="btn" onclick="navigator.clipboard&&navigator.clipboard.writeText(window._idmsg).then(()=>toast('Copié'))">📋 Copier</button><button class="btn" onclick="window.open('https://wa.me/?text='+encodeURIComponent(window._idmsg),'_blank')">📲 WhatsApp</button><button class="btn p" onclick="closeModal();render()">Terminé</button></div>`);
+}
+async function majCompte(uid, champs, action){
+  const avant = COMPTES[uid], apres = { ...avant, ...champs };
+  try { await firebase.database().ref(COMPTES_PATH + '/' + uid).set(apres); COMPTES[uid] = apres; audit('comptes', action, JSON.stringify(avant), JSON.stringify(apres), uid); save(); toast('Enregistré'); render(); }
+  catch(e){ toast('Refusé : ' + (e.code || e.message)); render(); }
+}
+const roleCompte = (uid, role) => majCompte(uid, { role }, 'changement de rôle');
+function actifCompte(uid){
+  const u = COMPTES[uid];
+  modal(`<h2>${u.actif ? 'Désactiver' : 'Réactiver'} le compte</h2><p>${u.actif ? 'Désactiver' : 'Réactiver'} le compte de <b>${esc(u.nom)}</b> (${esc(u.email)}) ?${u.actif ? ' Elle ne pourra plus rien voir ni saisir.' : ''}</p>
+    <div class="act"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" onclick="closeModal();majCompte('${uid}',{actif:${!u.actif}},'${u.actif ? 'désactivation' : 'réactivation'} d’un compte')">Confirmer</button></div>`);
+}
+async function mdpCompte(uid){
+  const u = COMPTES[uid];
+  try { await firebase.auth().sendPasswordResetEmail(u.email); audit('comptes', 'réinitialisation du mot de passe demandée', '', u.nom, uid); save(); toast('E-mail envoyé à ' + u.email + ' (regardez aussi les spams)'); } catch(e){ toast(fbAuthErr(e)); }
+}
 function fbAuthErr(e){
   const c = String(e && e.code || '');
   if (/wrong-password|invalid-credential|invalid-login|user-not-found|invalid-email/.test(c)) return 'E-mail ou mot de passe incorrect.';
   if (/too-many-requests/.test(c)) return 'Trop d\'essais. Attendez quelques minutes.';
   if (/network/.test(c)) return 'Pas de connexion internet.';
+  if (/compte-inactif/.test(c)) return 'Ce compte n\'est pas autorisé ou a été désactivé. Voyez avec le propriétaire.';
+  if (/requires-recent-login/.test(c)) return 'Par sécurité, déconnectez-vous puis reconnectez-vous avant de changer le mot de passe.';
+  if (/weak-password/.test(c)) return 'Mot de passe trop faible (8 caractères minimum).';
+  if (/email-already-in-use/.test(c)) return 'Cette adresse e-mail a déjà un compte.';
   return 'Connexion impossible (' + (c || 'erreur') + ').';
 }
 async function fbConnexion(){
@@ -2071,6 +2170,7 @@ async function fbConnexion(){
     _db = firebase.database(); _auth = firebase.auth();
     if (LISTEN_PATH) _db.ref(LISTEN_PATH).off();
     await _auth.signInWithEmailAndPassword(e, pw);
+    if (!await fbChargerCompte(_auth.currentUser)){ await _auth.signOut(); throw {code:'compte-inactif'}; }
     _fbSessionP = Promise.resolve(_auth.currentUser);
     closeModal(); toast('🔐 Connecté : ' + e);
     FB_ERR = null; REMOTE_SEEN = false; LISTEN_PATH = ''; if (CFG.fbAuto) fbListen();
@@ -2084,11 +2184,12 @@ async function fbOubli(){
 }
 async function fbDeconnexion(){
   try { if (LISTEN_PATH) _db.ref(LISTEN_PATH).off(); await _auth.signOut(); } catch(e){}
-  LISTEN_PATH = ''; REMOTE_SEEN = false; _fbSessionP = null; setFb('off', 'Déconnecté');
+  LISTEN_PATH = ''; REMOTE_SEEN = false; _fbSessionP = null; setFb('off', 'Déconnecté'); compteLocal(null);
   closeModal(); toast('Déconnecté'); render();
 }
 function fbErr(e){
   const m = String(e && (e.code || e.message) || '');
+  if (/compte-inactif/.test(m)) return 'Ce compte n\'est pas autorisé ou a été désactivé par le propriétaire.';
   if (/PERMISSION|permission/.test(m)) return fbCompteTxt() ? 'Firebase refuse l\'accès à ce compte (règles de sécurité de la base).' : 'Connectez-vous avec le compte de l\'entreprise : Paramètres → Synchronisation Firebase → 🔐 Compte.';
   if (/SDK|network|offline/i.test(m)) return 'Pas de connexion internet : les données restent sur ce téléphone et partiront au retour du réseau.';
   return m || 'Firebase indisponible';
@@ -2263,6 +2364,8 @@ async function doLogin(){
   const lock = +sessionStorage.getItem('moayes_v2_lock') || 0;
   if (Date.now() < lock){ $('#lerr').textContent = `Trop d'essais. Réessayez dans ${Math.ceil((lock-Date.now())/1000)} s.`; return; }
   const p = await pins(), v = $('#pin').value;
+  const cl = compteLocal();
+  if (cl.role && window._role !== cl.role){ $('#lerr').textContent = `Cet appareil est relié au compte de ${cl.nom} : choisissez le rôle « ${ROLES[cl.role] ? ROLES[cl.role].name : cl.role} ».`; $('#pin').value = ''; return; }
   if (await hash(v) === p[window._role]){
     sessionStorage.removeItem('moayes_v2_fail');
     USER = window._role; sessionStorage.setItem('moayes_v2_user', USER); sessionStorage.setItem('moayes_v2_lh', await hash(v)); $('#layer').innerHTML = '';
