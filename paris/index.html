@@ -71,7 +71,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
 <div id="toast"></div>
 <script>
 'use strict';
-const VERSION = 'V1.1';
+const VERSION = 'V1.2';
 const REPO_RAW = 'https://raw.githubusercontent.com/MOAYEINDUSTRIE/moayes-gestion/registre-paris/';
 const ODDS = 'https://api.the-odds-api.com/v4';
 const PERIME_MIN = 20;          // au-delà, les cotes sont considérées comme anciennes
@@ -201,7 +201,8 @@ async function api(path){
   try { r = await fetch(ODDS + path + (path.includes('?') ? '&' : '?') + 'apiKey=' + encodeURIComponent(D.cfg.cle), { cache: 'no-store' }); }
   catch(e){ throw new Error('Pas de connexion internet'); }
   const reste = r.headers.get('x-requests-remaining'); if (reste != null && reste !== ''){ D.cache.restant = reste; save(); }
-  if (r.status === 401 || r.status === 403) throw new Error('Clé API refusée : vérifiez-la dans ⚙ Paramètres');
+  if (r.status === 401 || r.status === 403){ let m = ''; try { m = (await r.json()).message || ''; } catch(e){}
+    throw new Error('Clé API refusée (' + D.cfg.cle.length + ' caractères, il en faut 32' + (D.cfg.cle.length === 32 ? ' : la longueur est bonne, la clé est peut-être pas encore activée ou mal recopiée' : '') + ')' + (m ? ' — ' + m : '')); }
   if (r.status === 429) throw new Error('Quota de la clé épuisé pour ce mois');
   if (r.status === 404 || r.status === 422) throw new Error('Ligue indisponible');
   if (!r.ok) throw new Error('Service des cotes indisponible (' + r.status + ')');
@@ -364,7 +365,7 @@ VIEWS.bilan = () => {
 
 /* ---------- paramètres ---------- */
 VIEWS.params = () => `<div class="card"><h3>Cotes en temps réel</h3>
-  <label>Clé The Odds API (gratuite sur the-odds-api.com ; elle reste sur cet appareil)</label><div class="row"><input id="s_cle" type="password" value="${esc(D.cfg.cle)}" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:180px"><button class="btn" onclick="testerCle()">Tester la clé</button></div>
+  <label>Clé The Odds API (gratuite sur the-odds-api.com ; elle reste sur cet appareil)</label><div class="row"><input id="s_cle" type="password" value="${esc(D.cfg.cle)}" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:180px"><button class="btn" title="Afficher ou masquer" onclick="const i=$('#s_cle');i.type=i.type==='password'?'text':'password'">👁</button><button class="btn" onclick="testerCle()">Tester la clé</button></div>
   <label>Région des bookmakers</label><select id="s_reg">${[['eu','Europe'],['uk','Royaume-Uni'],['us','États-Unis'],['au','Australie']].map(([k, t]) => `<option value="${k}" ${D.cfg.regions === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
   <label>Ligues suivies (${D.cfg.ligues.length})</label><div id="s_lig" class="small">${SPORTS ? SPORTS.map(s => `<label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:4px 0"><input type="checkbox" style="width:auto" value="${esc(s.key)}" ${D.cfg.ligues.includes(s.key) ? 'checked' : ''}> ${esc(s.title)}</label>`).join('') : esc(D.cfg.ligues.join(', ') || 'aucune') + ` <button class="btn sm" onclick="chargerSports()">Choisir les ligues</button>`}</div>
   <p class="small muted">Chaque ligue chargée consomme 2 requêtes. Avec 4 ligues : environ 60 chargements par mois en formule gratuite. Tester la clé et choisir les ligues ne consomment rien.</p></div>
@@ -379,7 +380,8 @@ VIEWS.params = () => `<div class="card"><h3>Cotes en temps réel</h3>
   <div class="act"><button class="btn p" onclick="enregistrerParams()">Enregistrer</button></div></div>
   <div class="card"><h3>Sauvegarde</h3><p class="small muted">Vos paris sont enregistrés uniquement sur cet appareil : faites une sauvegarde de temps en temps. La clé API n'est jamais dans le fichier.</p><div class="row"><button class="btn" onclick="exporter()">⬇ Télécharger une sauvegarde</button><label class="btn" style="margin:0;color:var(--ink)">⬆ Restaurer<input type="file" accept=".json,application/json" style="display:none" onchange="importer(this.files[0]);this.value=''"></label></div></div>
   <p class="small muted">Paris Pro ${VERSION} · usage personnel · aucun pari n'est placé automatiquement · aucun gain n'est garanti.</p>`;
-function lireCle(){ const c = ($('#s_cle') ? $('#s_cle').value : D.cfg.cle).trim(); if (c && c !== D.cfg.cle){ D.cfg.cle = c; save(); } return c; }
+const nettoyerCle = v => String(v || '').replace(/[^A-Za-z0-9]/g, '');
+function lireCle(){ const c = nettoyerCle($('#s_cle') ? $('#s_cle').value : D.cfg.cle); if ($('#s_cle')) $('#s_cle').value = c; if (c && c !== D.cfg.cle){ D.cfg.cle = c; save(); } return c; }
 async function chargerSports(){
   if (!lireCle()) return toast('Collez d\'abord la clé API');
   try { SPORTS = (await api('/sports/')).filter(s => s.active && s.group === 'Soccer' && !s.has_outrights).sort((a, b) => String(a.title).localeCompare(b.title)); render(); } catch(e){ toast(e.message); }
@@ -395,7 +397,7 @@ function pause(j){
 function enregistrerParams(){
   const c = D.cfg, bk = $('#s_bk').value.trim();
   if (bk && !/^https:\/\/[^\s]+$/i.test(bk)) return toast('L\'adresse du bookmaker doit commencer par https://');
-  c.cle = $('#s_cle').value.trim(); c.regions = ['eu', 'uk', 'us', 'au'].includes($('#s_reg').value) ? $('#s_reg').value : 'eu';
+  c.cle = nettoyerCle($('#s_cle').value); c.regions = ['eu', 'uk', 'us', 'au'].includes($('#s_reg').value) ? $('#s_reg').value : 'eu';
   const cb = [...document.querySelectorAll('#s_lig input[type=checkbox]')]; if (cb.length) c.ligues = cb.filter(x => x.checked).map(x => x.value).slice(0, 12);
   c.budget = Math.max(0, Math.round(num($('#s_bud').value))); c.miseMax = Math.max(0, Math.round(num($('#s_max').value)));
   c.seuil = Math.min(.99, Math.max(.5, (num($('#s_seuil').value) || 70) / 100)); c.valeurMin = Math.min(.5, Math.max(0, num($('#s_val').value) / 100));

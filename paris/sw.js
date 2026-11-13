@@ -1,5 +1,5 @@
 /* Paris Pro — fonctionnement hors ligne (la page est toujours demandée d'abord au réseau). */
-const CACHE = 'paris-shell-2';
+const CACHE = 'paris-shell-3';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(n => n.startsWith('paris-') && n !== CACHE).map(n => caches.delete(n)))).then(() => self.clients.claim())); });
