@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Paris Pro</title>
 <meta name="theme-color" content="#14231c">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api.the-odds-api.com https://raw.githubusercontent.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <style>
 :root{--bg:#f3f1ea;--card:#fff;--ink:#16211c;--muted:#6b7570;--line:#e4e1d8;--brand:#1f5c43;--brand2:#e8f1ec;--red:#b42318;--red2:#fdecea;--amber:#9a6200;--amber2:#fff4dc;--green:#167a45;--green2:#e3f5ea}
 @media (prefers-color-scheme:dark){:root{--bg:#101613;--card:#18211c;--ink:#e6ece8;--muted:#9aa6a0;--line:#2a3530;--brand:#5fbf93;--brand2:#1d2e26;--red:#ff8a80;--red2:#3a1f1d;--amber:#ffc65c;--amber2:#33290f;--green:#6fdc9f;--green2:#173326}}
@@ -66,42 +71,65 @@ td.n,th.n{text-align:right;white-space:nowrap}
 <div id="toast"></div>
 <script>
 'use strict';
-const VERSION = 'V1.0';
+const VERSION = 'V1.1';
 const REPO_RAW = 'https://raw.githubusercontent.com/MOAYEINDUSTRIE/moayes-gestion/registre-paris/';
 const ODDS = 'https://api.the-odds-api.com/v4';
+const PERIME_MIN = 20;          // au-delà, les cotes sont considérées comme anciennes
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = x => { const n = parseFloat(String(x == null ? '' : x).replace(/\s/g, '').replace(',', '.')); return isFinite(n) ? n : 0; };
 const F = (n, d = 0) => (isFinite(n) ? Number(n) : 0).toLocaleString('fr-FR', {minimumFractionDigits: d, maximumFractionDigits: d});
-const P = x => isFinite(x) ? F(x * 100, 1) + ' %' : '—';
-const today = () => new Date().toISOString().slice(0, 10);
-const mois = d => (d || '').slice(0, 7);
-function toast(m){ const t = $('#toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 2600); }
+const P = x => isFinite(x) && x !== '' ? F(x * 100, 1) + ' %' : '—';
+const jour = d => { const x = new Date(d); x.setMinutes(x.getMinutes() - x.getTimezoneOffset()); return x.toISOString().slice(0, 10); };
+const today = () => jour(Date.now());
+const mois = d => String(d || '').slice(0, 7);
+const frDate = d => String(d || '').split('-').reverse().join('/');
+function toast(m){ const t = $('#toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 3200); }
 function modal(h){ $('#layer').innerHTML = `<div class="md" onclick="event.stopPropagation()">${h}</div>`; }
 function closeModal(){ $('#layer').innerHTML = ''; }
 $('#layer').onclick = closeModal;
+window.addEventListener('error', e => toast('Erreur : ' + (e.message || 'inconnue')));
+window.addEventListener('unhandledrejection', e => toast('Erreur : ' + ((e.reason && e.reason.message) || 'inconnue')));
 
 /* ---------- stockage (sur l'appareil uniquement) ---------- */
 const KEY = 'paris_pro_v1';
-const DEF = { paris: [], cfg: { cle: '', regions: 'eu', ligues: ['soccer_epl', 'soccer_france_ligue_one', 'soccer_spain_la_liga', 'soccer_uefa_champs_league'], budget: 20000, miseMax: 1000, seuil: 0.70, valeurMin: 0.03, bookmaker: '', notif: false }, cache: {} };
-let D;
-function load(){ try { D = JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e){ D = {}; } D = { ...DEF, ...D, cfg: { ...DEF.cfg, ...(D.cfg || {}) }, cache: D.cache || {} }; }
-function save(){ try { localStorage.setItem(KEY, JSON.stringify(D)); } catch(e){ toast('Mémoire de l\'appareil pleine'); } }
+const DEF_CFG = { cle: '', regions: 'eu', ligues: ['soccer_epl', 'soccer_france_ligue_one', 'soccer_spain_la_liga', 'soccer_uefa_champs_league'], budget: 20000, miseMax: 1000, seuil: 0.70, valeurMin: 0.03, bookmaker: '', notif: false, pause: '' };
+const ISSUES = ['EN_ATTENTE', 'GAGNÉ', 'PERDU', 'REMBOURSÉ'];
+let D, STOCK_OK = true;
+function propre(p){   // un pari toujours bien formé, d'où qu'il vienne (ancienne version, fichier restauré)
+  if (!p || typeof p !== 'object') return null;
+  const cote = num(p.cote), mise = Math.round(num(p.mise));
+  if (!(cote > 1) || !(mise > 0) || !p.match) return null;
+  let pr = num(p.proba); if (pr > 1) pr /= 100;
+  return { id: String(p.id || '').replace(/[^a-z0-9]/gi, '').slice(0, 24) || Date.now().toString(36) + Math.random().toString(36).slice(2, 6), date: /^\d{4}-\d{2}-\d{2}$/.test(p.date) ? p.date : today(), match: String(p.match).slice(0, 120), competition: String(p.competition || '').slice(0, 80), marche: String(p.marche || '').slice(0, 80), cote, mise, proba: pr > 0 && pr <= 1 ? pr : '', source: String(p.source || 'manuel').slice(0, 60), note: String(p.note || '').slice(0, 200), issue: ISSUES.includes(p.issue) ? p.issue : 'EN_ATTENTE', regle: String(p.regle || '') };
+}
+function load(){
+  let x = {}; try { x = JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e){ x = {}; }
+  D = { paris: (Array.isArray(x.paris) ? x.paris : []).map(propre).filter(Boolean), cfg: { ...DEF_CFG, ...(x.cfg || {}) }, cache: x.cache && typeof x.cache === 'object' ? x.cache : {} };
+  if (!Array.isArray(D.cfg.ligues)) D.cfg.ligues = DEF_CFG.ligues.slice();
+}
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(D)); STOCK_OK = true; } catch(e){ STOCK_OK = false; toast('⚠️ Enregistrement impossible sur cet appareil (mémoire pleine ou navigation privée)'); } }
 load();
 
 /* ---------- navigation ---------- */
 const PAGES = [['jour','📅 Aujourd\'hui'], ['cotes','📈 Cotes'], ['paris','📒 Mes paris'], ['bilan','📊 Bilan'], ['params','⚙ Paramètres']];
-let PAGE = 'jour';
+let PAGE = 'jour', ACT = [];
+const act = o => ACT.push(o) - 1;       // les données d'un bouton restent en mémoire, jamais dans le HTML
 function go(p){ PAGE = p; render(); scrollTo(0, 0); }
 function render(){
+  ACT = [];
   $('#nav').innerHTML = PAGES.map(([k, t]) => `<button class="${k === PAGE ? 'on' : ''}" onclick="go('${k}')">${t}</button>`).join('');
-  $('#app').innerHTML = VIEWS[PAGE]();
+  let h; try { h = VIEWS[PAGE](); } catch(e){ h = `<div class="alert r">Cet écran n'a pas pu s'afficher (${esc(e.message)}). Vos paris ne sont pas perdus : ⚙ Paramètres → Télécharger une sauvegarde.</div>`; }
+  $('#app').innerHTML = (STOCK_OK ? '' : '<div class="alert r">⚠️ L\'appareil refuse d\'enregistrer : vos saisies seraient perdues à la fermeture. Quittez la navigation privée ou libérez de la mémoire.</div>') + h;
 }
 const VIEWS = {};
 
 /* ---------- budget et jeu responsable ---------- */
-const miseMois = (m = mois(today())) => D.paris.filter(p => mois(p.date) === m).reduce((s, p) => s + (+p.mise || 0), 0);
+const miseMois = (m = mois(today())) => D.paris.filter(p => mois(p.date) === m && p.issue !== 'REMBOURSÉ').reduce((s, p) => s + p.mise, 0);
 const resteBudget = () => (+D.cfg.budget || 0) - miseMois();
+const enPause = () => D.cfg.pause && D.cfg.pause > today();
 function bandeauBudget(){
+  if (enPause()) return `<div class="alert r">⏸ Pause en cours jusqu'au ${frDate(D.cfg.pause)} : aucun pari ne peut être enregistré. C'est vous qui l'avez décidé, tenez bon.</div>`;
   const r = resteBudget(), b = +D.cfg.budget || 0;
   if (!b) return '<div class="alert a">Fixez un budget mensuel dans ⚙ Paramètres : c\'est la règle n° 1 pour ne pas perdre le contrôle.</div>';
   if (r <= 0) return `<div class="alert r">⛔ Budget du mois atteint (${F(b)} F). Arrêtez les paris jusqu'au mois prochain.</div>`;
@@ -110,146 +138,207 @@ function bandeauBudget(){
 }
 
 /* ---------- agent : registre et rapport du jour ---------- */
-let AGENT = null; // {reg:[], sites:[], journal:'', jdate:''}
-function csv(t){
-  const L = t.trim().split(/\r?\n/); const h = L.shift().split(';');
-  return L.filter(x => x.trim()).map(l => { const v = l.split(';'); const o = {}; h.forEach((k, i) => o[k] = v[i] || ''); return o; });
+let AGENT = null;
+function csv(t){   // séparateur « ; », guillemets acceptés
+  const rows = []; let row = [], cur = '', q = false;
+  t = String(t).replace(/^﻿/, '');
+  for (let i = 0; i < t.length; i++){
+    const c = t[i];
+    if (q){ if (c === '"'){ if (t[i + 1] === '"'){ cur += '"'; i++; } else q = false; } else cur += c; }
+    else if (c === '"') q = true;
+    else if (c === ';'){ row.push(cur); cur = ''; }
+    else if (c === '\n' || c === '\r'){ if (c === '\r' && t[i + 1] === '\n') i++; row.push(cur); cur = ''; if (row.some(x => x.trim())) rows.push(row); row = []; }
+    else cur += c;
+  }
+  row.push(cur); if (row.some(x => x.trim())) rows.push(row);
+  const h = (rows.shift() || []).map(x => x.trim());
+  return rows.map(v => { const o = {}; h.forEach((k, i) => o[k] = (v[i] || '').trim()); return o; });
 }
+async function texte(url){ const r = await fetch(url + '?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); }
 async function chargerAgent(force){
   if (AGENT && !force) return;
-  AGENT = { charge: true, reg: [], sites: [], journal: '', jdate: '' };
-  const nc = '?t=' + Date.now();
-  try { AGENT.reg = csv(await (await fetch(REPO_RAW + 'registre.csv' + nc)).text()); } catch(e){ AGENT.err = 'registre'; }
-  try { AGENT.sites = csv(await (await fetch(REPO_RAW + 'suivi_sites.csv' + nc)).text()); } catch(e){}
-  for (let i = 0; i < 4; i++){
-    const d = new Date(Date.now() - i * 864e5).toISOString().slice(0, 10);
-    try { const r = await fetch(REPO_RAW + 'journal/' + d + '.md' + nc); if (r.ok){ AGENT.journal = await r.text(); AGENT.jdate = d; break; } } catch(e){}
+  AGENT = { charge: true, reg: [], sites: [], journal: '', jdate: '' }; if (force) render();
+  const A = { reg: [], sites: [], journal: '', jdate: '', maj: Date.now() };
+  try {
+    A.reg = csv(await texte(REPO_RAW + 'registre.csv')).filter(r => r.match);
+    try { A.sites = csv(await texte(REPO_RAW + 'suivi_sites.csv')); } catch(e){}
+    for (let i = 0; i < 5 && !A.journal; i++){ const d = jour(Date.now() - i * 864e5); try { A.journal = await texte(REPO_RAW + 'journal/' + d + '.md'); A.jdate = d; } catch(e){} }
+    D.cache.agent = A; save(); AGENT = A;
+  } catch(e){
+    AGENT = D.cache.agent ? { ...D.cache.agent, horsLigne: true } : { reg: [], sites: [], journal: '', jdate: '', err: true };
   }
-  AGENT.charge = false; render();
+  render();
 }
 VIEWS.jour = () => {
-  if (!AGENT){ chargerAgent(); }
+  if (!AGENT) chargerAgent();
   const h = bandeauBudget();
   if (!AGENT || AGENT.charge) return h + '<div class="card">Chargement du rapport de l\'agent…</div>';
+  const etat = AGENT.err ? '<div class="alert r">Impossible de joindre le registre de l\'agent (pas d\'internet ?). Touchez « Actualiser ».</div>'
+    : AGENT.horsLigne ? `<div class="alert a">Hors ligne : affichage des données du ${new Date(AGENT.maj).toLocaleString('fr-FR', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'})}.</div>` : '';
   const sel = AGENT.reg.filter(r => r.date_emission === today());
-  const att = AGENT.reg.filter(r => r.issue === 'EN_ATTENTE' && r.date_emission !== today());
-  const jr = AGENT.jdate === today() ? '' : `<div class="alert a">Le rapport du jour n'est pas encore publié (l'agent passe vers 8 h). Dernier rapport : ${esc(AGENT.jdate || 'aucun')}.</div>`;
-  return h + `<div class="card"><div class="row" style="justify-content:space-between"><h3>Sélections de l'agent — ${new Date().toLocaleDateString('fr-FR')}</h3><button class="btn sm" onclick="chargerAgent(true)">↻ Actualiser</button></div>
-    ${sel.length ? sel.map(carteSel).join('') : '<div class="alert b">Aucun pari recommandé aujourd\'hui. Ne pas parier est aussi une décision gagnante.</div>'}
-    ${att.length ? `<h3 style="margin-top:12px">En attente de résultat</h3>${att.map(carteSel).join('')}` : ''}</div>
-    <div class="card"><h3>Rapport de l'agent ${AGENT.jdate ? '(' + esc(AGENT.jdate) + ')' : ''}</h3>${jr}<div class="rep">${esc(AGENT.journal || 'Aucun rapport disponible.')}</div></div>`;
+  const att = AGENT.reg.filter(r => (r.issue || 'EN_ATTENTE') === 'EN_ATTENTE' && r.date_emission !== today());
+  const jr = AGENT.jdate === today() ? '' : `<div class="alert a">Le rapport d'aujourd'hui n'est pas encore publié (l'agent passe vers 8 h). Dernier rapport : ${AGENT.jdate ? frDate(AGENT.jdate) : 'aucun'}.</div>`;
+  return h + etat + `<div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Sélections de l'agent — ${frDate(today())}</h3><button class="btn sm" onclick="chargerAgent(true)">↻ Actualiser</button></div>
+    <div style="margin-top:10px">${sel.length ? sel.map(carteSel).join('') : (AGENT.jdate === today() ? '<div class="alert b" style="margin:0">Aucun pari recommandé aujourd\'hui. Ne pas parier est aussi une décision gagnante.</div>' : '<div class="alert a" style="margin:0">Pas encore de sélection pour aujourd\'hui.</div>')}</div>
+    ${att.length ? `<h3 style="margin-top:14px">En attente de résultat</h3>${att.map(carteSel).join('')}` : ''}</div>
+    <div class="card"><h3>Rapport de l'agent ${AGENT.jdate ? '(' + frDate(AGENT.jdate) + ')' : ''}</h3>${jr}<div class="rep">${esc(AGENT.journal || 'Aucun rapport disponible.')}</div></div>`;
 };
 function carteSel(r){
-  return `<div class="match"><div class="row" style="justify-content:space-between"><b>${esc(r.match)}</b><span class="tag ${r.issue === 'GAGNÉ' ? 'g' : r.issue === 'PERDU' ? 'r' : 'a'}">${esc(r.issue || 'EN_ATTENTE')}</span></div>
+  const iss = r.issue || 'EN_ATTENTE'; let pr = num(r.proba_estimee); if (pr > 1) pr /= 100;
+  const i = act({ match: r.match, competition: r.competition, marche: r.marche, cote: num(r.cote) || '', proba: pr || '', source: 'Agent' });
+  return `<div class="match"><div class="row" style="justify-content:space-between"><b>${esc(r.match)}</b><span class="tag ${iss === 'GAGNÉ' ? 'g' : iss === 'PERDU' ? 'r' : 'a'}">${esc(iss)}</span></div>
   <div class="small muted">${esc(r.competition)} · ${esc(r.coup_envoi_local)} ${esc(r.fuseau)}</div>
-  <div class="row small" style="margin-top:6px"><span class="tag b">${esc(r.marche)}</span> cote <b>${esc(r.cote)}</b> (${esc(r.bookmaker_source_cote)}) · probabilité ${esc(r.proba_estimee)} · confiance ${esc(r.confiance_100)}/100 · valeur ${esc(r.valeur_attendue)}</div>
+  <div class="small" style="margin-top:6px"><span class="tag b">${esc(r.marche)}</span> cote <b>${esc(r.cote)}</b> (${esc(r.bookmaker_source_cote)}) · probabilité ${esc(r.proba_estimee)} · confiance ${esc(r.confiance_100)}/100 · valeur ${esc(r.valeur_attendue)}</div>
   <div class="small muted" style="margin-top:4px">${esc(r.methode)}</div>
-  ${r.issue === 'EN_ATTENTE' || !r.issue ? `<div class="act" style="margin-top:8px"><button class="btn sm p" onclick='parier(${JSON.stringify({match: r.match, competition: r.competition, marche: r.marche, cote: parseFloat(String(r.cote).replace(',', '.')) || '', proba: parseFloat(String(r.proba_estimee).replace(',', '.')) || '', source: 'Agent'}).replace(/'/g, '&#39;')})'>Parier</button></div>` : ''}</div>`;
+  ${iss === 'EN_ATTENTE' ? `<div class="act" style="margin-top:8px"><span class="small muted" style="flex:1">Vérifiez la cote chez votre bookmaker : elle a pu changer.</span><button class="btn sm p" onclick="parier(ACT[${i}])">Parier</button></div>` : ''}</div>`;
 }
 
 /* ---------- cotes en temps réel (The Odds API) ---------- */
 let COTES = null, SPORTS = null;
 async function api(path){
-  if (!D.cfg.cle) throw new Error('cle');
-  const r = await fetch(ODDS + path + (path.includes('?') ? '&' : '?') + 'apiKey=' + encodeURIComponent(D.cfg.cle));
-  const reste = r.headers.get('x-requests-remaining'); if (reste != null){ D.cache.restant = reste; save(); }
-  if (r.status === 401) throw new Error('Clé API refusée');
+  if (!D.cfg.cle) throw new Error('Clé API manquante');
+  let r;
+  try { r = await fetch(ODDS + path + (path.includes('?') ? '&' : '?') + 'apiKey=' + encodeURIComponent(D.cfg.cle), { cache: 'no-store' }); }
+  catch(e){ throw new Error('Pas de connexion internet'); }
+  const reste = r.headers.get('x-requests-remaining'); if (reste != null && reste !== ''){ D.cache.restant = reste; save(); }
+  if (r.status === 401 || r.status === 403) throw new Error('Clé API refusée : vérifiez-la dans ⚙ Paramètres');
   if (r.status === 429) throw new Error('Quota de la clé épuisé pour ce mois');
-  if (!r.ok) throw new Error('Erreur ' + r.status);
-  return r.json();
+  if (r.status === 404 || r.status === 422) throw new Error('Ligue indisponible');
+  if (!r.ok) throw new Error('Service des cotes indisponible (' + r.status + ')');
+  const j = await r.json(); if (!Array.isArray(j)) throw new Error('Réponse inattendue du service des cotes');
+  return j;
 }
 async function chargerCotes(){
-  COTES = { charge: true, matchs: [], err: '' }; render();
+  if (COTES && COTES.charge) return;
+  if (COTES && COTES.ts && Date.now() - COTES.ts < 60000) return toast('Cotes relevées il y a moins d\'une minute');
+  const anc = COTES; COTES = { charge: true, matchs: [], errs: [] }; render();
   const fin = new Date(Date.now() + 36 * 3600e3).toISOString().slice(0, 19) + 'Z';
+  let ok = 0;
   for (const lg of D.cfg.ligues){
     try {
-      const L = await api(`/sports/${lg}/odds/?regions=${D.cfg.regions}&markets=h2h,totals&oddsFormat=decimal&dateFormat=iso&commenceTimeTo=${fin}`);
-      L.forEach(m => COTES.matchs.push(analyser(m)));
-    } catch(e){ COTES.err = e.message === 'cle' ? 'cle' : e.message; if (/Clé|Quota/.test(e.message)) break; }
+      const L = await api(`/sports/${encodeURIComponent(lg)}/odds/?regions=${encodeURIComponent(D.cfg.regions)}&markets=h2h,totals&oddsFormat=decimal&dateFormat=iso&commenceTimeTo=${fin}`);
+      L.forEach(m => { try { const a = analyser(m); if (a) COTES.matchs.push(a); } catch(e){} }); ok++;
+    } catch(e){ if (/Ligue indisponible/.test(e.message)) COTES.errs.push(lg + ' : hors saison ou indisponible'); else { COTES.errs.push(e.message); break; } }
   }
-  COTES.matchs = COTES.matchs.filter(m => new Date(m.debut) > new Date()).sort((a, b) => a.debut.localeCompare(b.debut));
-  COTES.charge = false; COTES.heure = new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'});
-  D.cache.cotes = { heure: COTES.heure, date: today(), matchs: COTES.matchs }; save();
+  if (!ok && anc && anc.matchs){ COTES = { ...anc, errs: COTES.errs }; return render(); }   // échec complet : on garde l'ancien relevé
+  COTES.matchs.sort((a, b) => a.debut.localeCompare(b.debut));
+  COTES.charge = false; COTES.ts = Date.now();
+  D.cache.cotes = { ts: COTES.ts, matchs: COTES.matchs }; save();
   notifier(); render();
 }
-// Prédiction = probabilité du marché sans marge, moyenne de tous les bookmakers ; valeur = meilleure cote × probabilité − 1
+const mediane = a => { const s = a.slice().sort((x, y) => x - y), n = s.length; return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : 0; };
+// Probabilité = avis du marché sans marge (moyenne des bookmakers) ; valeur = meilleure cote × probabilité − 1.
+// Une cote isolée très au-dessus des autres est presque toujours une erreur ou une cote périmée : elle est écartée.
 function analyser(m){
+  if (!m || !m.home_team || !m.away_team || !m.commence_time) return null;
   const issues = {};
-  const ajout = (k, nom, cote, prob, bk) => { const o = issues[k] || (issues[k] = { nom, probs: [], best: 0, bk: '' }); o.probs.push(prob); if (cote > o.best){ o.best = cote; o.bk = bk; } };
+  const ajout = (k, nom, cote, prob, bk) => { const o = issues[k] || (issues[k] = { nom, probs: [], prix: [] }); o.probs.push(prob); o.prix.push({ c: cote, bk }); };
   (m.bookmakers || []).forEach(b => (b.markets || []).forEach(mk => {
-    const out = mk.outcomes || []; const inv = out.reduce((s, o) => s + 1 / o.price, 0); if (!inv) return;
-    out.forEach(o => {
-      const prob = (1 / o.price) / inv;
-      if (mk.key === 'h2h') ajout('h2h:' + o.name, o.name === m.home_team ? '1 · ' + o.name : o.name === m.away_team ? '2 · ' + o.name : 'X · Nul', o.price, prob, b.title);
-      else if (mk.key === 'totals') ajout('tot:' + o.name + o.point, (o.name === 'Over' ? 'Plus de ' : 'Moins de ') + String(o.point).replace('.', ','), o.price, prob, b.title);
-    });
+    const out = (mk.outcomes || []).filter(o => o && o.price > 1);
+    if (out.length < 2 || (mk.key === 'h2h' && out.length !== 3)) return;
+    if (mk.key === 'totals'){
+      const pts = {}; out.forEach(o => (pts[o.point] = pts[o.point] || []).push(o));
+      Object.values(pts).forEach(g => { if (g.length !== 2) return; const inv = g.reduce((s, o) => s + 1 / o.price, 0); g.forEach(o => ajout('tot:' + o.name + o.point, (o.name === 'Over' ? 'Plus de ' : 'Moins de ') + String(o.point).replace('.', ','), o.price, (1 / o.price) / inv, b.title)); });
+    } else if (mk.key === 'h2h'){
+      const inv = out.reduce((s, o) => s + 1 / o.price, 0);
+      out.forEach(o => ajout('h2h:' + o.name, o.name === m.home_team ? '1 · ' + o.name : o.name === m.away_team ? '2 · ' + o.name : 'X · Nul', o.price, (1 / o.price) / inv, b.title));
+    }
   }));
-  const L = Object.entries(issues).map(([k, o]) => { const p = o.probs.reduce((s, x) => s + x, 0) / o.probs.length; return { k, nom: o.nom, p, best: o.best, bk: o.bk, n: o.probs.length, val: p * o.best - 1 }; });
-  // doubles chances déduites des probabilités 1X2
-  const g = n => L.find(x => x.k === 'h2h:' + n);
-  const h = g(m.home_team), a = g(m.away_team), x = g('Draw');
+  const L = Object.entries(issues).map(([k, o]) => {
+    const p = o.probs.reduce((s, x) => s + x, 0) / o.probs.length, med = mediane(o.prix.map(x => x.c));
+    const sains = o.prix.filter(x => x.c <= med * 1.12), top = sains.reduce((a, x) => x.c > a.c ? x : a, { c: 0, bk: '' });
+    return { k, nom: o.nom, p, best: top.c, bk: top.bk, n: o.probs.length, val: p * top.c - 1 };
+  });
+  const g = n => L.find(x => x.k === 'h2h:' + n), h = g(m.home_team), a = g(m.away_team), x = g('Draw');
   if (h && a && x){ L.push({ k: 'dc:1X', nom: '1X · ' + m.home_team + ' ou nul', p: h.p + x.p, best: 0, n: h.n }); L.push({ k: 'dc:X2', nom: 'X2 · nul ou ' + m.away_team, p: a.p + x.p, best: 0, n: a.n }); }
-  return { id: m.id, ligue: m.sport_title, debut: m.commence_time, dom: m.home_team, ext: m.away_team, issues: L, nbk: (m.bookmakers || []).length };
+  if (!L.length) return null;
+  return { id: m.id, ligue: m.sport_title || '', debut: m.commence_time, dom: m.home_team, ext: m.away_team, issues: L, nbk: (m.bookmakers || []).length };
 }
-function notifier(){
+const forte = i => i.best > 1 && i.n >= 3 && i.p >= D.cfg.seuil && i.val >= D.cfg.valeurMin;
+const aVenir = m => new Date(m.debut).getTime() > Date.now();
+const ageMin = () => COTES && COTES.ts ? Math.floor((Date.now() - COTES.ts) / 60000) : 0;
+async function notifier(){
   if (!D.cfg.notif || !('Notification' in window) || Notification.permission !== 'granted') return;
-  const fortes = (COTES.matchs || []).flatMap(m => m.issues.filter(i => i.best && i.p >= D.cfg.seuil && i.val >= D.cfg.valeurMin).map(i => m.dom + ' – ' + m.ext + ' : ' + i.nom));
-  if (fortes.length) try { new Notification('Paris Pro — ' + fortes.length + ' opportunité(s)', { body: fortes.slice(0, 3).join('\n') }); } catch(e){}
+  const f = COTES.matchs.filter(aVenir).flatMap(m => m.issues.filter(forte).map(i => m.dom + ' – ' + m.ext + ' : ' + i.nom));
+  if (!f.length) return;
+  const titre = 'Paris Pro — ' + f.length + ' opportunité(s) à étudier', opt = { body: f.slice(0, 3).join('\n'), icon: 'icons/icon-192.png', tag: 'paris-pro' };
+  try { const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if (reg) await reg.showNotification(titre, opt); else new Notification(titre, opt); } catch(e){}
 }
 VIEWS.cotes = () => {
   const h = bandeauBudget();
   if (!D.cfg.cle) return h + `<div class="card"><h3>Clé API nécessaire</h3><p class="small">Les cotes viennent de <b>The Odds API</b> (formule gratuite : 500 requêtes par mois, sans carte bancaire). Créez votre clé sur the-odds-api.com, puis collez-la dans ⚙ Paramètres. Elle reste uniquement sur cet appareil.</p><button class="btn p" onclick="go('params')">Aller aux paramètres</button></div>`;
-  if (!COTES && D.cache.cotes && D.cache.cotes.date === today()) COTES = { matchs: D.cache.cotes.matchs, heure: D.cache.cotes.heure };
-  const tete = `<div class="card"><div class="row" style="justify-content:space-between"><div><h3 style="margin:0">Matchs des 36 prochaines heures</h3><div class="small muted">${COTES && COTES.heure ? 'Cotes relevées à ' + COTES.heure : 'Pas encore chargées'} · ${D.cfg.ligues.length} ligue(s) · requêtes restantes : ${esc(D.cache.restant ?? '?')}</div></div><button class="btn p" ${COTES && COTES.charge ? 'disabled' : ''} onclick="chargerCotes()">${COTES && COTES.charge ? 'Chargement…' : '↻ Charger les cotes'}</button></div>
-    <p class="small muted" style="margin:8px 0 0">« Probabilité » = avis du marché sans la marge des bookmakers (moyenne de tous). <span class="tag g">valeur</span> = la meilleure cote paie plus que cette probabilité. Ce n'est jamais une certitude.</p></div>`;
-  if (!COTES) return h + tete;
-  if (COTES.err === 'cle') return h + tete;
-  const err = COTES.err ? `<div class="alert r">${esc(COTES.err)}</div>` : '';
-  if (!COTES.matchs.length) return h + tete + err + '<div class="card muted">Aucun match trouvé pour vos ligues dans les 36 prochaines heures.</div>';
-  return h + tete + err + COTES.matchs.map(m => {
-    const fort = m.issues.some(i => i.best && i.p >= D.cfg.seuil && i.val >= D.cfg.valeurMin);
-    return `<div class="match ${fort ? 'val' : ''}"><div class="row" style="justify-content:space-between"><b>${esc(m.dom)} – ${esc(m.ext)}</b>${fort ? '<span class="tag g">⭐ à étudier</span>' : ''}</div>
-    <div class="small muted">${esc(m.ligue)} · ${new Date(m.debut).toLocaleString('fr-FR', {weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'})} (heure de l'appareil) · ${m.nbk} bookmakers</div>
-    <div class="odds">${m.issues.filter(i => !/^tot:/.test(i.k) || /2\.5$/.test(i.k)).map(i => `<button class="odd ${i.best && i.val >= D.cfg.valeurMin ? 'val' : ''}" ${i.best ? `onclick='parier(${JSON.stringify({match: m.dom + ' – ' + m.ext, competition: m.ligue, marche: i.nom, cote: i.best, proba: +i.p.toFixed(3), source: 'Cotes (' + i.bk + ')'}).replace(/'/g, '&#39;')})'` : 'disabled'}><div class="small">${esc(i.nom)}</div><b>${i.best ? F(i.best, 2) : '—'}</b> <span class="small muted">${P(i.p)}</span>${i.best ? `<div class="small ${i.val >= 0 ? '' : 'muted'}">valeur ${i.val >= 0 ? '+' : ''}${F(i.val * 100, 1)} %</div>` : '<div class="small muted">probabilité</div>'}</button>`).join('')}</div></div>`;
+  if (!COTES && D.cache.cotes && Array.isArray(D.cache.cotes.matchs)) COTES = { matchs: D.cache.cotes.matchs, ts: D.cache.cotes.ts, errs: [] };
+  const charge = COTES && COTES.charge, age = ageMin(), cout = D.cfg.ligues.length * 2;
+  const tete = `<div class="card"><div class="row" style="justify-content:space-between"><div style="flex:1;min-width:200px"><h3 style="margin:0">Matchs des 36 prochaines heures</h3><div class="small muted">${COTES && COTES.ts ? 'Cotes relevées à ' + new Date(COTES.ts).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'}) + (jour(COTES.ts) !== today() ? ' le ' + frDate(jour(COTES.ts)) : '') : 'Pas encore chargées'} · ${D.cfg.ligues.length} ligue(s) · requêtes restantes ce mois : ${esc(D.cache.restant ?? '?')}</div></div><button class="btn p" ${charge || !D.cfg.ligues.length ? 'disabled' : ''} onclick="chargerCotes()">${charge ? 'Chargement…' : '↻ Charger les cotes (' + cout + ' requêtes)'}</button></div>
+    <p class="small muted" style="margin:8px 0 0">« Probabilité » = avis du marché sans la marge des bookmakers (moyenne de tous). <span class="tag g">valeur</span> = la meilleure cote paie plus que cette probabilité. ⭐ = au moins 3 bookmakers, probabilité ≥ ${Math.round(D.cfg.seuil * 100)} % et valeur ≥ ${F(D.cfg.valeurMin * 100, 1)} %. Ce n'est jamais une certitude.</p></div>`;
+  if (!COTES || charge) return h + tete;
+  const errs = (COTES.errs || []).map(e => `<div class="alert ${/hors saison/.test(e) ? 'a' : 'r'}">${esc(e)}</div>`).join('');
+  const vieux = COTES.ts && age >= PERIME_MIN ? `<div class="alert a">⚠️ Ces cotes ont ${age >= 120 ? Math.floor(age / 60) + ' h' : age + ' min'} : rechargez-les avant de parier.</div>` : '';
+  const M = (COTES.matchs || []).filter(aVenir);
+  if (!M.length) return h + tete + errs + '<div class="card muted">Aucun match à venir pour vos ligues dans les 36 prochaines heures. Changez de ligues dans ⚙ Paramètres ou revenez plus tard.</div>';
+  return h + tete + errs + vieux + M.map(m => {
+    const vis = m.issues.filter(i => !/^tot:/.test(i.k) || /2\.5$/.test(i.k));
+    return `<div class="match ${vis.some(forte) ? 'val' : ''}"><div class="row" style="justify-content:space-between"><b>${esc(m.dom)} – ${esc(m.ext)}</b>${vis.some(forte) ? '<span class="tag g">⭐ à étudier</span>' : ''}</div>
+    <div class="small muted">${esc(m.ligue)} · ${new Date(m.debut).toLocaleString('fr-FR', {weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'})} (heure de l'appareil) · ${m.nbk} bookmaker(s)</div>
+    <div class="odds">${vis.map(i => { const ok = i.best > 1; const a = ok ? act({ match: m.dom + ' – ' + m.ext, competition: m.ligue, marche: i.nom, cote: i.best, proba: +i.p.toFixed(3), source: 'Cotes (' + i.bk + ')', debut: m.debut, ts: COTES.ts }) : -1;
+      return `<button class="odd ${forte(i) ? 'val' : ''}" ${ok ? `onclick="parier(ACT[${a}])"` : 'disabled'}><div class="small">${esc(i.nom)}</div><b>${ok ? F(i.best, 2) : '—'}</b> <span class="small muted">${P(i.p)}</span>${ok ? `<div class="small ${i.val >= 0 ? '' : 'muted'}">valeur ${i.val >= 0 ? '+' : ''}${F(i.val * 100, 1)} %</div>` : '<div class="small muted">probabilité seule</div>'}</button>`; }).join('')}</div></div>`;
   }).join('');
 };
 
 /* ---------- enregistrer un pari ---------- */
+let PARI = null;
 function parier(o){
-  const r = resteBudget(), mx = +D.cfg.miseMax || 0;
-  const conseil = mx ? Math.min(mx, Math.max(r, 0)) : Math.max(r, 0);
+  if (!o) return;
+  if (enPause()) return toast('Pause en cours jusqu\'au ' + frDate(D.cfg.pause));
+  if (o.debut && new Date(o.debut).getTime() <= Date.now()) return toast('Ce match a déjà commencé');
+  PARI = o;
+  const r = resteBudget(), b = +D.cfg.budget || 0, mx = +D.cfg.miseMax || 0;
+  const plafond = Math.max(0, Math.min(mx || Infinity, b ? r : Infinity));
+  const vieux = o.ts && Date.now() - o.ts > PERIME_MIN * 60000;
+  const doublon = D.paris.some(p => p.date === today() && p.match === o.match && p.marche === o.marche);
   modal(`<h3>Enregistrer un pari</h3>
-    ${r <= 0 ? '<div class="alert r">⛔ Votre budget du mois est atteint. Le plus sage est de ne pas parier.</div>' : ''}
-    <div class="small muted">${esc(o.competition || '')}</div><b>${esc(o.match)}</b>
-    <label>Marché</label><input id="p_mar" value="${esc(o.marche)}">
-    <div class="row"><div style="flex:1"><label>Cote</label><input id="p_cote" type="number" step="0.01" min="1.01" value="${esc(o.cote)}"></div>
-    <div style="flex:1"><label>Mise (F CFA)</label><input id="p_mise" type="number" step="100" min="0" value="${conseil ? Math.min(conseil, 1000) : ''}"></div></div>
-    <div class="small muted" style="margin-top:6px">Probabilité estimée : ${o.proba ? P(o.proba) : '—'} · source : ${esc(o.source || 'manuel')}${mx ? ' · mise maximale fixée : ' + F(mx) + ' F' : ''}</div>
-    <label>Note (facultatif)</label><input id="p_note">
-    <div class="act">${D.cfg.bookmaker ? `<a class="btn" href="${esc(D.cfg.bookmaker)}" target="_blank" rel="noopener">Ouvrir le site du bookmaker ↗</a>` : ''}<button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" onclick='enregistrer(${JSON.stringify(o).replace(/'/g, '&#39;')})'>J'ai parié — enregistrer</button></div>`);
+    ${b && r <= 0 ? '<div class="alert r">⛔ Votre budget du mois est atteint : ce pari ne peut pas être enregistré.</div>' : ''}
+    ${vieux ? '<div class="alert a">⚠️ Cette cote date de plus de ' + PERIME_MIN + ' min. Vérifiez-la chez votre bookmaker et corrigez-la ci-dessous.</div>' : ''}
+    ${doublon ? '<div class="alert a">Vous avez déjà enregistré ce pari aujourd\'hui.</div>' : ''}
+    ${o.match ? `<div class="small muted">${esc(o.competition || '')}</div><b>${esc(o.match)}</b>` : '<label>Match</label><input id="p_match" maxlength="120" placeholder="Équipe A – Équipe B"><label>Compétition</label><input id="p_comp" maxlength="80">'}
+    <label>Marché</label><input id="p_mar" maxlength="80" value="${esc(o.marche)}" placeholder="ex. 1X, moins de 3,5 buts">
+    <div class="row"><div style="flex:1"><label>Cote réellement obtenue</label><input id="p_cote" type="text" inputmode="decimal" maxlength="7" value="${o.cote ? String(o.cote).replace('.', ',') : ''}"></div>
+    <div style="flex:1"><label>Mise (F CFA)</label><input id="p_mise" type="number" inputmode="numeric" step="100" min="1" value="${isFinite(plafond) && plafond > 0 ? plafond : ''}"></div></div>
+    <div class="small muted" style="margin-top:6px">Probabilité estimée : ${o.proba ? P(o.proba) : '—'} · source : ${esc(o.source || 'manuel')}${mx ? ' · mise maximale : ' + F(mx) + ' F' : ''}${b ? ' · reste du budget : ' + F(Math.max(r, 0)) + ' F' : ''}</div>
+    <label>Note (facultatif)</label><input id="p_note" maxlength="200">
+    <p class="small muted">Paris Pro ne place aucun pari : faites-le chez votre bookmaker, puis enregistrez-le ici.</p>
+    <div class="act">${/^https:\/\//i.test(D.cfg.bookmaker) ? `<a class="btn" href="${esc(D.cfg.bookmaker)}" target="_blank" rel="noopener noreferrer">Ouvrir le bookmaker ↗</a>` : ''}<button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" ${b && r <= 0 ? 'disabled' : ''} onclick="enregistrer()">J'ai parié — enregistrer</button></div>`);
 }
-function enregistrer(o){
-  const cote = parseFloat($('#p_cote').value), mise = parseFloat($('#p_mise').value);
-  if (!(cote > 1) || !(mise > 0)) return toast('Cote et mise obligatoires');
+function enregistrer(){
+  const o = PARI; if (!o) return;
+  if (enPause()) return toast('Pause en cours');
+  const match = o.match || (($('#p_match') || {}).value || '').trim(), comp = o.match ? (o.competition || '') : (($('#p_comp') || {}).value || '').trim();
+  const cote = num($('#p_cote').value), mise = Math.round(num($('#p_mise').value)), marche = $('#p_mar').value.trim();
+  if (!match) return toast('Match obligatoire');
+  if (!marche) return toast('Marché obligatoire');
+  if (!(cote >= 1.01 && cote <= 1000)) return toast('Cote invalide (entre 1,01 et 1000)');
+  if (!(mise > 0)) return toast('Mise obligatoire');
   if (D.cfg.miseMax && mise > D.cfg.miseMax) return toast('Mise supérieure à votre maximum (' + F(D.cfg.miseMax) + ' F)');
-  D.paris.unshift({ id: Date.now().toString(36), date: today(), match: o.match, competition: o.competition || '', marche: $('#p_mar').value.trim(), cote, mise, proba: o.proba || '', source: o.source || 'manuel', note: $('#p_note').value.trim(), issue: 'EN_ATTENTE' });
-  save(); closeModal(); toast('Pari enregistré'); render();
+  if (D.cfg.budget && mise > resteBudget()) return toast('Cette mise dépasse le reste de votre budget (' + F(Math.max(resteBudget(), 0)) + ' F)');
+  const p = propre({ date: today(), match, competition: comp, marche, cote, mise, proba: o.proba, source: o.source || 'manuel', note: $('#p_note').value.trim(), issue: 'EN_ATTENTE' });
+  if (!p) return toast('Pari invalide');
+  D.paris.unshift(p); save(); PARI = null; closeModal(); toast('Pari enregistré'); render();
 }
-const gain = p => p.issue === 'GAGNÉ' ? p.mise * (p.cote - 1) : p.issue === 'PERDU' ? -p.mise : 0;
+const gain = p => p.issue === 'GAGNÉ' ? Math.round(p.mise * (p.cote - 1)) : p.issue === 'PERDU' ? -p.mise : 0;
 VIEWS.paris = () => {
-  const L = D.paris;
-  return bandeauBudget() + `<div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Mes paris (${L.length})</h3><button class="btn sm" onclick="parierManuel()">+ Pari manuel</button></div>
-  <div class="tw"><table><tr><th>Date</th><th>Match / marché</th><th class="n">Cote</th><th class="n">Mise</th><th>Résultat</th><th class="n">Gain</th></tr>
-  ${L.map(p => `<tr><td class="small">${esc(p.date.split('-').reverse().join('/'))}</td><td><b>${esc(p.match)}</b><div class="small muted">${esc(p.marche)} · ${esc(p.source)}</div></td><td class="n">${F(p.cote, 2)}</td><td class="n">${F(p.mise)}</td>
-  <td>${p.issue === 'EN_ATTENTE' ? `<div class="row"><button class="btn sm" onclick="regler('${p.id}','GAGNÉ')">✅</button><button class="btn sm" onclick="regler('${p.id}','PERDU')">❌</button><button class="btn sm" onclick="regler('${p.id}','REMBOURSÉ')">↩</button></div>` : `<span class="tag ${p.issue === 'GAGNÉ' ? 'g' : p.issue === 'PERDU' ? 'r' : 'a'}">${esc(p.issue)}</span> <button class="btn sm" title="Annuler le résultat" onclick="regler('${p.id}','EN_ATTENTE')">↺</button>`}</td>
-  <td class="n ${gain(p) > 0 ? '' : 'muted'}">${p.issue === 'EN_ATTENTE' ? '—' : (gain(p) > 0 ? '+' : '') + F(gain(p))}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Aucun pari enregistré.</td></tr>'}
-  </table></div><p class="small muted">✅ gagné · ❌ perdu · ↩ remboursé (match annulé).</p></div>`;
+  const L = D.paris, att = L.filter(p => p.issue === 'EN_ATTENTE');
+  return bandeauBudget() + `<div class="card"><div class="row" style="justify-content:space-between"><div><h3 style="margin:0">Mes paris (${L.length})</h3><div class="small muted">${att.length} en attente · ${F(att.reduce((s, p) => s + p.mise, 0))} F engagés</div></div><button class="btn sm" onclick="parier({match:'',competition:'',marche:'',cote:'',proba:'',source:'manuel'})">+ Pari manuel</button></div>
+  <div style="margin-top:10px">${L.map(p => `<div class="match"><div class="row" style="justify-content:space-between;align-items:flex-start;flex-wrap:nowrap"><div><b>${esc(p.match)}</b><div class="small muted">${esc(frDate(p.date))} · ${esc(p.marche)} · ${esc(p.source)}${p.note ? ' · ' + esc(p.note) : ''}</div></div><span class="tag ${p.issue === 'GAGNÉ' ? 'g' : p.issue === 'PERDU' ? 'r' : 'a'}" style="white-space:nowrap">${p.issue === 'EN_ATTENTE' ? 'en attente' : esc(p.issue)}</span></div>
+  <div class="row" style="justify-content:space-between;margin-top:8px"><div class="small">cote <b>${F(p.cote, 2)}</b> · mise <b>${F(p.mise)} F</b>${p.issue === 'EN_ATTENTE' ? ` · gain possible ${F(Math.round(p.mise * (p.cote - 1)))} F` : ` · résultat <b style="color:${gain(p) > 0 ? 'var(--green)' : gain(p) < 0 ? 'var(--red)' : 'inherit'}">${gain(p) > 0 ? '+' : ''}${F(gain(p))} F</b>`}</div>
+  <div class="row" style="flex-wrap:nowrap">${p.issue === 'EN_ATTENTE' ? `<button class="btn sm" title="Gagné" onclick="regler('${esc(p.id)}','GAGNÉ')">✅</button><button class="btn sm" title="Perdu" onclick="regler('${esc(p.id)}','PERDU')">❌</button><button class="btn sm" title="Remboursé" onclick="regler('${esc(p.id)}','REMBOURSÉ')">↩</button>` : `<button class="btn sm" title="Corriger le résultat" onclick="regler('${esc(p.id)}','EN_ATTENTE')">↺</button>`}<button class="btn sm" title="Supprimer" onclick="supprimer('${esc(p.id)}')">🗑</button></div></div></div>`).join('') || '<div class="muted">Aucun pari enregistré.</div>'}
+  </div><p class="small muted">✅ gagné · ❌ perdu · ↩ remboursé (match annulé) · ↺ corriger · 🗑 supprimer une saisie faite par erreur.</p></div>`;
 };
-function parierManuel(){
-  modal(`<h3>Pari manuel</h3><label>Match</label><input id="m_match" placeholder="Équipe A – Équipe B"><label>Compétition</label><input id="m_comp">
-    <div class="act"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" onclick="const m=$('#m_match').value.trim();if(!m)return toast('Match obligatoire');parier({match:m,competition:$('#m_comp').value.trim(),marche:'',cote:'',proba:'',source:'manuel'})">Continuer</button></div>`);
+function regler(id, issue){ const p = D.paris.find(x => x.id === id); if (!p || !ISSUES.includes(issue)) return; p.issue = issue; p.regle = issue === 'EN_ATTENTE' ? '' : today(); save(); render(); }
+function supprimer(id){
+  const p = D.paris.find(x => x.id === id); if (!p) return;
+  modal(`<h3>Supprimer ce pari ?</h3><p><b>${esc(p.match)}</b><br><span class="small muted">${esc(p.marche)} · cote ${F(p.cote, 2)} · mise ${F(p.mise)} F</span></p><p class="small">À utiliser seulement pour une saisie faite par erreur. Un pari perdu doit rester dans l'historique : sinon le bilan devient faux.</p>
+    <div class="act"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" onclick="D.paris=D.paris.filter(x=>x.id!=='${esc(p.id)}');save();closeModal();toast('Pari supprimé');render()">Supprimer</button></div>`);
 }
-function regler(id, issue){ const p = D.paris.find(x => x.id === id); if (!p) return; p.issue = issue; p.regle = issue === 'EN_ATTENTE' ? '' : today(); save(); render(); }
 
 /* ---------- bilan ---------- */
 function stats(L){
@@ -262,55 +351,84 @@ VIEWS.bilan = () => {
   const tr = [[.5, .6], [.6, .7], [.7, .8], [.8, .9], [.9, 1.01]].map(([a, b]) => { const L = D.paris.filter(p => p.proba >= a && p.proba < b && (p.issue === 'GAGNÉ' || p.issue === 'PERDU')); return { a, b, n: L.length, ok: L.filter(p => p.issue === 'GAGNÉ').length }; });
   let ag = '';
   if (AGENT && !AGENT.charge){
-    const r = AGENT.reg.filter(x => x.issue === 'GAGNÉ' || x.issue === 'PERDU'), u = r.reduce((t, x) => t + (parseFloat(String(x.gain_perte_unites).replace(',', '.')) || 0), 0);
-    const sites = {}; AGENT.sites.filter(x => x.issue === 'JUSTE' || x.issue === 'FAUX').forEach(x => { const o = sites[x.site] || (sites[x.site] = { n: 0, ok: 0 }); o.n++; if (x.issue === 'JUSTE') o.ok++; });
+    const r = AGENT.reg.filter(x => x.issue === 'GAGNÉ' || x.issue === 'PERDU'), u = r.reduce((t, x) => t + num(x.gain_perte_unites), 0);
+    const sites = {}; AGENT.sites.filter(x => x.site && (x.issue === 'JUSTE' || x.issue === 'FAUX')).forEach(x => { const o = sites[x.site] || (sites[x.site] = { n: 0, ok: 0 }); o.n++; if (x.issue === 'JUSTE') o.ok++; });
     ag = `<div class="card"><h3>Agent d'analyse (registre)</h3><p class="small">${AGENT.reg.length} sélection(s) émise(s) · ${r.length} réglée(s) · ${r.filter(x => x.issue === 'GAGNÉ').length} gagnée(s) · résultat ${u >= 0 ? '+' : ''}${F(u, 2)} unité(s)${r.length < 100 ? ' · <i>échantillon insuffisant pour juger la méthode</i>' : ''}</p>
     <div class="tw"><table><tr><th>Source des pronostics</th><th class="n">Réglés</th><th class="n">Justes</th><th class="n">Réussite</th></tr>${Object.entries(sites).sort((a, b) => b[1].ok / b[1].n - a[1].ok / a[1].n).map(([k, o]) => `<tr><td>${esc(k)}</td><td class="n">${o.n}</td><td class="n">${o.ok}</td><td class="n">${P(o.ok / o.n)}${o.n < 50 ? ' <span class="tag a">peu de données</span>' : ''}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">Pas encore de pronostic réglé.</td></tr>'}</table></div></div>`;
-  } else { chargerAgent(); }
-  return bandeauBudget() + `<div class="grid"><div class="kpi"><span>Paris</span><b>${s.n}</b><span>${s.reg} réglés</span></div><div class="kpi"><span>Réussite</span><b>${s.reg ? P(s.g / s.reg) : '—'}</b><span>${s.g} gagnés</span></div><div class="kpi"><span>Total misé (réglés)</span><b>${F(s.mise)} F</b></div><div class="kpi"><span>Bénéfice / perte</span><b style="color:${s.res >= 0 ? 'var(--green)' : 'var(--red)'}">${s.res >= 0 ? '+' : ''}${F(s.res)} F</b><span>rentabilité ${isFinite(s.roi) ? (s.roi >= 0 ? '+' : '') + F(s.roi * 100, 1) + ' %' : '—'}</span></div></div>
+  } else if (!AGENT) chargerAgent();
+  return bandeauBudget() + `<div class="grid"><div class="kpi"><span>Paris</span><b>${s.n}</b><span>${s.reg} réglés</span></div><div class="kpi"><span>Réussite</span><b>${s.reg ? P(s.g / s.reg) : '—'}</b><span>${s.g} gagné(s)</span></div><div class="kpi"><span>Total misé (réglés)</span><b>${F(s.mise)} F</b></div><div class="kpi"><span>Bénéfice / perte</span><b style="color:${s.res >= 0 ? 'var(--green)' : 'var(--red)'}">${s.res >= 0 ? '+' : ''}${F(s.res)} F</b><span>rentabilité ${isFinite(s.roi) ? (s.roi >= 0 ? '+' : '') + F(s.roi * 100, 1) + ' %' : '—'}</span></div></div>
   ${s.reg && s.reg < 100 ? '<div class="alert a">Moins de 100 paris réglés : trop peu pour savoir si la méthode est vraiment gagnante.</div>' : ''}
-  <div class="card"><h3>Par mois</h3><div class="tw"><table><tr><th>Mois</th><th class="n">Paris</th><th class="n">Misé</th><th class="n">Résultat</th><th class="n">Budget</th></tr>${ms.map(m => { const x = stats(D.paris.filter(p => mois(p.date) === m)); return `<tr><td>${m}</td><td class="n">${x.n}</td><td class="n">${F(miseMois(m))}</td><td class="n">${x.res >= 0 ? '+' : ''}${F(x.res)}</td><td class="n">${F(D.cfg.budget)}</td></tr>`; }).join('') || '<tr><td colspan="5" class="muted">Aucun pari.</td></tr>'}</table></div></div>
-  <div class="card"><h3>Vos probabilités sont-elles justes ?</h3><p class="small muted">Si les paris estimés à 70–80 % gagnent nettement moins de 70 % du temps, les estimations sont trop optimistes.</p><div class="tw"><table><tr><th>Probabilité estimée</th><th class="n">Paris réglés</th><th class="n">Réussite réelle</th></tr>${tr.map(t => `<tr><td>${t.a * 100}–${Math.min(t.b, 1) * 100} %</td><td class="n">${t.n}</td><td class="n">${t.n ? P(t.ok / t.n) : '—'}</td></tr>`).join('')}</table></div></div>${ag}`;
+  <div class="card"><h3>Par mois</h3><div class="tw"><table><tr><th>Mois</th><th class="n">Paris</th><th class="n">Misé</th><th class="n">Résultat</th></tr>${ms.map(m => { const x = stats(D.paris.filter(p => mois(p.date) === m)); return `<tr><td>${esc(m.split('-').reverse().join('/'))}</td><td class="n">${x.n}</td><td class="n">${F(miseMois(m))}</td><td class="n">${x.res >= 0 ? '+' : ''}${F(x.res)}</td></tr>`; }).join('') || '<tr><td colspan="4" class="muted">Aucun pari.</td></tr>'}</table></div></div>
+  <div class="card"><h3>Les probabilités sont-elles justes ?</h3><p class="small muted">Si les paris estimés à 70–80 % gagnent nettement moins de 70 % du temps, les estimations sont trop optimistes.</p><div class="tw"><table><tr><th>Probabilité estimée</th><th class="n">Paris réglés</th><th class="n">Réussite réelle</th></tr>${tr.map(t => `<tr><td>${Math.round(t.a * 100)}–${Math.round(Math.min(t.b, 1) * 100)} %</td><td class="n">${t.n}</td><td class="n">${t.n ? P(t.ok / t.n) : '—'}</td></tr>`).join('')}</table></div></div>${ag}`;
 };
 
 /* ---------- paramètres ---------- */
 VIEWS.params = () => `<div class="card"><h3>Cotes en temps réel</h3>
-  <label>Clé The Odds API (gratuite sur the-odds-api.com, reste sur cet appareil)</label><input id="s_cle" type="password" value="${esc(D.cfg.cle)}" autocomplete="off">
+  <label>Clé The Odds API (gratuite sur the-odds-api.com ; elle reste sur cet appareil)</label><div class="row"><input id="s_cle" type="password" value="${esc(D.cfg.cle)}" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:180px"><button class="btn" onclick="testerCle()">Tester la clé</button></div>
   <label>Région des bookmakers</label><select id="s_reg">${[['eu','Europe'],['uk','Royaume-Uni'],['us','États-Unis'],['au','Australie']].map(([k, t]) => `<option value="${k}" ${D.cfg.regions === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
-  <label>Ligues suivies</label><div id="s_lig" class="small">${SPORTS ? SPORTS.filter(s => s.group === 'Soccer').map(s => `<label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:4px 0"><input type="checkbox" style="width:auto" value="${esc(s.key)}" ${D.cfg.ligues.includes(s.key) ? 'checked' : ''}> ${esc(s.title)}</label>`).join('') : esc(D.cfg.ligues.join(', ')) + ` <button class="btn sm" onclick="chargerSports()">Choisir les ligues</button>`}</div>
-  <p class="small muted">Chaque ligue chargée consomme 2 requêtes (résultat et buts). Avec 4 ligues : environ 60 chargements par mois en formule gratuite.</p></div>
+  <label>Ligues suivies (${D.cfg.ligues.length})</label><div id="s_lig" class="small">${SPORTS ? SPORTS.map(s => `<label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:4px 0"><input type="checkbox" style="width:auto" value="${esc(s.key)}" ${D.cfg.ligues.includes(s.key) ? 'checked' : ''}> ${esc(s.title)}</label>`).join('') : esc(D.cfg.ligues.join(', ') || 'aucune') + ` <button class="btn sm" onclick="chargerSports()">Choisir les ligues</button>`}</div>
+  <p class="small muted">Chaque ligue chargée consomme 2 requêtes. Avec 4 ligues : environ 60 chargements par mois en formule gratuite. Tester la clé et choisir les ligues ne consomment rien.</p></div>
   <div class="card"><h3>Jeu responsable</h3>
-  <div class="row"><div style="flex:1;min-width:140px"><label>Budget mensuel (F)</label><input id="s_bud" type="number" step="1000" value="${esc(D.cfg.budget)}"></div><div style="flex:1;min-width:140px"><label>Mise maximale par pari (F)</label><input id="s_max" type="number" step="100" value="${esc(D.cfg.miseMax)}"></div></div>
-  <p class="small muted">Ne jouez que l'argent que vous acceptez de perdre, jamais celui du ménage ou des entreprises. Pas de martingale, pas de « récupération » des pertes.</p></div>
+  <div class="row"><div style="flex:1;min-width:140px"><label>Budget mensuel (F)</label><input id="s_bud" type="number" inputmode="numeric" min="0" step="1000" value="${esc(D.cfg.budget)}"></div><div style="flex:1;min-width:140px"><label>Mise maximale par pari (F)</label><input id="s_max" type="number" inputmode="numeric" min="0" step="100" value="${esc(D.cfg.miseMax)}"></div></div>
+  <p class="small muted">Ne jouez que l'argent que vous acceptez de perdre, jamais celui du ménage ou des entreprises. Pas de martingale, pas de « récupération » des pertes. Jeu réservé aux majeurs.</p>
+  ${enPause() ? `<div class="alert r" style="margin:0">⏸ Pause en cours jusqu'au ${frDate(D.cfg.pause)}. Elle ne peut pas être levée avant cette date.</div>` : `<div class="row"><button class="btn" onclick="pause(7)">⏸ Faire une pause de 7 jours</button><button class="btn" onclick="pause(30)">⏸ 30 jours</button></div>`}</div>
   <div class="card"><h3>Alertes et bookmaker</h3>
-  <div class="row"><div style="flex:1;min-width:140px"><label>Probabilité minimale d'une alerte (%)</label><input id="s_seuil" type="number" min="50" max="99" value="${Math.round(D.cfg.seuil * 100)}"></div><div style="flex:1;min-width:140px"><label>Valeur minimale (%)</label><input id="s_val" type="number" step="0.5" value="${F(D.cfg.valeurMin * 100, 1).replace(',', '.')}"></div></div>
-  <label style="display:flex;gap:8px;align-items:center;color:var(--ink)"><input id="s_notif" type="checkbox" style="width:auto" ${D.cfg.notif ? 'checked' : ''}> Notification quand une opportunité dépasse ces seuils (au chargement des cotes)</label>
-  <label>Adresse du site de votre bookmaker (bouton « Ouvrir le site »)</label><input id="s_bk" placeholder="https://..." value="${esc(D.cfg.bookmaker)}">
+  <div class="row"><div style="flex:1;min-width:140px"><label>Probabilité minimale d'une ⭐ (%)</label><input id="s_seuil" type="number" inputmode="numeric" min="50" max="99" value="${Math.round(D.cfg.seuil * 100)}"></div><div style="flex:1;min-width:140px"><label>Valeur minimale (%)</label><input id="s_val" type="text" inputmode="decimal" maxlength="5" value="${F(D.cfg.valeurMin * 100, 1)}"></div></div>
+  <label style="display:flex;gap:8px;align-items:center;color:var(--ink)"><input id="s_notif" type="checkbox" style="width:auto" ${D.cfg.notif ? 'checked' : ''}> Notification quand une ⭐ apparaît (au chargement des cotes)</label>
+  <label>Adresse du site de votre bookmaker (commence par https://)</label><input id="s_bk" type="url" placeholder="https://..." value="${esc(D.cfg.bookmaker)}">
   <div class="act"><button class="btn p" onclick="enregistrerParams()">Enregistrer</button></div></div>
-  <div class="card"><h3>Sauvegarde</h3><p class="small muted">Vos paris sont enregistrés uniquement sur cet appareil.</p><div class="row"><button class="btn" onclick="exporter()">⬇ Télécharger une sauvegarde</button><label class="btn" style="margin:0;color:var(--ink)">⬆ Restaurer<input type="file" accept=".json" style="display:none" onchange="importer(this.files[0])"></label></div></div>
-  <p class="small muted">Paris Pro ${VERSION} · usage personnel · aucun pari n'est placé automatiquement.</p>`;
+  <div class="card"><h3>Sauvegarde</h3><p class="small muted">Vos paris sont enregistrés uniquement sur cet appareil : faites une sauvegarde de temps en temps. La clé API n'est jamais dans le fichier.</p><div class="row"><button class="btn" onclick="exporter()">⬇ Télécharger une sauvegarde</button><label class="btn" style="margin:0;color:var(--ink)">⬆ Restaurer<input type="file" accept=".json,application/json" style="display:none" onchange="importer(this.files[0]);this.value=''"></label></div></div>
+  <p class="small muted">Paris Pro ${VERSION} · usage personnel · aucun pari n'est placé automatiquement · aucun gain n'est garanti.</p>`;
+function lireCle(){ const c = ($('#s_cle') ? $('#s_cle').value : D.cfg.cle).trim(); if (c && c !== D.cfg.cle){ D.cfg.cle = c; save(); } return c; }
 async function chargerSports(){
-  if (!D.cfg.cle){ const c = $('#s_cle').value.trim(); if (!c) return toast('Collez d\'abord la clé API'); D.cfg.cle = c; save(); }
-  try { SPORTS = (await api('/sports/')).filter(s => s.active); render(); } catch(e){ toast(e.message === 'cle' ? 'Clé manquante' : e.message); }
+  if (!lireCle()) return toast('Collez d\'abord la clé API');
+  try { SPORTS = (await api('/sports/')).filter(s => s.active && s.group === 'Soccer' && !s.has_outrights).sort((a, b) => String(a.title).localeCompare(b.title)); render(); } catch(e){ toast(e.message); }
+}
+async function testerCle(){
+  if (!lireCle()) return toast('Collez d\'abord la clé API');
+  try { const L = await api('/sports/'); toast('✅ Clé valide — ' + L.length + ' compétitions disponibles'); } catch(e){ toast('❌ ' + e.message); }
+}
+function pause(j){
+  modal(`<h3>Faire une pause de ${j} jours ?</h3><p class="small">Aucun pari ne pourra être enregistré jusqu'au <b>${frDate(jour(Date.now() + j * 864e5))}</b>. La pause ne peut pas être annulée avant cette date.</p>
+    <div class="act"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" onclick="D.cfg.pause='${jour(Date.now() + j * 864e5)}';save();closeModal();render()">Confirmer la pause</button></div>`);
 }
 function enregistrerParams(){
-  const c = D.cfg;
-  c.cle = $('#s_cle').value.trim(); c.regions = $('#s_reg').value;
-  const cb = [...document.querySelectorAll('#s_lig input[type=checkbox]')]; if (cb.length) c.ligues = cb.filter(x => x.checked).map(x => x.value);
-  c.budget = Math.max(0, +$('#s_bud').value || 0); c.miseMax = Math.max(0, +$('#s_max').value || 0);
-  c.seuil = Math.min(.99, Math.max(.5, (+$('#s_seuil').value || 70) / 100)); c.valeurMin = (+$('#s_val').value || 0) / 100;
-  c.bookmaker = $('#s_bk').value.trim(); c.notif = $('#s_notif').checked;
+  const c = D.cfg, bk = $('#s_bk').value.trim();
+  if (bk && !/^https:\/\/[^\s]+$/i.test(bk)) return toast('L\'adresse du bookmaker doit commencer par https://');
+  c.cle = $('#s_cle').value.trim(); c.regions = ['eu', 'uk', 'us', 'au'].includes($('#s_reg').value) ? $('#s_reg').value : 'eu';
+  const cb = [...document.querySelectorAll('#s_lig input[type=checkbox]')]; if (cb.length) c.ligues = cb.filter(x => x.checked).map(x => x.value).slice(0, 12);
+  c.budget = Math.max(0, Math.round(num($('#s_bud').value))); c.miseMax = Math.max(0, Math.round(num($('#s_max').value)));
+  c.seuil = Math.min(.99, Math.max(.5, (num($('#s_seuil').value) || 70) / 100)); c.valeurMin = Math.min(.5, Math.max(0, num($('#s_val').value) / 100));
+  c.bookmaker = bk; c.notif = $('#s_notif').checked;
   if (c.notif && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission();
-  COTES = null; D.cache.cotes = null; save(); toast('Paramètres enregistrés'); render();
+  if (c.notif && 'Notification' in window && Notification.permission === 'denied') toast('Notifications bloquées dans les réglages du téléphone');
+  save(); toast('Paramètres enregistrés'); render();
 }
 function exporter(){
-  const b = new Blob([JSON.stringify({ paris: D.paris, cfg: { ...D.cfg, cle: '' } }, null, 1)], { type: 'application/json' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'ParisPro_sauvegarde_' + today() + '.json'; a.click();
+  const { cle, ...cfg } = D.cfg;
+  const b = new Blob([JSON.stringify({ application: 'Paris Pro', version: VERSION, date: today(), paris: D.paris, cfg }, null, 1)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'ParisPro_sauvegarde_' + today() + '.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 async function importer(f){
   if (!f) return;
-  try { const x = JSON.parse(await f.text()); if (!Array.isArray(x.paris)) throw 0; D.paris = x.paris; D.cfg = { ...D.cfg, ...x.cfg, cle: D.cfg.cle }; save(); toast('Sauvegarde restaurée'); render(); } catch(e){ toast('Fichier invalide'); }
+  if (f.size > 5e6) return toast('Fichier trop gros');
+  let x; try { x = JSON.parse(await f.text()); } catch(e){ return toast('Fichier illisible'); }
+  if (!x || !Array.isArray(x.paris)) return toast('Ce n\'est pas une sauvegarde Paris Pro');
+  const L = x.paris.map(propre).filter(Boolean);
+  window._imp = { L, cfg: x.cfg && typeof x.cfg === 'object' ? x.cfg : {} };
+  modal(`<h3>Restaurer la sauvegarde ?</h3><p class="small">Le fichier contient <b>${L.length}</b> pari(s)${x.date ? ' (sauvegarde du ' + esc(frDate(x.date)) + ')' : ''}. Ils <b>remplaceront</b> les ${D.paris.length} pari(s) de cet appareil.</p>
+    <div class="act"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" onclick="restaurer()">Remplacer</button></div>`);
 }
+function restaurer(){
+  const i = window._imp; if (!i) return;
+  const { cle, pause, ...c } = i.cfg;                       // on garde la clé et la pause de l'appareil
+  D.paris = i.L; D.cfg = { ...DEF_CFG, ...D.cfg, ...c, cle: D.cfg.cle, pause: D.cfg.pause };
+  if (!Array.isArray(D.cfg.ligues)) D.cfg.ligues = DEF_CFG.ligues.slice();
+  if (!/^https:\/\//i.test(D.cfg.bookmaker || '')) D.cfg.bookmaker = '';
+  window._imp = null; save(); closeModal(); toast('Sauvegarde restaurée'); render();
+}
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !$('#layer').innerHTML && (PAGE === 'cotes' || PAGE === 'jour')) render(); });   // au retour dans l'application : matchs commencés retirés, âge des cotes à jour
 render();
 </script>
 </body>
