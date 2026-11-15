@@ -243,7 +243,7 @@ function enLettres(n){
 function blank(){
   return { societe:{ nom:'IMPACT GLOBAL CONSULTING', sigle:'IGC', forme:'SARL', capital:1000000, rccm:'', cc:'', adresse:'Abidjan, Côte d\'Ivoire', tel:'', email:'', banque:'', rib:'', tvaTaux:18, tvaDefaut:false, mentions:'' },
     clients:[], devis:[], missions:[], factures:[], paiements:[], depenses:[], ordres:[],
-    soldes:{ caisse:0, banque:0, mobile:0, date:today() }, compteurs:{}, _del:{}, _pins:{}, audit:[], _lastSaved:0 };
+    soldes:{ caisse:0, banque:0, mobile:0, date:today() }, compteurs:{}, _del:{}, _pins:{}, audit:[], _lastSaved:0, nonRes:{} };
 }
 let DATA = load();
 function load(){
@@ -257,6 +257,7 @@ function sanitize(d){
   for (const c of COLS) d[c] = (Array.isArray(d[c]) ? d[c] : Object.values(d[c] || {})).filter(x => x && x.id);
   d.devis.concat(d.factures).forEach(x => { if (!Array.isArray(x.lignes)) x.lignes = Object.values(x.lignes || {}); });
   if (!Array.isArray(d.audit)) d.audit = Object.values(d.audit || {});
+  if (!d.nonRes || typeof d.nonRes !== 'object') d.nonRes = {};
   return d;
 }
 let DIRTY = false;
@@ -363,6 +364,7 @@ function mergeData(remote){
     for (const k of ['societe','soldes','_pins']) if (JSON.stringify(DATA[k]) !== JSON.stringify(remote[k])){ DATA[k] = remote[k]; changed = true; }
   }
   for (const k in remote.compteurs || {}) DATA.compteurs[k] = Math.max(DATA.compteurs[k] || 0, remote.compteurs[k]);
+  for (const k in remote.nonRes || {}){ const r = remote.nonRes[k], l = DATA.nonRes[k]; if (r && (!l || num(r.u) > num(l.u))){ DATA.nonRes[k] = r; changed = true; } }
   const seen = new Set(DATA.audit.map(a => a.t + a.a));
   (remote.audit || []).forEach(a => { if (!seen.has(a.t + a.a)) DATA.audit.push(a); });
   DATA.audit.sort((a, b) => b.t - a.t); DATA.audit = DATA.audit.slice(0, 300);
@@ -1466,7 +1468,7 @@ VIEWS.strategie = a => {
       <div class="f" style="margin-top:8px">
         <div><label>Participation estimée (%) — calculée, modifiable</label><input id="stratpart" inputmode="decimal" value="${esc(d.part)}" oninput="diagEtat(${i}).part=num(this.value)||1;majStrat(${i})"></div>
         ${cs.length ? `<div><label>Camp du candidat (pour l'historique)</label><select onchange="diagEtat(${i}).camp=+this.value;diagEtat(${i}).campChoisi=1;majStrat(${i})">${cs.map((c, k) => `<option value="${k}" ${d.camp === k ? 'selected' : ''}>${esc(c[1])} — ${esc(c[2])}</option>`).join('')}<option value="-1" ${d.camp === -1 ? 'selected' : ''}>Nouveau candidat</option></select></div>` : ''}
-        ${champ('parMille', 'Cellules pour 1 000 électeurs')}${champ('membres', 'Membres par cellule (en plus du responsable)')}${champ('ctrlCel', 'Cellules suivies par contrôleur')}${champ('visitesSem', 'Visites par contrôleur et par semaine')}
+        ${champ('parMille', 'Cellules pour 1 000 électeurs')}${champ('membres', 'Membres par cellule (en plus du responsable)')}${champ('ctrlCel', 'Cellules suivies par contrôleur')}${champ('visitesSem', 'Visites par contrôleur et par semaine')}<div class="full"><label>Électeurs non-résidents de la zone (relevés sur le fichier électoral) — une ligne par commune : « Commune ; nombre »</label><textarea id="nonres" rows="5" placeholder="ADJAME ; 2764&#10;TREICHVILLE ; 509">${esc(nonResTexte(i))}</textarea><div class="act" style="justify-content:flex-start"><button class="btn sm p" onclick="saveNonRes(${i})">Enregistrer les non-résidents</button></div></div>
         ${cs.length ? `<div class="full"><label>Origine politique des candidats (lecture des acteurs dans le document ; laisser vide si identique à l'étiquette)</label>${cs.slice(0, 8).map((c, k) => `<div style="display:flex;gap:6px;align-items:center;margin:4px 0;flex-wrap:wrap"><span class="small" style="flex:1 1 160px">${esc(c[1])} — ${esc(c[2])}</span><input style="flex:1 1 140px" value="${esc((d.orig || {})[k] || '')}" placeholder="ex. PDCI-RDA" oninput="(diagEtat(${i}).orig=diagEtat(${i}).orig||{})[${k}]=this.value"></div>`).join('')}</div>` : ''}</div></details></div>
   <div id="stratcorps">${stratEcran(i)}</div>`;
 };
@@ -2051,7 +2053,11 @@ function etudeModele(i){
   M.push({ t: 'p', r: [['Données électorales', 1]] });
   M.push({ t: 'table', sq: 1, head: [zoneN.slice(0, 18), 'LV', 'BV', 'Électorat', 'Hommes %', 'Femmes %'], rows: [['DONNÉES', F(D.n), F(D.bv), F(D.tot), PT ? pc(hom, PT) : '—', PT ? pc(fem, PT) : '—']], w: [2026, 1200, 1200, 1800, 1400, 1400], rd: [1, 2, 3, 4, 5] });
   M.push({ t: 'p', r: [['Les électeurs non-résidents', 1]] });
-  M.push({ t: 'p', r: Rn('À relever sur le fichier électoral de la zone (nombre d’électeurs par commune de résidence) : la Commission électorale indépendante ne publie pas cette donnée.') });
+  const NR = nonResDe(i);
+  if (NR.length){ const tnr = NR.reduce((s, l) => s + l[1], 0);
+    M.push({ t: 'table', sq: 1, head: ['N°', 'Communes', 'Nombre d’électeurs'], rows: NR.map((l, k) => [String(k + 1).padStart(2, '0'), l[0], F(l[1])]).concat([['', 'TOTAL', F(tnr) + ' électeurs']]), w: [900, 4826, 3300], bold: [NR.length], rd: [2], la: [1] });
+    M.push({ t: 'p', r: Rn(`Soit **${pc(tnr, D.tot)}** de l’électorat de la zone : ces électeurs votent ici mais habitent ailleurs.`) });
+  } else M.push({ t: 'p', r: Rn('À relever sur le fichier électoral de la zone (nombre d’électeurs par commune de résidence) : la Commission électorale indépendante ne publie pas cette donnée. Saisissez-la une fois dans IGC Gestion (Stratégie → Hypothèses) : elle sera reprise ici.') });
   M.push({ t: 'p', r: [['Étude par tranche d’âge', 1]] });
   if (PT){
     const ages = [['18 ans à 34 ans', P[0] + P[3]], ['35 ans à 60 ans', P[1] + P[4]], ['Plus de 60 ans', P[2] + P[5]]], dom = ages.slice().sort((a, b) => b[1] - a[1])[0];
@@ -2121,6 +2127,16 @@ function stratEcran(i){
   if (!LV) return `<div class="card"><p class="small muted">Chargement du répertoire des lieux de vote…</p></div>` + stratCorps(i);
   let etude = ''; try { etude = etudeFrag(etudeModele(i).M, false); } catch (e) { etude = `<p class="small muted">Étude indisponible pour ce territoire.</p>`; }
   return `<div class="card" style="margin-bottom:12px">${etude}</div><details class="card" style="margin-bottom:12px"><summary style="cursor:pointer;font-weight:700">📎 Annexes — détail du réseau (cellules lieu par lieu, plan, contrôle, tableau de bord)</summary>${annexeStrat(stratCorps(i))}</details>`;
+}
+/* V1.20 — électeurs non-résidents : saisis une fois par zone (la CEI ne les publie pas), synchronisés, repris dans l'étude */
+const nonResCle = i => { const t = elT(i); return elNorm(String(t[4]).replace(/\(.*?\)/g, '')) + '_' + (t[3] || TY(t[0])); };
+const nonResDe = i => ((DATA.nonRes || {})[nonResCle(i)] || {}).lignes || [];
+const nonResTexte = i => nonResDe(i).map(l => `${l[0]} ; ${l[1]}`).join('\n');
+function saveNonRes(i){
+  const lignes = String(val('nonres') || '').split('\n').map(x => x.trim()).filter(Boolean).map(x => { const m = x.match(/^(.*?)[\s;:,\t]+([\d\s  .]+)$/); return m ? [m[1].replace(/^\d+\s*[-.)]?\s*/, '').trim().toUpperCase(), Math.round(num(m[2].replace(/[\s  .]/g, '')))] : null; });
+  if (lignes.some(l => !l || !l[0] || !(l[1] > 0))) return toast('Une ligne n’est pas lisible : écrivez « Commune ; nombre »');
+  DATA.nonRes = DATA.nonRes || {}; DATA.nonRes[nonResCle(i)] = { u: now(), lignes };
+  save(`Non-résidents ${elT(i)[4]} : ${lignes.length} commune(s)`); toast('Non-résidents enregistrés'); majStrat(i);
 }
 function exportEtudeWord(i){
   if (!LV){ toast('Répertoire des lieux de vote en cours de chargement…'); chargeLV(); return; }
