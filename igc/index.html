@@ -2008,7 +2008,7 @@ function etudeModele(i){
   M.push({ t: 'h2', x: 'A - Elections antérieures' });
   M.push({ t: 'p', r: Rn('Le rappel des élections antérieures permettra au candidat de faire des analyses et des projections pour les élections à venir. Voir les résultats passés.') });
   const depMode = reg ? 'leg' : (presid && !t[1]) ? 'pres' : '';
-  const evoA = reg ? evo.filter(g => g.ty === 3 || g.ty === 0) : presid ? evo.filter(g => g.ty === 4 || g.ty === 0) : evo;
+  const evoA = reg ? evo.filter(g => g.ty === 3 || g.ty === 0) : presid ? evo.filter(g => g.ty === 4 || g.ty === 0) : muni ? evo.filter(g => g.ty === 2) : evo; /* municipales : la mairie seulement (Moaye, 15/11/2026) */
   if (reg) M.push({ t: 'p', r: Rn('Pour une élection régionale, on retient les élections régionales et législatives antérieures, sur l’ensemble de la région, puis département par département.') });
   if (presid) M.push({ t: 'p', r: Rn(`Pour une élection présidentielle, on retient les élections présidentielles et législatives antérieures${depMode ? ', sur l’ensemble de la région, puis département par département' : ''}.`) });
   evoA.forEach(g => {
