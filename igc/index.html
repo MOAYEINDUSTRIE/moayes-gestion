@@ -179,7 +179,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  IGC Gestion  ===================== */
-const VERSION = 'V1.24';
+const VERSION = 'V1.25';
 const KEY = 'igc_gestion_v1';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -343,7 +343,7 @@ const can = () => SESSION && ROLES[SESSION.role] && ROLES[SESSION.role].all;
 
 /* ---------- Firebase (chemin moayes/igc_data) ---------- */
 let fb = null, fbRef = null, FBST = { c:'', t:'Hors ligne' };
-function setFb(c, t){ FBST = { c, t }; const el = $('#fbpill'); if (el){ el.className = 'pill ' + c; el.textContent = '☁ ' + t; } }
+function setFb(c, t){ const avant = FBST.t; FBST = { c, t }; if (!SESSION && avant !== t && !document.querySelector('.modal-bg') && $('#dots')) render(); const el = $('#fbpill'); if (el){ el.className = 'pill ' + c; el.textContent = '☁ ' + t; } }
 function mergeData(remote){
   remote = sanitize(remote);
   const dels = Object.assign({}, remote._del || {}, DATA._del || {});
@@ -507,15 +507,16 @@ function loginHTML(){
     <div class="f" style="grid-template-columns:1fr"><div><select id="role" onchange="PINROLE=this.value">${Object.entries(ROLES).map(([k, r]) => `<option value="${k}" ${k === PINROLE ? 'selected' : ''}>${r.nom}</option>`).join('')}</select></div></div>
     <div style="display:flex;align-items:center;justify-content:center;gap:6px"><div class="dots" id="dots">${pinAff()}</div><button type="button" class="oeil-pin" title="Afficher le code" onclick="PINVOIR=!PINVOIR;$('#dots').innerHTML=pinAff();this.innerHTML=PINVOIR?OEIL.FERME:OEIL.OUVERT">${PINVOIR ? OEIL.FERME : OEIL.OUVERT}</button></div>
     <div class="pinpad">${[1,2,3,4,5,6,7,8,9,'⌫',0,'OK'].map(k => `<button onclick="pinKey('${k}')">${k}</button>`).join('')}</div>
-    <p class="small muted" style="margin-top:12px">${VERSION}</p></div></div>`;
+    <p class="small" style="margin-top:12px"><a style="cursor:pointer;text-decoration:underline" onclick="fbCompte('Code refusé sur cet appareil ? Connectez le compte du cabinet : vos codes PIN et vos données arrivent, puis retapez votre code.')">☁ ${fbCompteTxt() ? 'Compte du cabinet : ' + esc(fbCompteTxt()) : 'Connecter le compte du cabinet (codes PIN à jour)'}</a><br><span class="muted">Synchronisation : ${esc(FBST.t)}</span></p>
+    <p class="small muted" style="margin-top:6px">${VERSION}</p></div></div>`;
 }
-let PINVOIR = false;
+let PINVOIR = false, PIN_ECHECS = 0;
 const pinAff = () => (PINVOIR ? esc(PIN) : '•'.repeat(PIN.length)) || '<span class="muted small">Code PIN</span>';
 async function pinKey(k){
   if (k === '⌫') PIN = PIN.slice(0, -1);
   else if (k === 'OK'){
     if (await checkPin(PINROLE, PIN)){ SESSION = { role: PINROLE, t: now() }; sessionStorage.setItem('igc_session', JSON.stringify(SESSION)); PIN = ''; const h = location.hash.slice(1); VIEW = VIEWS[h] ? h : 'tableau'; render(); if (!DATA._pins[PINROLE]) toast('Pensez à changer votre code PIN dans Paramètres'); return; }
-    PIN = ''; toast('Code incorrect');
+    PIN = ''; PIN_ECHECS++; if (PIN_ECHECS >= 2 && !fbCompteTxt()) fbCompte('Code refusé : cet appareil n\'a peut-être pas reçu vos codes PIN. Connectez le compte du cabinet, puis retapez votre code.'); else toast('Code incorrect');
   } else if (PIN.length < 8) PIN += k;
   $('#dots').innerHTML = pinAff();
 }
