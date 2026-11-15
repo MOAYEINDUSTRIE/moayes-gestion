@@ -179,12 +179,12 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  IGC Gestion  ===================== */
-const VERSION = 'V1.23';
+const VERSION = 'V1.24';
 const KEY = 'igc_gestion_v1';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
 const FB_PATH = 'moayes/igc_data';
-const COLS = ['clients','devis','missions','factures','paiements','depenses','ordres'];
+const COLS = ['clients','devis','missions','factures','paiements','depenses','ordres','catalogue','dossiers','comptesRendus'];
 const ROLES = { gerant:{nom:'Gérant', all:true}, cogerant:{nom:'Cogérante', all:true}, assistant:{nom:'Assistant(e)', all:false} };
 const DOMAINES = ['Communication politique et électorale','Communication institutionnelle','Affaires publiques','Communication corporate','Consultance stratégique','Branding et digital','Événementiel','Applications et start-up','Formation','Autre'];
 const TYPES_CLI = ['Institution publique','Entreprise','Parti / candidat','ONG / association','Organisation internationale','Particulier','Autre'];
@@ -242,7 +242,7 @@ function enLettres(n){
 /* ---------- données ---------- */
 function blank(){
   return { societe:{ nom:'IMPACT GLOBAL CONSULTING', sigle:'IGC', forme:'SARL', capital:1000000, rccm:'', cc:'', adresse:'Abidjan, Côte d\'Ivoire', tel:'', email:'', banque:'', rib:'', tvaTaux:18, tvaDefaut:false, mentions:'' },
-    clients:[], devis:[], missions:[], factures:[], paiements:[], depenses:[], ordres:[],
+    clients:[], devis:[], missions:[], factures:[], paiements:[], depenses:[], ordres:[], catalogue:[], dossiers:[], comptesRendus:[],
     soldes:{ caisse:0, banque:0, mobile:0, date:today() }, compteurs:{}, _del:{}, _pins:{}, audit:[], _lastSaved:0, nonRes:{} };
 }
 let DATA = load();
@@ -471,7 +471,7 @@ window.addEventListener('offline', () => setFb('', 'Hors ligne'));
 /* ---------- navigation ---------- */
 const MENU = [
   ['Pilotage', [['tableau','📊','Tableau de bord'],['atlas','🧭','ATLAS IA — Commandement'],['elec','🗳️','Base électorale'],['agents','🤖','Agents IA']]],
-  ['Commercial', [['clients','👥','Clients'],['devis','📝','Devis'],['missions','🎯','Missions']]],
+  ['Commercial', [['clients','👥','Clients'],['catalogue','🏷️','Catalogue des prestations'],['devis','📝','Devis'],['missions','🎯','Missions'],['dossiers','🗂️','Dossiers'],['comptesRendus','🗒️','Comptes rendus']]],
   ['Finances', [['factures','🧾','Factures'],['paiements','💰','Encaissements'],['depenses','💸','Dépenses'],['tresorerie','🏦','Trésorerie'],['rapports','📈','Rapports']]],
   ['Système', [['parametres','⚙️','Paramètres'],['aide','❓','Mode d\'emploi']]],
 ];
@@ -523,7 +523,7 @@ document.addEventListener('keydown', e => { if (SESSION || $('.modal-bg')) retur
 function logout(){ SESSION = null; sessionStorage.removeItem('igc_session'); render(); }
 
 /* liste compacte sur téléphone : ligne 1 = nom + montant, ligne 2 = détails */
-const TITRES_COL = ['Client','Mission','Nom','Objet','Libellé','Agent','Catégorie','N°','Numéro','Date','Circonscription','Commune','Région','Territoire'];
+const TITRES_COL = ['Dossier','Prestation','Client','Mission','Nom','Objet','Libellé','Agent','Catégorie','N°','Numéro','Date','Circonscription','Commune','Région','Territoire'];
 function lignesMobiles(root){
   root.querySelectorAll('table.resp').forEach(t => {
     const h = [...t.querySelectorAll('thead th')].map(x => x.textContent.trim());
@@ -633,6 +633,7 @@ const commonDocFields = (d, cid) => `
   <div><label>Client *</label><select id="x_cli">${cliOpts(d.clientId || cid)}</select></div>
   <div><label>Date</label><input id="x_date" type="date" value="${d.date || today()}"></div>
   <div class="full"><label>Objet *</label><input id="x_obj" value="${esc(d.objet)}" placeholder="ex. Plan de communication institutionnelle 2027"></div>
+  <div class="full"><select id="x_cat" onchange="if(this.value){ajoutCatalogue(this.value);this.value=''}">${catOpts()}</select></div>
   <div class="full" id="lig">${lignesHTML()}</div>
   <div><label>Remise (F)</label><input id="x_remise" inputmode="numeric" value="${esc(d.remise || '')}" oninput="majTot()"></div>
   <div><label style="display:flex;gap:8px;align-items:center;margin-top:22px"><input id="x_tva" type="checkbox" style="width:auto" ${(d.tva ?? DATA.societe.tvaDefaut) ? 'checked' : ''} onchange="majTot()"> Appliquer la TVA (${DATA.societe.tvaTaux} %)</label></div>
@@ -657,7 +658,7 @@ function editDevis(id, cid){
     <div><label>Statut</label><select id="x_st">${Object.entries(DST).map(([k, v]) => `<option value="${k}" ${d.statut === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></div>
     <div><label>Validité (jours)</label><input id="x_val" inputmode="numeric" value="${esc(d.validite ?? 30)}"></div></div>
     <div class="act">${id && can() ? `<button class="btn d" onclick="if(confirm('Supprimer ce devis ?')){del('devis','${id}','Suppression devis');closeModal();render()}">Supprimer</button>` : ''}
-    ${id ? `<button class="btn" onclick="printDoc('devis','${id}')">🖨 Imprimer / PDF</button>` : ''}
+    ${id ? `<button class="btn" onclick="printDoc('devis','${id}')">🖨 Imprimer / PDF</button><button class="btn" onclick="contratMission('devis','${id}')">📄 Contrat de mission</button>` : ''}
     ${id && d.statut !== 'refuse' ? `<button class="btn g" onclick="devisVersFacture('${id}')">→ Facturer</button>` : ''}
     <button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" onclick="saveDevis('${id || ''}')">Enregistrer</button></div>`);
   majTot();
@@ -706,7 +707,7 @@ function editMission(id){
     <div><label>Avancement : <b id="m_av_l">${num(m.avancement)} %</b></label><input id="m_av" type="range" min="0" max="100" step="5" value="${num(m.avancement)}" oninput="$('#m_av_l').textContent=this.value+' %'"></div>
     <div class="full"><label>Livrables, étapes, notes</label><textarea id="m_n">${esc(m.notes)}</textarea></div></div>
     <div class="act">${id && can() ? `<button class="btn d" onclick="if(confirm('Supprimer cette mission ?')){del('missions','${id}','Suppression mission');closeModal();render()}">Supprimer</button>` : ''}
-    ${id ? `<button class="btn" onclick="closeModal();editFacture(null,'${m.clientId}',{objet:${esc(JSON.stringify(m.titre))},missionId:'${id}'})">+ Facture</button>` : ''}
+    ${id ? `<button class="btn" onclick="closeModal();editFacture(null,'${m.clientId}',{objet:${esc(JSON.stringify(m.titre))},missionId:'${id}'})">+ Facture</button><button class="btn" onclick="contratMission('missions','${id}')">📄 Contrat</button><button class="btn" onclick="closeModal();editCR(null,{clientId:'${m.clientId}',missionId:'${id}',objet:${esc(JSON.stringify(m.titre))}})">🗒️ Compte rendu</button>` : ''}
     <button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" onclick="saveMission('${id || ''}')">Enregistrer</button></div>`);
 }
 function saveMission(id){
@@ -2350,6 +2351,9 @@ VIEWS.aide = () => `<div class="card"><h3>Mode d'emploi en 6 gestes</h3><ol>
   <li><b>Paramètres</b> : remplissez une fois les informations du cabinet (RCCM, compte contribuable, banque). Changez les codes PIN.</li>
   <li><b>Trésorerie</b> : saisissez ce qu'il y a aujourd'hui en banque, en caisse et sur mobile.</li>
   <li><b>Clients</b> : ajoutez vos clients et prospects.</li>
+  <li><b>Catalogue des prestations</b> : la grille de prix du cabinet. Dans un devis ou une facture, choisissez la prestation dans la liste « ＋ Ajouter une prestation du catalogue » : le prix se met tout seul et reste modifiable sur la ligne. Le gérant et la cogérante corrigent les prix dans le menu Catalogue.</li>
+  <li><b>Dossiers</b> : création d'entreprise, de coopérative, de cabinet, formation payante, application. Le dossier crée ses étapes, son devis (📝 Devis) et son document (🖨 Dossier PDF).</li>
+  <li><b>Contrat de mission et compte rendu</b> : 📄 Contrat de mission depuis un devis ou une mission ; 🗒️ Compte rendu depuis une mission ou le menu Comptes rendus. Tous portent l'en-tête du cabinet.</li>
   <li><b>Devis</b> : créez le devis, imprimez-le en PDF, passez-le à « Envoyé ». Quand le client accepte : <b>→ Facturer</b> (la mission et la facture sont créées).</li>
   <li><b>Factures</b> : à chaque paiement reçu, <b>+ Encaissement</b>. Les retards s'affichent en rouge ; <b>📲 Relancer</b> envoie un message WhatsApp prêt.</li>
   <li><b>Dépenses</b> : notez chaque sortie d'argent. Le tableau de bord et les rapports se calculent seuls.</li></ol>
@@ -2388,6 +2392,272 @@ function printDoc(type, id){
   w.document.write(html); w.document.close(); setTimeout(() => { w.focus(); w.print(); }, 400);
 }
 
+
+/* =====================  Catalogue des prestations (V1.24)  ===================== */
+/* Grille de départ proposée le 15/11/2026, retenue par la gérance ; chaque prix reste modifiable. */
+const CAT_FAM = ['Électoral','Communication','Conseil stratégique','Création de structures','Formation','Frais annexes'];
+const UNITES = ['Forfait','Journée','Mois','Lieu de vote','Unité','Personne','Jour','Heure'];
+const CATALOGUE_IGC = [
+  ['ELE-01','Électoral','Étude et stratégie électorale — commune (municipales)','Forfait',2500000,1500000,4000000,'Scrutins retenus : municipales seules.'],
+  ['ELE-02','Électoral','Étude et stratégie électorale — circonscription (législatives)','Forfait',4000000,2500000,6000000,'Municipales + législatives.'],
+  ['ELE-03','Électoral','Étude et stratégie électorale — région (régionales)','Forfait',8000000,5000000,12000000,'Régionales + législatives, département par département.'],
+  ['ELE-04','Électoral','Étude et stratégie électorale — présidentielle (national)','Forfait',40000000,25000000,60000000,'Présidentielles + législatives.'],
+  ['ELE-05','Électoral','Mise en place du réseau de coordinations','Lieu de vote',75000,50000,100000,'Une coordination = un lieu de vote, 25 électeurs au maximum. Hors frais de terrain.'],
+  ['ELE-06','Électoral','Formation des coordinateurs','Journée',500000,300000,800000,'Groupe jusqu\'à 30 personnes. Salle et restauration à part.'],
+  ['ELE-07','Électoral','Direction et suivi de campagne','Mois',2000000,1000000,3500000,'Pilotage, tableaux de bord, réunions hebdomadaires.'],
+  ['ELE-08','Électoral','Plan de communication de campagne','Forfait',1500000,1000000,2500000,'Messages, slogan, calendrier, conception des supports.'],
+  ['ELE-09','Électoral','Gestion des réseaux sociaux de campagne','Mois',500000,300000,1000000,'Hors budget de publicité sponsorisée.'],
+  ['COM-01','Communication','Stratégie de communication institutionnelle','Forfait',2500000,1500000,4000000,'Diagnostic, plan annuel, messages clés.'],
+  ['COM-02','Communication','Communication corporate / image de marque','Forfait',1500000,800000,3000000,'Identité, charte, positionnement.'],
+  ['COM-03','Communication','Animation des réseaux sociaux','Mois',350000,200000,600000,'Hors publicité sponsorisée.'],
+  ['COM-04','Communication','Organisation d\'événement — honoraires','Forfait',1000000,500000,2000000,'Conception et coordination ; logistique facturée à part.'],
+  ['COM-05','Communication','Relations presse (communiqué, diffusion)','Unité',250000,150000,400000,'Achat d\'espace à part.'],
+  ['CON-01','Conseil stratégique','Journée de conseil','Journée',250000,150000,400000,''],
+  ['CON-02','Conseil stratégique','Diagnostic organisationnel','Forfait',1000000,500000,2000000,''],
+  ['CON-03','Conseil stratégique','Plan stratégique / business plan','Forfait',1000000,500000,2500000,''],
+  ['CRE-01','Création de structures','Création d\'entreprise (SARL, SAS) — accompagnement CEPICI','Forfait',250000,150000,400000,'Frais officiels en sus, à vérifier au CEPICI.'],
+  ['CRE-02','Création de structures','Création de coopérative (SCOOPS ou SCOOP-CA)','Forfait',400000,250000,700000,'Frais officiels en sus.'],
+  ['CRE-03','Création de structures','Création de cabinet de conseil','Forfait',350000,200000,500000,'Statuts, immatriculation, offre de services.'],
+  ['CRE-04','Création de structures','Montage d\'une formation payante','Forfait',600000,300000,1000000,'Programme, supports, prix, plan commercial.'],
+  ['CRE-05','Création de structures','Conception d\'application de gestion','Forfait',3000000,1500000,8000000,'Cahier des charges et développement ; maintenance à part.'],
+  ['FOR-01','Formation','Formation (groupe jusqu\'à 20)','Journée',400000,250000,600000,''],
+  ['FOR-02','Formation','Formation — tarif par participant','Personne',50000,25000,100000,'Sessions ouvertes.'],
+  ['ANX-01','Frais annexes','Déplacement hors Abidjan (per diem)','Jour',40000,25000,60000,'Hébergement et repas ; transport à part.'],
+];
+/* identifiants fixes (P-code) : deux appareils qui installent la grille ne créent pas de doublons ; toute modification l'emporte (u = 1) */
+function seedCatalogue(){
+  if (DATA._catSeed) return;
+  CATALOGUE_IGC.forEach(([code, cat, d, unite, pu, bas, haut, note]) => {
+    const id = 'P-' + code;
+    if (DATA._del[id] || DATA.catalogue.some(x => x.id === id)) return;
+    DATA.catalogue.push({ id, code, cat, d, unite, pu, bas, haut, note, actif: true, u: 1 });
+  });
+  DATA._catSeed = 1;
+  try { localStorage.setItem(KEY, JSON.stringify(DATA)); } catch(e){}
+}
+const catTrie = () => [...DATA.catalogue].sort((a, b) => (CAT_FAM.indexOf(a.cat) - CAT_FAM.indexOf(b.cat)) || String(a.code).localeCompare(String(b.code)));
+const catLib = p => p.d + (p.unite && p.unite !== 'Forfait' ? ' (par ' + p.unite.toLowerCase() + ')' : '');
+const catOpts = () => `<option value="">＋ Ajouter une prestation du catalogue…</option>` + CAT_FAM.map(f => { const L = catTrie().filter(p => p.cat === f && p.actif !== false); return L.length ? `<optgroup label="${esc(f)}">${L.map(p => `<option value="${p.id}">${esc(p.code + ' — ' + p.d + ' — ' + F(p.pu) + ' F / ' + (p.unite || 'forfait').toLowerCase())}</option>`).join('')}</optgroup>` : ''; }).join('');
+function ajoutCatalogue(id){
+  const p = get('catalogue', id); if (!p) return;
+  const vide = LIG.findIndex(l => !l.d && !num(l.pu));
+  const l = { d: catLib(p), q: 1, pu: p.pu };
+  if (vide >= 0) LIG[vide] = l; else LIG.push(l);
+  $('#lig').innerHTML = lignesHTML(); majTot();
+  toast('Prix ' + FCFA(p.pu) + ' repris : modifiable sur la ligne');
+}
+
+let CATF = 'toutes';
+VIEWS.catalogue = () => {
+  const L = catTrie().filter(p => CATF === 'toutes' || p.cat === CATF);
+  return `<div class="bar"><select onchange="CATF=this.value;render()"><option value="toutes">Toutes les familles</option>${CAT_FAM.map(f => `<option ${CATF === f ? 'selected' : ''}>${esc(f)}</option>`).join('')}</select><span class="grow"></span>${can() ? `<button class="btn p" onclick="editPresta()">+ Prestation</button>` : ''}</div>
+  <div class="card"><p class="small muted" style="margin-top:0">Prix en F CFA hors taxes, honoraires seuls. Dans un devis ou une facture, choisissez la prestation dans la liste : le prix se met tout seul et reste modifiable sur la ligne.</p>
+  ${tbl([['Code'],['Prestation'],['Famille'],['Unité'],['Prix','n'],['Fourchette','n']], L.map(p => `<tr class="click" onclick="editPresta('${p.id}')"><td>${esc(p.code)}</td><td><b>${esc(p.d)}</b>${p.actif === false ? ' <span class="tag">masquée</span>' : ''}${p.note ? `<br><span class="small muted">${esc(p.note)}</span>` : ''}</td><td>${esc(p.cat)}</td><td>${esc(p.unite)}</td><td class="n"><b>${FCFA(p.pu)}</b></td><td class="n small">${p.bas || p.haut ? F(p.bas) + ' – ' + F(p.haut) : ''}</td></tr>`), 'Catalogue vide.')}</div>`;
+};
+function editPresta(id){
+  const p = id ? get('catalogue', id) : { cat: CATF !== 'toutes' ? CATF : 'Conseil stratégique', unite: 'Forfait', actif: true };
+  const ro = !can();
+  modal(`<h2>${id ? 'Prestation ' + esc(p.code) : 'Nouvelle prestation'}</h2>${ro ? '<p class="small muted">Lecture seule : seuls le gérant et la cogérante modifient le catalogue.</p>' : ''}<div class="f">
+    <div><label>Code</label><input id="p_code" value="${esc(p.code)}" placeholder="ex. CON-04" ${ro ? 'disabled' : ''}></div>
+    <div><label>Famille</label><select id="p_cat" ${ro ? 'disabled' : ''}>${opts(CAT_FAM, p.cat)}</select></div>
+    <div class="full"><label>Désignation (imprimée sur le devis) *</label><input id="p_d" value="${esc(p.d)}" ${ro ? 'disabled' : ''}></div>
+    <div><label>Unité</label><select id="p_u" ${ro ? 'disabled' : ''}>${opts(UNITES, p.unite)}</select></div>
+    <div><label>Prix unitaire HT (F) *</label><input id="p_pu" inputmode="numeric" value="${esc(p.pu ?? '')}" ${ro ? 'disabled' : ''}></div>
+    <div><label>Fourchette basse (F)</label><input id="p_bas" inputmode="numeric" value="${esc(p.bas ?? '')}" ${ro ? 'disabled' : ''}></div>
+    <div><label>Fourchette haute (F)</label><input id="p_haut" inputmode="numeric" value="${esc(p.haut ?? '')}" ${ro ? 'disabled' : ''}></div>
+    <div class="full"><label>Remarque interne (non imprimée)</label><input id="p_note" value="${esc(p.note)}" ${ro ? 'disabled' : ''}></div>
+    <div class="full"><label style="display:flex;gap:8px;align-items:center"><input id="p_act" type="checkbox" style="width:auto" ${p.actif !== false ? 'checked' : ''} ${ro ? 'disabled' : ''}> Proposée dans les devis et factures</label></div></div>
+    <div class="act">${id && !ro ? `<button class="btn d" onclick="if(confirm('Supprimer cette prestation du catalogue ?')){del('catalogue','${id}','Suppression prestation ${esc(p.code)}');closeModal();render()}">Supprimer</button>` : ''}
+    <button class="btn" onclick="closeModal()">${ro ? 'Fermer' : 'Annuler'}</button>${ro ? '' : `<button class="btn p" onclick="savePresta('${id || ''}')">Enregistrer</button>`}</div>`);
+}
+function savePresta(id){
+  const d = val('p_d'), pu = num(val('p_pu')); if (!d || !pu) return toast('Désignation et prix obligatoires');
+  const p = Object.assign(id ? get('catalogue', id) : { id: uid('P') }, { code: val('p_code').toUpperCase(), cat: val('p_cat'), d, unite: val('p_u'), pu, bas: num(val('p_bas')), haut: num(val('p_haut')), note: val('p_note'), actif: $('#p_act').checked });
+  put('catalogue', p, (id ? 'Modification' : 'Création') + ' prestation ' + (p.code || d) + ' : ' + FCFA(pu)); closeModal(); toast('Catalogue mis à jour'); render();
+}
+
+/* =====================  En-tête commun des documents IGC  ===================== */
+function docIGC(titre, sousTitre, corps){
+  const s = DATA.societe;
+  return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>${esc(titre)}</title><style>
+  @page{size:A4;margin:16mm}body{font:12.5px/1.5 Arial,Helvetica,sans-serif;color:#16202e;margin:0}
+  .hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #14213a;padding-bottom:12px}
+  .lg{display:flex;gap:10px;align-items:center}.lg .m{width:52px;height:52px;border-radius:10px;background:#c9962a;color:#14213a;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px}
+  h1{font-size:20px;margin:0;color:#14213a;letter-spacing:.5px}h2{font-size:14px;color:#14213a;margin:18px 0 6px;border-bottom:1px solid #d7dbe3;padding-bottom:3px}
+  .box{border:1px solid #d7dbe3;border-radius:8px;padding:10px 12px}table{width:100%;border-collapse:collapse;margin-top:8px}
+  th{background:#14213a;color:#fff;text-align:left;padding:6px 8px;font-size:11.5px}td{padding:6px 8px;border-bottom:1px solid #e3e6ec;vertical-align:top}.n{text-align:right;white-space:nowrap}
+  .ft{margin-top:26px;border-top:1px solid #d7dbe3;padding-top:8px;font-size:10.5px;color:#555;text-align:center}.sig{display:flex;justify-content:space-between;margin-top:34px;gap:30px}.sig>div{flex:1;text-align:center}
+  .pre{white-space:pre-wrap}.ck{display:inline-block;width:11px;height:11px;border:1.4px solid #14213a;border-radius:2px;margin-right:6px;vertical-align:-1px;text-align:center;font-size:10px;line-height:10px}
+  </style></head><body>
+  <div class="hd"><div class="lg"><div class="m">${esc(s.sigle || 'IGC')}</div><div><b style="font-size:15px">${esc(s.nom)}</b><br>${esc(s.forme)} au capital de ${F(s.capital)} F CFA<br>${esc(s.adresse)}<br>${esc(s.tel)} ${s.email ? '· ' + esc(s.email) : ''}</div></div>
+    <div style="text-align:right"><h1>${esc(titre)}</h1>${sousTitre || ''}</div></div>
+  ${corps}
+  <div class="ft">${esc(s.nom)} — ${esc(s.forme)} au capital de ${F(s.capital)} F CFA${s.rccm ? ' — RCCM ' + esc(s.rccm) : ''}${s.cc ? ' — CC ' + esc(s.cc) : ''} — Document confidentiel</div>
+  </body></html>`;
+}
+function imprimer(html, nom){
+  if (window.AndroidBridge && AndroidBridge.printHtml){ AndroidBridge.printHtml(html, nom); return; }
+  const w = window.open('', '_blank'); if (!w){ toast('Autorisez les fenêtres pour imprimer'); return; }
+  w.document.write(html); w.document.close(); setTimeout(() => { w.focus(); w.print(); }, 400);
+}
+const para = t => `<p class="pre">${esc(t)}</p>`;
+
+/* ----- contrat de mission (depuis un devis ou une mission) ----- */
+function contratMission(type, id){
+  const src = get(type === 'devis' ? 'devis' : 'missions', id); if (!src) return;
+  const dv = type === 'devis' ? src : (src.devisId ? get('devis', src.devisId) : null);
+  const m = type === 'missions' ? src : DATA.missions.find(x => x.devisId === id);
+  const c = cli(src.clientId), s = DATA.societe;
+  const objet = (dv && dv.objet) || (m && m.titre) || '';
+  const t = dv ? totaux(dv) : null, montant = t ? t.ttc : num(m && m.montant);
+  const numC = 'IGC-CM-' + ((dv && dv.num) || (m && m.id) || '').replace(/^IGC-D-/, '');
+  const lignes = dv && dv.lignes.length ? `<table><thead><tr><th>Prestation</th><th class="n">Qté</th><th class="n">Prix unitaire</th><th class="n">Montant</th></tr></thead><tbody>${dv.lignes.map(l => `<tr><td>${esc(l.d)}</td><td class="n">${l.q}</td><td class="n">${F(l.pu)}</td><td class="n">${F(num(l.q) * num(l.pu))}</td></tr>`).join('')}</tbody></table>` : '';
+  const corps = `
+  <div style="display:flex;gap:14px;margin-top:14px"><div class="box" style="flex:1"><span style="color:#667085;font-size:11px">LE CABINET</span><br><b>${esc(s.nom)}</b><br>${esc(s.forme)} au capital de ${F(s.capital)} F CFA${s.rccm ? '<br>RCCM ' + esc(s.rccm) : ''}<br>${esc(s.adresse)}<br>représenté par sa Gérance</div>
+  <div class="box" style="flex:1"><span style="color:#667085;font-size:11px">LE CLIENT</span><br><b>${esc(c.nom)}</b>${c.contact ? '<br>représenté par ' + esc(c.contact) : ''}${c.adresse ? '<br>' + esc(c.adresse) : ''}${c.cc ? '<br>CC : ' + esc(c.cc) : ''}</div></div>
+  <h2>Article 1 — Objet</h2><p>Le Client confie au Cabinet, qui l'accepte, la mission suivante : <b>${esc(objet)}</b>${dv ? ', telle que décrite dans le devis n° ' + esc(dv.num) + ' du ' + dfr(dv.date) + ', qui fait partie du présent contrat' : ''}.</p>
+  <h2>Article 2 — Prestations</h2>${lignes || '<p>Prestations définies d\'un commun accord entre les parties.</p>'}
+  <h2>Article 3 — Durée</h2><p>La mission débute le ${m && m.debut ? dfr(m.debut) : '____/____/______'} et prend fin le ${m && m.fin ? dfr(m.fin) : '____/____/______'}, ou à la remise des livrables.</p>
+  <h2>Article 4 — Prix et modalités de paiement</h2><p>Le prix de la mission est fixé à <b>${F(montant)} F CFA${t && t.tva ? ' TTC' : ''}</b> (${enLettres(montant)} francs CFA). Il est payable comme suit : 50 % à la signature, 50 % à la remise des livrables, sauf accord écrit différent.${s.banque || s.rib ? ' Règlement par virement : ' + esc(s.banque) + ' — ' + esc(s.rib) + '.' : ''} Les frais officiels, de logistique et de déplacement non compris dans les prestations ci-dessus sont facturés à part, sur justificatif et après accord du Client.</p>
+  ${dv && dv.notes ? `<h2>Conditions particulières</h2>${para(dv.notes)}` : ''}
+  <h2>Article 5 — Obligations des parties</h2><p>Le Cabinet exécute la mission avec diligence et selon les règles de l'art. Le Client fournit à temps les informations et documents nécessaires et désigne un interlocuteur.</p>
+  <h2>Article 6 — Confidentialité</h2><p>Chaque partie garde confidentielles les informations reçues de l'autre pendant la mission et après sa fin. Les données personnelles sont traitées dans le respect de la loi n° 2013-450 relative à la protection des données à caractère personnel.</p>
+  <h2>Article 7 — Propriété des livrables</h2><p>Les livrables deviennent la propriété du Client après paiement intégral du prix. Le Cabinet conserve ses méthodes, outils et savoir-faire.</p>
+  <h2>Article 8 — Résiliation</h2><p>En cas de manquement grave de l'une des parties, l'autre peut résilier le contrat quinze (15) jours après une mise en demeure restée sans effet. Les prestations réalisées restent dues.</p>
+  <h2>Article 9 — Litiges</h2><p>Les parties recherchent d'abord un règlement amiable. À défaut, le litige est porté devant les juridictions compétentes d'Abidjan.</p>
+  <p style="margin-top:16px">Fait à Abidjan, le ____/____/______, en deux exemplaires originaux.</p>
+  <div class="sig"><div>Pour le Client<br><span class="small">(nom, cachet, signature)</span></div><div>Pour ${esc(s.nom)}<br>La Gérance</div></div>`;
+  imprimer(docIGC('CONTRAT DE MISSION', `<b>N° ${esc(numC)}</b>`, corps), numC);
+}
+
+/* =====================  Comptes rendus  ===================== */
+VIEWS.comptesRendus = () => {
+  const L = [...DATA.comptesRendus].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  return `<div class="bar"><span class="grow"></span><button class="btn p" onclick="editCR()">+ Compte rendu</button></div>
+  <div class="card">${tbl([['Date'],['Objet'],['Client'],['Mission']], L.map(r => `<tr class="click" onclick="editCR('${r.id}')"><td>${dfr(r.date)}</td><td><b>${esc(r.objet)}</b></td><td>${r.clientId ? esc(cli(r.clientId).nom) : '<span class="muted">Interne IGC</span>'}</td><td>${r.missionId && get('missions', r.missionId) ? esc(get('missions', r.missionId).titre) : ''}</td></tr>`), 'Aucun compte rendu.')}</div>`;
+};
+function editCR(id, pre){
+  const r = id ? get('comptesRendus', id) : Object.assign({ date: today(), type: 'Réunion' }, pre || {});
+  modal(`<h2>${id ? 'Compte rendu' : 'Nouveau compte rendu'}</h2><div class="f">
+    <div><label>Date</label><input id="r_date" type="date" value="${r.date || today()}"></div>
+    <div><label>Type</label><select id="r_type">${opts(['Réunion','Séance de travail','Mission de terrain','Entretien client','Point d\'étape'], r.type)}</select></div>
+    <div class="full"><label>Objet *</label><input id="r_obj" value="${esc(r.objet)}"></div>
+    <div><label>Client (vide = interne)</label><select id="r_cli">${cliOpts(r.clientId)}</select></div>
+    <div><label>Mission</label><select id="r_mis"><option value="">—</option>${DATA.missions.map(m => `<option value="${m.id}" ${m.id === r.missionId ? 'selected' : ''}>${esc(m.titre)}</option>`).join('')}</select></div>
+    <div><label>Lieu</label><input id="r_lieu" value="${esc(r.lieu)}"></div>
+    <div><label>Rédigé par</label><input id="r_red" value="${esc(r.redacteur)}"></div>
+    <div class="full"><label>Participants</label><textarea id="r_part" placeholder="Un nom par ligne">${esc(r.participants || '')}</textarea></div>
+    <div class="full"><label>Ordre du jour</label><textarea id="r_odj">${esc(r.odj || '')}</textarea></div>
+    <div class="full"><label>Points discutés</label><textarea id="r_pts" style="min-height:110px">${esc(r.points || '')}</textarea></div>
+    <div class="full"><label>Décisions</label><textarea id="r_dec">${esc(r.decisions || '')}</textarea></div>
+    <div class="full"><label>Actions à mener (action — responsable — échéance)</label><textarea id="r_act">${esc(r.actions || '')}</textarea></div>
+    <div><label>Prochaine réunion</label><input id="r_next" type="date" value="${r.prochaine || ''}"></div></div>
+    <div class="act">${id && can() ? `<button class="btn d" onclick="if(confirm('Supprimer ce compte rendu ?')){del('comptesRendus','${id}','Suppression compte rendu');closeModal();render()}">Supprimer</button>` : ''}
+    ${id ? `<button class="btn" onclick="printCR('${id}')">🖨 Imprimer / PDF</button>` : ''}
+    <button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" onclick="saveCR('${id || ''}')">Enregistrer</button></div>`);
+}
+function saveCR(id){
+  const objet = val('r_obj'); if (!objet) return toast('L\'objet est obligatoire');
+  const r = Object.assign(id ? get('comptesRendus', id) : { id: uid('R') }, { date: val('r_date') || today(), type: val('r_type'), objet, clientId: val('r_cli'), missionId: val('r_mis'), lieu: val('r_lieu'), redacteur: val('r_red'), participants: val('r_part'), odj: val('r_odj'), points: val('r_pts'), decisions: val('r_dec'), actions: val('r_act'), prochaine: val('r_next') });
+  put('comptesRendus', r, (id ? 'Modification' : 'Création') + ' compte rendu ' + objet); closeModal(); toast('Compte rendu enregistré'); if (VIEW === 'comptesRendus') render(); else go('comptesRendus');
+}
+function printCR(id){
+  const r = get('comptesRendus', id); if (!r) return;
+  const m = r.missionId ? get('missions', r.missionId) : null;
+  const sec = (t, v) => v ? `<h2>${t}</h2>${para(v)}` : '';
+  const corps = `<div style="display:flex;gap:14px;margin-top:14px"><div class="box" style="flex:2"><span style="color:#667085;font-size:11px">OBJET</span><br><b>${esc(r.objet)}</b>${m ? '<br>Mission : ' + esc(m.titre) : ''}</div>
+    <div class="box" style="flex:1"><span style="color:#667085;font-size:11px">${esc((r.type || 'Réunion').toUpperCase())}</span><br>${dfr(r.date)}${r.lieu ? '<br>' + esc(r.lieu) : ''}${r.clientId ? '<br>' + esc(cli(r.clientId).nom) : ''}</div></div>
+    ${sec('Participants', r.participants)}${sec('Ordre du jour', r.odj)}${sec('Points discutés', r.points)}${sec('Décisions', r.decisions)}${sec('Actions à mener', r.actions)}
+    ${r.prochaine ? `<h2>Prochaine réunion</h2><p>${dfr(r.prochaine)}</p>` : ''}
+    <div class="sig"><div></div><div>Rédigé par<br><b>${esc(r.redacteur || 'IGC')}</b></div></div>`;
+  imprimer(docIGC('COMPTE RENDU', `<b>${dfr(r.date)}</b>`, corps), 'Compte rendu ' + dfr(r.date));
+}
+
+/* =====================  Dossiers (création de structures)  ===================== */
+/* Chaque type : prestation du catalogue liée, informations à recueillir, étapes générées automatiquement. */
+const DOSSIER_TYPES = {
+  entreprise: { nom: 'Création d\'entreprise', ico: '🏢', presta: 'CRE-01',
+    champs: [['forme','Forme juridique',['SARL','SARLU','SAS','SASU','Entreprise individuelle']],['capital','Capital (F)'],['siege','Siège social'],['activite','Activité principale'],['associes','Associés (un par ligne : nom — apport)','t'],['gerant','Gérant / dirigeant']],
+    etapes: ['Entretien de cadrage : activité, associés, capital, siège','Choix de la forme juridique et du nom ; vérification de la disponibilité du nom','Rédaction des statuts','Déclaration de souscription et de versement (DSV)','Contrat de bail ou attestation de domiciliation du siège','Pièces d\'identité des associés et du gérant','Pièces demandées pour le gérant (casier judiciaire ou déclaration sur l\'honneur, selon la liste CEPICI en vigueur)','Vérification de la liste officielle des pièces et des frais sur le site du CEPICI','Dépôt du dossier au guichet unique du CEPICI et paiement des frais officiels','Retrait du RCCM, de la déclaration fiscale d\'existence (DFE / compte contribuable) et de l\'immatriculation CNPS','Ouverture du compte bancaire de la société','Remise du dossier complet au client'] },
+  cooperative: { nom: 'Création de coopérative', ico: '🌾', presta: 'CRE-02',
+    champs: [['forme','Forme',['SCOOPS (société coopérative simplifiée, 5 membres au moins)','SCOOP-CA (avec conseil d\'administration, 15 membres au moins)']],['nbMembres','Nombre de membres'],['siege','Siège'],['activite','Activité (filière)'],['capital','Capital social (F)'],['membres','Membres fondateurs (un par ligne)','t']],
+    etapes: ['Réunion d\'information des futurs membres','Vérification du nombre minimum de membres (OHADA : 5 en SCOOPS, 15 en SCOOP-CA)','Rédaction des statuts et du règlement intérieur','Souscription et libération des parts sociales','Assemblée générale constitutive : adoption des statuts, élection des organes','Procès-verbal de l\'assemblée générale constitutive et liste des membres','Pièces d\'identité des membres et des dirigeants','Vérification du guichet compétent et de la liste des pièces pour l\'immatriculation','Immatriculation au Registre des sociétés coopératives','Ouverture du compte bancaire','Formation des dirigeants à la gestion coopérative','Remise du dossier complet au client'] },
+  cabinet: { nom: 'Création de cabinet', ico: '💼', presta: 'CRE-03',
+    champs: [['forme','Forme juridique',['SARL','SARLU','SAS','SASU','Entreprise individuelle']],['domaines','Domaines de conseil'],['siege','Siège'],['associes','Associés / consultants (un par ligne)','t']],
+    etapes: ['Entretien de cadrage : domaines, cibles, associés','Création juridique (voir les étapes « Création d\'entreprise »)','Offre de services et grille de prix','Modèles de documents : devis, contrat de mission, facture, compte rendu','Identité visuelle : nom, logo, carte de visite','Présentation du cabinet (plaquette)','Outils de gestion : clients, devis, factures, trésorerie','Plan de prospection des 3 premiers mois','Remise du dossier complet au client'] },
+  formation: { nom: 'Formation payante', ico: '🎓', presta: 'CRE-04',
+    champs: [['theme','Thème de la formation'],['public','Public visé'],['duree','Durée (jours ou heures)'],['prix','Prix par participant (F)'],['effectif','Effectif par session'],['lieu','Lieu / en ligne']],
+    etapes: ['Analyse du besoin et du public visé','Objectifs pédagogiques','Programme détaillé et déroulé','Supports : présentation, cahier du participant, exercices','Calcul du prix et seuil de rentabilité','Vérification des obligations : agrément ou financement éventuel (FDFP)','Fiche d\'inscription et conditions de vente','Plan de communication et de vente','Logistique : salle ou plateforme, matériel, restauration','Évaluation et attestation de fin de formation','Remise du dossier complet au client'] },
+  application: { nom: 'Application de gestion', ico: '📱', presta: 'CRE-05',
+    champs: [['nomApp','Nom de l\'application'],['utilisateurs','Utilisateurs'],['fonctions','Fonctions attendues (une par ligne)','t'],['support','Supports',['Téléphone et ordinateur','Téléphone','Ordinateur']],['delai','Délai souhaité']],
+    etapes: ['Entretien de cadrage : besoins, utilisateurs, budget','Cahier des charges validé par le client','Maquettes des écrans','Développement','Essais sur téléphone et sur ordinateur','Correction des anomalies','Mise en ligne et accès des utilisateurs','Formation des utilisateurs et mode d\'emploi','Sauvegarde et sécurité des données','Contrat de maintenance','Remise du dossier complet au client'] },
+};
+const DOS_ST = { cadrage:['Cadrage','b'], en_cours:['En cours','w'], termine:['Terminé','g'], suspendu:['Suspendu','r'] };
+const dosTag = x => `<span class="tag ${DOS_ST[x.statut || 'cadrage'][1]}">${DOS_ST[x.statut || 'cadrage'][0]}</span>`;
+const dosAv = x => { const e = x.etapes || []; return e.length ? Math.round(e.filter(s => s.ok).length / e.length * 100) : 0; };
+VIEWS.dossiers = () => {
+  const L = [...DATA.dossiers].sort((a, b) => (b.cree || '').localeCompare(a.cree || ''));
+  return `<div class="card" style="margin-bottom:12px"><h3>Nouveau dossier</h3><div class="act" style="justify-content:flex-start;flex-wrap:wrap">${Object.entries(DOSSIER_TYPES).map(([k, t]) => `<button class="btn" onclick="editDossier(null,'${k}')">${t.ico} ${esc(t.nom)}</button>`).join('')}</div>
+  <p class="small muted" style="margin-bottom:0">Chaque dossier crée tout seul ses étapes, son devis (prix du catalogue) et son document imprimable.</p></div>
+  <div class="card">${tbl([['Dossier'],['Type'],['Client'],['Avancement','n'],['Statut']], L.map(x => `<tr class="click" onclick="editDossier('${x.id}')"><td><b>${esc(x.nom)}</b></td><td>${DOSSIER_TYPES[x.type] ? DOSSIER_TYPES[x.type].ico + ' ' + esc(DOSSIER_TYPES[x.type].nom) : ''}</td><td>${esc(cli(x.clientId).nom)}</td><td class="n">${dosAv(x)} %</td><td>${dosTag(x)}</td></tr>`), 'Aucun dossier.')}</div>`;
+};
+let DOSE = [];
+function etapesHTML(){
+  return DOSE.map((s, i) => `<div style="display:flex;gap:8px;align-items:center;margin:4px 0"><input type="checkbox" style="width:auto" ${s.ok ? 'checked' : ''} onchange="DOSE[${i}].ok=this.checked"><input value="${esc(s.t)}" oninput="DOSE[${i}].t=this.value" style="flex:1"><button class="btn sm d" onclick="DOSE.splice(${i},1);$('#dos_et').innerHTML=etapesHTML()">✕</button></div>`).join('') + `<button class="btn sm" style="margin-top:4px" onclick="DOSE.push({t:'',ok:false});$('#dos_et').innerHTML=etapesHTML()">+ Étape</button>`;
+}
+function editDossier(id, type){
+  if (!DATA.clients.length) { toast('Ajoutez d\'abord un client'); return editClient(); }
+  const x = id ? get('dossiers', id) : { type, statut: 'cadrage', infos: {}, cree: today() };
+  const T = DOSSIER_TYPES[x.type]; if (!T) return;
+  DOSE = (id ? x.etapes || [] : T.etapes.map(t => ({ t, ok: false }))).map(s => ({ ...s }));
+  const inf = x.infos || {};
+  const champ = ([k, lab, mode]) => Array.isArray(mode) ? `<div><label>${esc(lab)}</label><select id="dz_${k}"><option></option>${opts(mode, inf[k])}</select></div>`
+    : mode === 't' ? `<div class="full"><label>${esc(lab)}</label><textarea id="dz_${k}">${esc(inf[k] || '')}</textarea></div>` : `<div><label>${esc(lab)}</label><input id="dz_${k}" value="${esc(inf[k] || '')}"></div>`;
+  modal(`<h2>${T.ico} ${id ? esc(x.nom) : esc(T.nom)}</h2><div class="f">
+    <div class="full"><label>Nom du projet *</label><input id="dz_nom" value="${esc(x.nom)}" placeholder="ex. Coopérative des productrices d'attiéké de …"></div>
+    <div><label>Client *</label><select id="dz_cli">${cliOpts(x.clientId)}</select></div>
+    <div><label>Statut</label><select id="dz_st">${Object.entries(DOS_ST).map(([k, v]) => `<option value="${k}" ${x.statut === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></div>
+    ${T.champs.map(champ).join('')}
+    <div class="full"><label>Étapes (cochez au fur et à mesure)</label><div id="dos_et">${etapesHTML()}</div></div>
+    <div class="full"><label>Notes</label><textarea id="dz_notes">${esc(x.notes || '')}</textarea></div></div>
+    <div class="act">${id && can() ? `<button class="btn d" onclick="if(confirm('Supprimer ce dossier ?')){del('dossiers','${id}','Suppression dossier');closeModal();render()}">Supprimer</button>` : ''}
+    ${id ? `<button class="btn" onclick="printDossier('${id}')">🖨 Dossier PDF</button><button class="btn g" onclick="dossierDevis('${id}')">📝 Devis</button>` : ''}
+    <button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" onclick="saveDossier('${id || ''}','${x.type}')">Enregistrer</button></div>`);
+}
+function saveDossier(id, type, silent){
+  const nom = val('dz_nom'), clientId = val('dz_cli'); if (!nom || !clientId){ toast('Nom du projet et client obligatoires'); return null; }
+  const T = DOSSIER_TYPES[type], infos = {}; T.champs.forEach(([k]) => infos[k] = val('dz_' + k));
+  const x = Object.assign(id ? get('dossiers', id) : { id: uid('X'), type, cree: today() }, { nom, clientId, statut: val('dz_st'), infos, etapes: DOSE.filter(s => s.t.trim()).map(s => ({ t: s.t.trim(), ok: !!s.ok })), notes: val('dz_notes') });
+  if (x.etapes.length && x.etapes.every(s => s.ok)) x.statut = 'termine';
+  put('dossiers', x, (id ? 'Modification' : 'Création') + ' dossier ' + nom);
+  if (!silent){ closeModal(); toast(id ? 'Dossier enregistré' : 'Dossier créé avec ses étapes'); if (VIEW === 'dossiers') render(); else go('dossiers'); }
+  return x;
+}
+function dossierDevis(id){
+  const x0 = get('dossiers', id); if (!x0) return; const x = $('#dz_nom') ? saveDossier(id, x0.type, true) : x0; if (!x) return;
+  const T = DOSSIER_TYPES[x.type], p = DATA.catalogue.find(c => c.code === T.presta);
+  closeModal();
+  const ex = x.devisId && get('devis', x.devisId);
+  if (ex) return editDevis(ex.id);
+  const d = put('devis', { id: uid('D'), num: nextNum('D'), statut: 'brouillon', validite: 30, clientId: x.clientId, date: today(), objet: T.nom + ' — ' + x.nom, lignes: p ? [{ d: catLib(p), q: 1, pu: p.pu }] : [{ d: T.nom, q: 1, pu: 0 }], remise: 0, tva: !!DATA.societe.tvaDefaut, notes: 'Frais officiels, déplacements et logistique non compris, facturés à part sur justificatif.' }, 'Devis créé depuis le dossier ' + x.nom);
+  x.devisId = d.id; put('dossiers', x);
+  toast('Devis ' + d.num + ' créé : prix du catalogue, modifiable'); editDevis(d.id);
+}
+function printDossier(id){
+  const x = get('dossiers', id); if (!x) return;
+  const T = DOSSIER_TYPES[x.type], c = cli(x.clientId), inf = x.infos || {};
+  const infos = T.champs.filter(([k]) => inf[k]).map(([k, lab]) => `<tr><td style="width:34%;color:#475467">${esc(lab)}</td><td class="pre">${esc(inf[k])}</td></tr>`).join('');
+  const dv = x.devisId && get('devis', x.devisId);
+  const corps = `<div style="display:flex;gap:14px;margin-top:14px"><div class="box" style="flex:2"><span style="color:#667085;font-size:11px">PROJET</span><br><b>${esc(x.nom)}</b><br>${esc(T.nom)}</div>
+    <div class="box" style="flex:1"><span style="color:#667085;font-size:11px">CLIENT</span><br><b>${esc(c.nom)}</b>${c.contact ? '<br>' + esc(c.contact) : ''}${c.tel ? '<br>' + esc(c.tel) : ''}</div></div>
+    ${infos ? `<h2>Informations du projet</h2><table><tbody>${infos}</tbody></table>` : ''}
+    <h2>Étapes et pièces (avancement ${dosAv(x)} %)</h2><table><thead><tr><th style="width:30px">N°</th><th>Étape</th><th style="width:90px">État</th></tr></thead><tbody>${(x.etapes || []).map((s, i) => `<tr><td>${i + 1}</td><td>${esc(s.t)}</td><td><span class="ck">${s.ok ? '✓' : ''}</span>${s.ok ? 'Fait' : 'À faire'}</td></tr>`).join('')}</tbody></table>
+    ${dv ? `<h2>Honoraires</h2><p>Devis n° ${esc(dv.num)} du ${dfr(dv.date)} : <b>${FCFA(totaux(dv).ttc)}</b>${totaux(dv).tva ? ' TTC' : ''}. Frais officiels non compris.</p>` : ''}
+    ${x.notes ? `<h2>Notes</h2>${para(x.notes)}` : ''}
+    <div class="sig"><div>Le Client</div><div>${esc(DATA.societe.nom)}<br>La Gérance</div></div>`;
+  imprimer(docIGC('DOSSIER', `<b>${esc(T.nom)}</b><br>Ouvert le ${dfr(x.cree)}`, corps), 'Dossier ' + x.nom);
+}
+
 /* ----- exports ----- */
 function saveFile(name, mime, text){
   if (window.AndroidBridge && AndroidBridge.saveFile){ AndroidBridge.saveFile(name, mime, btoa(unescape(encodeURIComponent(text)))); return; }
@@ -2411,6 +2681,7 @@ function importJSON(file){
 }
 
 /* ---------- démarrage ---------- */
+seedCatalogue();
 render();
 fbInit();
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
