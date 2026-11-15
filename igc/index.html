@@ -342,6 +342,8 @@ async function checkPin(role, pin){
 const can = () => SESSION && ROLES[SESSION.role] && ROLES[SESSION.role].all;
 
 /* ---------- Firebase (chemin moayes/igc_data) ---------- */
+/* Application Firebase nommée « igc » : sa session est séparée de celle de MOAYES (attiéké) sur le même navigateur */
+function FBAPP(){ try { return firebase.app('igc'); } catch(e){ return firebase.initializeApp(FB_CFG, 'igc'); } }
 let fb = null, fbRef = null, FBST = { c:'', t:'Hors ligne' };
 function setFb(c, t){ const avant = FBST.t; FBST = { c, t }; if (!SESSION && avant !== t && !document.querySelector('.modal-bg') && $('#dots')) render(); const el = $('#fbpill'); if (el){ el.className = 'pill ' + c; el.textContent = '☁ ' + t; } }
 function mergeData(remote){
@@ -375,23 +377,23 @@ function mergeData(remote){
 function fbInit(){
   if (typeof firebase === 'undefined'){ setFb('', 'Hors ligne'); return; }
   try {
-    fb = firebase.apps.length ? firebase.app() : firebase.initializeApp(FB_CFG);
+    fb = FBAPP();
     setFb('w', 'Connexion…');
     fbSession().then(u => {
       if (u && !u.isAnonymous) return fbAttach();
       FB_PROPOSER = true; if (SESSION) render();
       // accès provisoire, tant que la base n'est pas verrouillée sur le compte du cabinet
-      (u ? Promise.resolve() : firebase.auth().signInAnonymously()).then(fbAttach).catch(e => setFb('r', 'Connexion refusée'));
+      (u ? Promise.resolve() : FBAPP().auth().signInAnonymously()).then(fbAttach).catch(e => setFb('r', 'Connexion refusée'));
     });
   } catch(e){ setFb('r', 'Erreur'); }
 }
 /* ---------- compte du cabinet (connexion e-mail + mot de passe) ---------- */
 let _fbSessionP = null, FB_PROPOSER = false;
 function fbSession(){
-  if (!_fbSessionP) _fbSessionP = new Promise(r => { const st = firebase.auth().onAuthStateChanged(u => { st(); r(u); }); });
+  if (!_fbSessionP) _fbSessionP = new Promise(r => { const st = FBAPP().auth().onAuthStateChanged(u => { st(); r(u); }); });
   return _fbSessionP;
 }
-function fbCompteTxt(){ try { const u = firebase.auth().currentUser; return u && !u.isAnonymous ? u.email : ''; } catch(e){ return ''; } }
+function fbCompteTxt(){ try { const u = FBAPP().auth().currentUser; return u && !u.isAnonymous ? u.email : ''; } catch(e){ return ''; } }
 function fbCompte(msg){
   const em = fbCompteTxt();
   if (em){
@@ -405,7 +407,7 @@ function fbCompte(msg){
     ${msg ? `<p class="small" style="color:#b42318"><b>${esc(msg)}</b></p>` : ''}
     <div class="f"><div class="full"><label>E-mail</label><input id="fb_e" type="email" autocomplete="username"></div>
     <div class="full"><label>Mot de passe</label><input id="fb_p" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')fbConnexion()"></div></div>
-    <p class="small"><a style="cursor:pointer;text-decoration:underline" onclick="fbOubli()">Mot de passe oublié ?</a></p>
+    <p class="small">Compte attendu : <b>impactglobalconsulting11@gmail.com</b> (le compte de MOAYES n'ouvre pas les données d'IGC). La connexion ici ne touche pas la session de l'application MOAYES.<br><a style="cursor:pointer;text-decoration:underline" onclick="fbOubli()">Mot de passe oublié ?</a></p>
     <div class="act"><button class="btn" onclick="closeModal()">Plus tard</button><button class="btn p" onclick="fbConnexion()">Se connecter</button></div>`);
 }
 function fbAuthErr(e){
@@ -420,25 +422,25 @@ async function fbConnexion(){
   if (!e || !pw){ toast('E-mail et mot de passe obligatoires'); return; }
   try {
     if (typeof firebase === 'undefined') throw { code:'network' };
-    if (!firebase.apps.length) firebase.initializeApp(FB_CFG);
+    FBAPP();
     if (fbRef){ fbRef.off(); fbRef = null; }
-    await firebase.auth().signInWithEmailAndPassword(e, pw);
-    _fbSessionP = Promise.resolve(firebase.auth().currentUser);
+    await FBAPP().auth().signInWithEmailAndPassword(e, pw);
+    _fbSessionP = Promise.resolve(FBAPP().auth().currentUser);
     closeModal(); toast('🔐 Connecté : ' + e); fbAttach(); render();
   } catch(err){ fbCompte(fbAuthErr(err)); const i = $('#fb_e'); if (i) i.value = e; }
 }
 async function fbOubli(){
   const e = ($('#fb_e').value || '').trim();
   if (!e){ toast('Écrivez d\'abord l\'e-mail'); return; }
-  try { await firebase.auth().sendPasswordResetEmail(e); toast('E-mail envoyé à ' + e + ' (regardez aussi les spams)'); } catch(err){ toast(fbAuthErr(err)); }
+  try { await FBAPP().auth().sendPasswordResetEmail(e); toast('E-mail envoyé à ' + e + ' (regardez aussi les spams)'); } catch(err){ toast(fbAuthErr(err)); }
 }
 async function fbDeconnexion(){
-  try { if (fbRef){ fbRef.off(); fbRef = null; } await firebase.auth().signOut(); } catch(e){}
+  try { if (fbRef){ fbRef.off(); fbRef = null; } await FBAPP().auth().signOut(); } catch(e){}
   _fbSessionP = null; setFb('', 'Déconnecté'); closeModal(); toast('Déconnecté'); render();
 }
 function fbAttach(){
   try {
-      fbRef = firebase.database().ref(FB_PATH);
+      fbRef = FBAPP().database().ref(FB_PATH);
       fbRef.on('value', snap => {
         const r = snap.val();
         if (r && r.societe){
