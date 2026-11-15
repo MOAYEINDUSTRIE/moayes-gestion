@@ -2095,6 +2095,7 @@ function etudeModele(i){
     M.push({ t: 'table', sq: 1, head: ['Département', 'Lieux de vote = coordinations', 'Bureaux de vote', 'Électorat', 'Électeurs acquis (x 25)'], rows: dps.map(dp => [dp.nom, F(dp.L.length), F(dp.bv), F(dp.el), F(dp.L.length * 25)]).concat([['TOTAL RÉGION', F(D.n), F(D.bv), F(D.tot), F(D.n * 25)]]), w: [2426, 1800, 1500, 1600, 1700], bold: [dps.length], la: [0], rd: [4] }); }
   M.push({ t: 'ul', items: [Rn(`**${F(D.n)} lieux de vote** (${F(D.n)} coordonnateurs, ${F(D.n)} coordinations) et ${F(D.bv)} bureaux de vote.`), Rn(`**Rappel pour gagner il faut : ${F(GAGNER)} électeurs maxi** sur la base du fichier de 2025, d’une participation estimée à ${P1(PART)} et de deux candidatures dont vous.`), Rn(`Une coordination ${reg ? 'régionale' : muni ? 'communale' : 'de la circonscription'} de (${F(COORD)} x 25) = **${F(ACQUIS)} électeurs acquis** après la mise en place du réseau électoral.`), Rn(RATIO > 0 ? `Technique terrain : le Réseautage. **((${F(GAGNER)} − ${F(ACQUIS)}) / ${F(ACQUIS)}) = ${RATIO.toFixed(2).replace('.', ',')} soit ${ceil(RATIO)} électeur(s) maxi** à trouver par chaque membre du réseau.` : `Technique terrain : le Réseautage. Les ${F(ACQUIS)} électeurs acquis couvrent l’objectif de ${F(GAGNER)} : chaque membre trouve 1 électeur de sécurité.`)] });
 
+  if (reg) strategieDepartements(i, D, M, { VOT, GAGNER, PART });
   M.push({ t: 'h1', x: 'III - Matérialisation de la stratégie' });
   M.push({ t: 'p', r: Rn('La matérialisation est la phase pratique de la mise en place du réseau électoral. Cette phase consiste à :') });
   M.push({ t: 'ul', items: ['Penser et créer le réseau électoral', 'Mettre en place une équipe technique', 'Créer physiquement les coordinations avec des électeurs identifiés', 'Former les membres du réseau afin qu’ils soient opérationnels', 'Fidéliser les membres du réseau (code identifiant)'].map(Rn) });
@@ -2200,14 +2201,80 @@ function etudeDepartements(i, D, M){
     const mx = tx.slice().sort((a, b) => b.v - a.v)[0], mn = tx.slice().sort((a, b) => a.v - b.v)[0], der = LG[LG.length - 1];
     const tete = der ? Object.entries(der.p).sort((x, y) => y[1] - x[1]) : [];
     const items = [Rn(`Poids électoral : **${pc(dp.el, D.tot)}** de l’électorat de la région (${F(dp.el)} électeurs, ${F(dp.L.length)} lieux de vote).`)];
-    if (mx) items.push(Rn(`Participation : maxi **${P1(mx.v)}** (${mx.l.toLowerCase()})${mn && mn !== mx ? `, mini ${P1(mn.v)} (${mn.l.toLowerCase()})` : ''}.`));
+    const suite = LG.filter(a => a.ins).map(a => ({ an: anneeDe(a.e), v: a.vot / a.ins * 100 }));
+    if (suite.length > 1){ const dv = suite[suite.length - 1].v - suite[0].v;
+      items.push(Rn(`Participation aux législatives : ${suite.map(x => `${P1(x.v)} (${x.an})`).join(' → ')} : **${Math.abs(dv) < 2 ? 'stable' : dv > 0 ? 'en hausse' : 'en baisse'}** (${dv >= 0 ? '+' : ''}${P1(dv).replace(' %', '')} points).`)); }
+    if (mx) items.push(Rn(`Participation, toutes élections : maxi **${P1(mx.v)}** (${mx.l.toLowerCase()})${mn && mn !== mx ? `, mini ${P1(mn.v)} (${mn.l.toLowerCase()})` : ''}.`));
     if (tete[0]) items.push(Rn(`Aux ${ELEC.E[der.e].toLowerCase()}, ${cn(tete[0][0])} arrive en tête avec ${F(tete[0][1])} voix${tete[1] ? ` devant ${cn(tete[1][0])} (${F(tete[1][1])})` : ''}.`));
     items.push(Rn(n === 0 ? 'Premier département de la région par le nombre d’électeurs : priorité dans l’organisation du réseau.' : `Rang ${n + 1} sur ${dps.length} départements par le nombre d’électeurs.`));
     M.push({ t: 'p', r: [['Conclusion', 1]] }); M.push({ t: 'ul', items });
-    synth.push([dp.nom, F(dp.el), pc(dp.el, D.tot), mx ? P1(mx.v) : '—', tete[0] ? cn(tete[0][0]) : '—']);
+    synth.push([dp.nom, F(dp.el), pc(dp.el, D.tot), suite.length ? P1(suite[suite.length - 1].v) : '—', mx ? P1(mx.v) : '—', tete[0] ? cn(tete[0][0]) : '—']);
   });
   M.push({ t: 'p', r: [['Synthèse des départements', 1]] });
-  M.push({ t: 'table', sq: 1, head: ['Département', 'Électorat 2025', 'Part', 'Meilleure participation', 'En tête aux dernières législatives'], rows: synth, w: [2226, 1600, 1100, 1900, 2200], la: [0], rd: [2] });
+  M.push({ t: 'table', sq: 1, head: ['Département', 'Électorat 2025', 'Part', 'Participation (dern. lég.)', 'Meilleure participation', 'En tête aux dernières législatives'], rows: synth, w: [1926, 1350, 950, 1500, 1500, 1800], la: [0], rd: [2, 3] });
+  const fort = synth.slice().sort((a, b) => num(String(b[3]).replace(',', '.')) - num(String(a[3]).replace(',', '.')));
+  if (fort.length > 1) M.push({ t: 'p', r: Rn(`**Conclusion sur la participation :** elle est la plus forte à **${fort[0][0]}** (${fort[0][3]}) et la plus faible à **${fort[fort.length - 1][0]}** (${fort[fort.length - 1][3]}) aux dernières législatives. Les départements à faible participation ont la plus grande réserve d’électeurs à mobiliser ; ceux à forte participation se gagnent surtout par la conviction.`) });
+}
+/* V1.21 — plan pour gagner, département par département (régionales).
+   Classement selon le score du camp défendu (+ alliés) aux dernières législatives du département :
+   bastion ≥ 50 % ; disputé si ≥ 35 % ou à moins de 10 points du premier ; sinon conquête.
+   Votants attendus : électorat × meilleure participation du département, ramenés au total régional estimé.
+   Part visée : bastion 60 %, disputé 52 %, conquête 40 %, relevées ensemble si leur somme n'atteint pas l'objectif régional (+5 % de marge). */
+function strategieDepartements(i, D, M, X){
+  const t = elT(i), cs = elC(i), d = diagEtat(i), dps = depsDe(D), pc = (a, b) => P1(a / (b || 1) * 100);
+  const noms = {}; ELEC.C.forEach(c => { const k = partiCle(c[1]); if (k && !noms[k]) noms[k] = String(c[1]).split('/')[0].trim(); });
+  const cn = k => k === 'INDEPENDANT' ? 'Indépendants' : (noms[k] || k);
+  const campOk = d.campChoisi && d.camp >= 0 && cs[d.camp], cle = campOk ? partiCle(cs[d.camp][1]) : '';
+  const allies = campOk ? (d.allies || []).map(k => cs[k] && partiCle(cs[k][1])).filter(k => k && k !== cle && k !== 'INDEPENDANT') : [];
+  const R = dps.map(dp => {
+    const leg = {}; let best = 0;
+    ELEC.T.forEach((u, j) => { if (TY(u[0]) !== 0 || !dp.circ.has(u[3])) return; const a = leg[u[0]] || (leg[u[0]] = { e: u[0], ins: 0, vot: 0, exp: 0, p: {} }); a.ins += u[6] || 0; a.vot += u[7] || 0; a.exp += u[9] || 0; elC(j).forEach(c => { const k = partiCle(c[1]) || 'AUTRE'; a.p[k] = (a.p[k] || 0) + c[3]; }); });
+    const LG = Object.values(leg).sort((a, b) => anneeDe(a.e) - anneeDe(b.e)), der = LG[LG.length - 1];
+    LG.forEach(a => { if (a.ins) best = Math.max(best, a.vot / a.ins); });
+    const exp = der ? (der.exp || Object.values(der.p).reduce((s, v) => s + v, 0)) : 0;
+    const q = der ? Object.entries(der.p).sort((a, b) => b[1] - a[1]) : [];
+    const voixCamp = der && cle ? (der.p[cle] || 0) + allies.reduce((s, k) => s + (der.p[k] || 0), 0) : 0;
+    const part = exp ? voixCamp / exp : 0, tete = q[0] ? q[0][1] / (exp || 1) : 0;
+    let cl;
+    if (!campOk) cl = !q[1] || (q[0][1] - q[1][1]) / (exp || 1) < 0.10 ? 'Disputé' : 'Dominé';
+    else cl = part >= 0.5 ? 'Bastion' : (part >= 0.35 || tete - part < 0.10) ? 'Disputé' : 'Conquête';
+    return { dp, der, q, exp, voixCamp, part, cl, dom: q[0] ? q[0][0] : '', best: best || (X.VOT / (D.tot || 1)), abst: der ? Math.max(0, der.ins - der.vot) : 0, absTx: der && der.ins ? (der.ins - der.vot) / der.ins : 0 };
+  });
+  const raw = R.reduce((s, r) => s + r.dp.el * r.best, 0) || 1;
+  R.forEach(r => { r.vot = Math.round(r.dp.el * r.best * X.VOT / raw); r.vise = { Bastion: 0.60, 'Disputé': 0.52, Conquête: 0.40, Dominé: 0.51 }[r.cl]; });
+  let somme = R.reduce((s, r) => s + r.vot * r.vise, 0);
+  const f = somme < X.GAGNER * 1.05 ? X.GAGNER * 1.05 / (somme || 1) : 1;
+  R.forEach(r => { r.vise = Math.min(0.75, r.vise * f); r.obj = Math.ceil(r.vot * r.vise); r.aGagner = Math.max(0, r.obj - r.voixCamp); r.coord = r.dp.L.length; r.acq = r.coord * 25; r.parM = r.acq ? Math.max(1, ceil((r.obj - r.acq) / r.acq)) : 0; });
+  /* priorité : en mission pour un client, disputé > bastion > conquête ; sinon (étude neutre) poids des votants attendus + bonus si disputé */
+  if (campOk) R.forEach(r => { r.prio = r.cl === 'Disputé' ? 1 : r.cl === 'Bastion' ? 2 : 3; });
+  else { const vt = R.reduce((s, r) => s + r.vot, 0) || 1; R.slice().sort((a, b) => (b.vot / vt + (b.cl === 'Disputé' ? 0.2 : 0)) - (a.vot / vt + (a.cl === 'Disputé' ? 0.2 : 0))).forEach((r, k) => { r.prio = k + 1; }); }
+  R.forEach(r => { r.sit = campOk ? r.cl : r.cl === 'Disputé' ? 'Disputé' : `Dominé par ${cn(r.dom)}`; });
+  const totObj = R.reduce((s, r) => s + r.obj, 0);
+  M.push({ h: 1, t: 'h3', x: 'C - Stratégie par département : le plan pour gagner' });
+  if (!campOk) M.push({ t: 'p', r: Rn('Cette stratégie vaut pour tout candidat. Chaque département est décrit par sa **situation** aux dernières législatives : **disputé** (moins de 10 points entre les deux premiers) ou **dominé** par une formation. L’objectif est de **51 % des votants attendus** dans chaque département ; la **priorité** dépend du poids du département et de son caractère disputé, là où l’élection se décide.') });
+  else M.push({ t: 'p', r: Rn(`Camp défendu : **${cn(cle)}**${allies.length ? ` avec ${allies.map(cn).join(', ')}` : ''}. Chaque département est classé selon le score de ce camp aux dernières législatives du département : **bastion** (50 % ou plus), **terrain disputé** (35 % ou plus, ou moins de 10 points derrière le premier), **terre de conquête** (au-delà).`) });
+  M.push({ t: 'table', sq: 1, head: ['Département', 'Situation', 'Votants attendus', 'Objectif de voix', campOk ? 'Voix du camp (dern. lég.)' : 'Réserve d’abstention', campOk ? 'Voix à gagner' : 'Abstention', 'Coordinations', 'Électeurs par membre', 'Priorité'],
+    rows: R.map(r => [r.dp.nom, r.sit, F(r.vot), F(r.obj) + ' (' + P1(r.vise * 100) + ')', campOk ? F(r.voixCamp) : F(r.abst), campOk ? F(r.aGagner) : P1(r.absTx * 100), F(r.coord), F(r.parM), String(r.prio)]).concat([['TOTAL RÉGION', '', F(R.reduce((s, r) => s + r.vot, 0)), F(totObj), F(campOk ? R.reduce((s, r) => s + r.voixCamp, 0) : R.reduce((s, r) => s + r.abst, 0)), campOk ? F(R.reduce((s, r) => s + r.aGagner, 0)) : '', F(D.n), '', '']]),
+    w: [1500, 1150, 1000, 1150, 1050, 850, 950, 850, 526], bold: [R.length], la: [0], rd: [3, 5] });
+  M.push({ t: 'p', r: Rn(`La somme des objectifs (**${F(totObj)} voix**) dépasse l’objectif régional de ${F(X.GAGNER)} voix avec une marge de sécurité : perdre un département n’empêche pas de gagner la région si les autres atteignent leur objectif.`) });
+  const ACT = {
+    Bastion: ['Consolider : réunir les responsables et les militants de chaque lieu de vote dès le lancement', 'Faire voter : listes d’électeurs identifiés, rappel la veille, accompagnement et transport le jour du vote', 'Protéger le vote : un délégué formé dans chaque bureau de vote'],
+    'Disputé': ['Convaincre les indécis : porte-à-porte et réunions de quartier dans les lieux de vote les plus grands', 'Ramener les abstentionnistes : la réserve est plus grande que l’écart à combler', 'S’appuyer sur des relais locaux respectés (chefs de communauté, associations, jeunes, femmes) sans les placer à la tête du réseau'],
+    Conquête: ['Limiter l’écart : viser les lieux de vote où le camp a déjà des électeurs', 'Chercher des alliés locaux et porter un message sur les besoins concrets du département', 'Concentrer les moyens sur les 5 plus grands lieux de vote'],
+    Dominé: ['Pour le candidat de la formation dominante : consolider et faire voter, sans relâcher l’effort', 'Pour un autre candidat : limiter l’écart en visant les lieux de vote où il a déjà des électeurs, et chercher des alliés locaux', 'Pour tous : la réserve d’abstention peut changer l’équilibre — la mobiliser dans les plus grands lieux de vote'] };
+  if (!campOk) ACT['Disputé'] = ['L’élection se décide ici : y concentrer d’abord les moyens et les meilleurs responsables', 'Convaincre les indécis : porte-à-porte et réunions de quartier dans les plus grands lieux de vote', 'Ramener les abstentionnistes : la réserve dépasse souvent l’écart entre les deux premiers', 'S’appuyer sur des relais locaux respectés (communautés, associations, jeunes, femmes) sans les placer à la tête du réseau'];
+  R.slice().sort((a, b) => a.prio - b.prio).forEach(r => {
+    M.push({ t: 'tt', x: `${r.dp.nom} — ${r.sit.toUpperCase()} — PRIORITÉ ${r.prio}` });
+    const it = [];
+    if (r.der) it.push(Rn(`Dernières législatives (${ELEC.E[r.der.e].replace('Législatives ', '')}) : ${r.q.slice(0, 2).map(q => `${cn(q[0])} ${F(q[1])} voix (${pc(q[1], r.exp)})`).join(', ')}${campOk ? ` ; camp défendu : **${F(r.voixCamp)} voix (${P1(r.part * 100)})**` : ''}.`));
+    it.push(Rn(`Objectif : **${F(r.obj)} voix** sur ${F(r.vot)} votants attendus (${P1(r.vise * 100)})${campOk ? `, soit **${F(r.aGagner)} voix à gagner** par rapport aux dernières législatives` : ''}.`));
+    if (!campOk && r.q[1]) { const ec = r.q[0][1] - r.q[1][1]; it.push(Rn(`Écart entre les deux premiers : **${F(ec)} voix** ; ${r.abst > ec ? `la réserve d’abstention (${F(r.abst)}) est **${F(Math.round(r.abst / Math.max(1, ec)))} fois plus grande** : la mobilisation peut renverser le résultat` : 'la réserve d’abstention est plus petite que l’écart'}.`)); }
+    if (r.abst) it.push(Rn(`Réserve : **${F(r.abst)} inscrits n’ont pas voté** aux dernières législatives${campOk && r.aGagner ? ` — ${r.abst > r.aGagner ? 'plus que les voix à gagner : la mobilisation peut suffire' : 'moins que les voix à gagner : il faut aussi convaincre des électeurs adverses'}` : ''}.`));
+    it.push(Rn(`Réseau : ${F(r.coord)} coordinations (une par lieu de vote) = ${F(r.acq)} électeurs acquis ; **${F(r.parM)} électeur(s) à trouver par membre**.`));
+    const top = r.dp.L.slice(0, 5); it.push(Rn(`Lieux de vote prioritaires : ${top.map(x => `${x[6]} (${F(x[8])})`).join(', ')}.`));
+    M.push({ t: 'ul', items: it });
+    M.push({ t: 'p', r: [['Actions', 1]] }); M.push({ t: 'ol', items: (ACT[r.cl] || ACT['Dominé']).map(Rn) });
+  });
 }
 function exportEtudeWord(i){
   if (!LV){ toast('Répertoire des lieux de vote en cours de chargement…'); chargeLV(); return; }
