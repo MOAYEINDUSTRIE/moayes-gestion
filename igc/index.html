@@ -179,7 +179,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  IGC Gestion  ===================== */
-const VERSION = 'V1.20';
+const VERSION = 'V1.21';
 const KEY = 'igc_gestion_v1';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
@@ -1637,7 +1637,7 @@ function exportStratExcel(i){
 function stratDocHTML(i, word){
   const t = elT(i), C = cibleDe(t), titre = `Stratégie électorale ${t[3] ? t[3] + ' ' : ''}${titreCas(t[4])} — ${C.Scrutin}`.slice(0, 120);
   const css = `body{font:11pt/1.45 Arial,sans-serif;color:#16202e;margin:18px}h1{font-size:17pt;color:#14213a;margin:0 0 2px}h2{font-size:14pt;color:#14213a}h3{font-size:12.5pt;color:#14213a;margin:16px 0 6px;border-bottom:2px solid #c9a227;padding-bottom:2px}table{width:100%;border-collapse:collapse;margin:4px 0}th,td{border:1px solid #dde1ea;padding:4px 5px;text-align:left;vertical-align:top;font-size:10pt}th{background:#e9edf5;color:#14213a;font-weight:bold}th.n,td.n{text-align:right;white-space:nowrap;width:13%}th:first-child,td:first-child{width:24%}.small{font-size:9.5pt}.muted{color:#667085}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.kpi{border:1px solid #dde1ea;border-radius:6px;padding:6px;margin:3px 0}.kpi .l{font-size:9pt;color:#667085}.kpi .v{font-size:14pt;font-weight:700}.kpi .s{font-size:9pt;color:#667085}.alert{border:1px solid #e7c873;background:#fff8e1;padding:6px}.card{break-inside:auto}tr{break-inside:avoid;page-break-inside:avoid}h2,h3{break-after:avoid;page-break-after:avoid}.empty{color:#667085}.ft{margin-top:14px;border-top:1px solid #ccc;padding-top:6px;font-size:8.5pt;color:#667085}@page{size:A4;margin:14mm}`;
-  STRAT_DOC = true; let contenu; try { contenu = etudeFrag(etudeModele(i).M, true) + annexeStrat(stratCorps(i)); } finally { STRAT_DOC = false; }
+  STRAT_DOC = true; let contenu; try { contenu = etudeFrag(etudeModele(i).M, true); } finally { STRAT_DOC = false; }
   contenu = contenu.replace(/<table class="resp">/g, '<table class="resp" width="100%" cellspacing="0" cellpadding="4">').replace(/<th class="n">/g, '<th class="n" width="14%" nowrap>').replace(/<td class="n">/g, '<td class="n" nowrap>').replace(/<td class="n b">/g, '<td class="n b" nowrap>');
   const corps = `<h1>Impact Global Consulting</h1><div class="small muted">${esc(titre)} · données de référence : ${esc(ELEC.E[t[0]])} (CEI) et liste électorale 2025 · ${esc(t[2])} · document confidentiel</div>${contenu}<div class="ft">Calcul automatique IGC Gestion · ${esc(ELEC.src)} · édité le ${dfr(today())}</div>`;
   if (word) return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${esc(titre)}</title><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]--><style>${css}</style></head><body>${corps}</body></html>`;
@@ -2007,7 +2007,9 @@ function etudeModele(i){
   M.push({ t: 'h1', x: `I - Etude caractéristique électorale de ${deZone}` });
   M.push({ t: 'h2', x: 'A - Elections antérieures' });
   M.push({ t: 'p', r: Rn('Le rappel des élections antérieures permettra au candidat de faire des analyses et des projections pour les élections à venir. Voir les résultats passés.') });
-  evo.forEach(g => {
+  const evoA = reg ? evo.filter(g => g.ty === 3 || g.ty === 0) : evo;
+  if (reg) M.push({ t: 'p', r: Rn('Pour une élection régionale, on retient les élections régionales et législatives antérieures, sur l’ensemble de la région, puis département par département.') });
+  evoA.forEach(g => {
     const top = g.lst.slice(0, 3), head = ['INSCRITS', 'VOTANTS', 'TAUX'], row = [F(g.ins), F(g.vot), P1(g.part)], or = [], wv = top.length ? Math.floor(5726 / (top.length * 2)) : 0;
     top.forEach(q => { const nm = q.k === 'INDEPENDANT' ? 'Indép.' : q.nom.length > 12 ? q.nom.slice(0, 12) : q.nom; head.push(nm + ' voix', nm + ' %'); row.push(F(q.voix), pc(q.voix, g.base)); if (/RHDP|RDR/.test(q.k)) or.push(head.length - 2, head.length - 1); });
     M.push({ t: 'tt', x: lab(g) });
@@ -2020,9 +2022,10 @@ function etudeModele(i){
     M.push({ t: 'table', sq: 1, head: ['Scrutin', 'Inscrits', 'Votants', 'Taux', '1er', 'Voix', '2e', 'Voix', 'Écart'], rows: memes.map(g => { const a = g.lst[0], b = g.lst[1]; const cn = q => q.k === 'INDEPENDANT' ? 'Indép.' : q.nom; return [g.lab, F(g.ins), F(g.vot), P1(g.part), cn(a), F(a.voix), b ? cn(b) : '—', b ? F(b.voix) : '—', b ? '+ ' + F(a.voix - b.voix) : '—']; }), w: [1500, 1050, 1000, 850, 1100, 900, 1100, 900, 626], rd: [3] });
   }
 
+  if (reg) etudeDepartements(i, D, M);
   M.push({ t: 'h3', x: 'A-1 - Analyse des résultats antérieurs' });
   M.push({ t: 'p', r: Rn('Vu ces résultats, on fait le constat suivant :') });
-  const comp = evo.filter(g => !g.partiel && g.ins), tri = comp.slice().sort((a, b) => b.part - a.part), ref = evo.find(g => g.ref) || comp[comp.length - 1];
+  const comp = evoA.filter(g => !g.partiel && g.ins), tri = comp.slice().sort((a, b) => b.part - a.part), ref = evo.find(g => g.ref) || comp[comp.length - 1];
   const an = [];
   if (tri.length) an.push(Rn(`Taux de participation ${tri[0].part < 30 ? 'faible' : tri[0].part < 50 ? 'moyen' : 'élevé'} (maxi : **${P1(tri[0].part)}** ${aux(tri[0])}${tri.length > 1 ? ` ; mini : ${P1(tri[tri.length - 1].part)} ${aux(tri[tri.length - 1])}` : ''}).`));
   if (ref) an.push(Rn(`**${pc(ref.non, ref.ins)}** des inscrits n’ont pas voté ${aux(ref)}, soit ${F(ref.non)} électeurs : c’est la première réserve de voix.`));
@@ -2066,7 +2069,13 @@ function etudeModele(i){
   } else M.push({ t: 'p', r: Rn('La CEI ne publie pas de statistiques par âge pour ce territoire.') });
   M.push({ t: 'p', r: [['Population électorale par lieu de vote', 1]] });
   const L = D.L.slice().sort((a, b) => b[8] - a[8]);
+  if (reg) depsDe(D).forEach(dp => {
+    M.push({ t: 'p', r: [[`Département de ${dp.nom} — ${F(dp.L.length)} lieux de vote, ${F(dp.bv)} bureaux, ${F(dp.el)} électeurs`, 1]] });
+    M.push({ t: 'table', sq: 1, head: ['N°', 'Lieux de vote', 'BV', 'Électorat'], rows: dp.L.map((x, k) => [String(k + 1), x[6], F(x[7]), F(x[8])]).concat([['', `TOTAL ${dp.nom}`, F(dp.bv), F(dp.el)]]), w: [700, 5726, 1100, 1500], bold: [dp.L.length], rd: [3], la: [1] });
+  });
+  if (!reg){
   M.push({ t: 'table', sq: 1, head: ['N°', 'Lieux de vote', 'BV', 'Électorat'], rows: L.map((x, k) => [String(k + 1), x[6], F(x[7]), F(x[8])]).concat([['', `TOTAL : ${F(D.n)} lieux de vote`, F(D.bv), F(D.tot)]]), w: [700, 5726, 1100, 1500], bold: [L.length], rd: [3], la: [1] });
+  }
   let s0 = 0, n0 = 0; for (const x of L){ if (s0 >= D.tot / 2) break; s0 += x[8]; n0++; }
   M.push({ t: 'p', r: Rn(`Les ${n0} plus grands lieux de vote regroupent à eux seuls la moitié de l’électorat (${F(s0)} électeurs) : ce sont les lieux à organiser en premier.`) });
   M.push({ t: 'p', r: [['Les électeurs non-résidents', 1]] });
@@ -2082,7 +2091,9 @@ function etudeModele(i){
   M.push({ t: 'ul', items: [['CIBLER LES ELECTEURS', 'les lieux de vote'], ['IDENTIFIER LES ELECTEURS', 'du corps à corps'], ['SENSIBILISER ET RECRUTER LES ELECTEURS', 'fiche d’identification'], ['FIDELISER LES ELECTEURS', 'code identifiant'], ['FAIRE VOTER LES ELECTEURS', 'le jour du vote']].map(([a, b]) => [[a, 1], [` (${b})`, 0]]) });
   M.push({ t: 'h3', x: 'B - Composition du réseau' });
   M.push({ t: 'p', r: Rn('Le réseau sera composé de l’ensemble des lieux de vote en tenant compte des bureaux de vote. On aura dans chaque lieu de vote une coordination, en tenant compte de ses bureaux de vote et de sa composante par secteurs d’activités : voir le tableau de la population électorale par lieu de vote. Une coordination sera composée au maximum de 25 électeurs. On aura donc :') });
-  M.push({ t: 'ul', items: [Rn(`**${F(D.n)} lieux de vote** (${F(D.n)} coordonnateurs, ${F(D.n)} coordinations) et ${F(D.bv)} bureaux de vote.`), Rn(`**Rappel pour gagner il faut : ${F(GAGNER)} électeurs maxi** sur la base du fichier de 2025, d’une participation estimée à ${P1(PART)} et de deux candidatures dont vous.`), Rn(`Une coordination communale de (${F(COORD)} x 25) = **${F(ACQUIS)} électeurs acquis** après la mise en place du réseau électoral.`), Rn(RATIO > 0 ? `Technique terrain : le Réseautage. **((${F(GAGNER)} − ${F(ACQUIS)}) / ${F(ACQUIS)}) = ${RATIO.toFixed(2).replace('.', ',')} soit ${ceil(RATIO)} électeur(s) maxi** à trouver par chaque membre du réseau.` : `Technique terrain : le Réseautage. Les ${F(ACQUIS)} électeurs acquis couvrent l’objectif de ${F(GAGNER)} : chaque membre trouve 1 électeur de sécurité.`)] });
+  if (reg){ const dps = depsDe(D);
+    M.push({ t: 'table', sq: 1, head: ['Département', 'Lieux de vote = coordinations', 'Bureaux de vote', 'Électorat', 'Électeurs acquis (x 25)'], rows: dps.map(dp => [dp.nom, F(dp.L.length), F(dp.bv), F(dp.el), F(dp.L.length * 25)]).concat([['TOTAL RÉGION', F(D.n), F(D.bv), F(D.tot), F(D.n * 25)]]), w: [2426, 1800, 1500, 1600, 1700], bold: [dps.length], la: [0], rd: [4] }); }
+  M.push({ t: 'ul', items: [Rn(`**${F(D.n)} lieux de vote** (${F(D.n)} coordonnateurs, ${F(D.n)} coordinations) et ${F(D.bv)} bureaux de vote.`), Rn(`**Rappel pour gagner il faut : ${F(GAGNER)} électeurs maxi** sur la base du fichier de 2025, d’une participation estimée à ${P1(PART)} et de deux candidatures dont vous.`), Rn(`Une coordination ${reg ? 'régionale' : muni ? 'communale' : 'de la circonscription'} de (${F(COORD)} x 25) = **${F(ACQUIS)} électeurs acquis** après la mise en place du réseau électoral.`), Rn(RATIO > 0 ? `Technique terrain : le Réseautage. **((${F(GAGNER)} − ${F(ACQUIS)}) / ${F(ACQUIS)}) = ${RATIO.toFixed(2).replace('.', ',')} soit ${ceil(RATIO)} électeur(s) maxi** à trouver par chaque membre du réseau.` : `Technique terrain : le Réseautage. Les ${F(ACQUIS)} électeurs acquis couvrent l’objectif de ${F(GAGNER)} : chaque membre trouve 1 électeur de sécurité.`)] });
 
   M.push({ t: 'h1', x: 'III - Matérialisation de la stratégie' });
   M.push({ t: 'p', r: Rn('La matérialisation est la phase pratique de la mise en place du réseau électoral. Cette phase consiste à :') });
@@ -2097,7 +2108,14 @@ function etudeModele(i){
   M.push({ t: 'h1', x: 'IV - CONCLUSION' });
   M.push({ t: 'p', r: Rn('Une élection réussie, c’est non seulement une idée, une organisation, une destination et un ensemble de solutions, mais aussi et surtout une opération fidèle à l’image du candidat et de son équipe.') });
   M.push({ t: 'p', r: Rn('L’application véritable de cette stratégie et de cette méthode permettra au candidat d’avoir une lisibilité dans sa campagne, de maîtriser son électorat et de minimiser les dépenses.') });
-  M.push({ t: 'small', x: `Sources : résultats officiels de la Commission électorale indépendante (${evo.map(g => g.lab).join(', ')}) ; liste électorale et répertoire des lieux de vote 2025 (CEI). Document produit par IGC Gestion le ${dfr(today())}.` });
+  M.push({ t: 'h1', x: 'ANNEXES — Références' });
+  M.push({ t: 'p', r: Rn('Les données suivantes ne sont pas reprises en détail dans ce document. Elles sont disponibles dans IGC Gestion (Base électorale → la zone → Stratégie) :') });
+  M.push({ t: 'ul', items: [
+    Rn(`**Bureaux de vote** (bouton « Bureaux de vote ») : les ${F(D.bv)} bureaux, leur identifiant et les inscrits estimés par bureau, avec les colonnes à remplir à partir des procès-verbaux.`),
+    Rn(`**Lieux de vote** (bouton « Lieux de vote ») : les ${F(D.n)} lieux avec leur code CEI, à compléter par les coordonnées GPS, le coordonnateur et son téléphone.`),
+    Rn('**Résultats détaillés de chaque scrutin** (fiche de la zone dans la Base électorale) : voix et pourcentage de chaque candidat ou liste.'),
+    Rn('**Outils de suivi du terrain** (bouton « Excel » et volet « Outils de terrain » de l’écran) : cellules lieu par lieu, plan d’action, contrôle et tableau de bord hebdomadaire.')] });
+  M.push({ t: 'small', x: `Sources : résultats officiels de la Commission électorale indépendante (${(reg ? evo.filter(g => g.ty === 3 || g.ty === 0 || g.ty === 4) : evo).map(g => g.lab).join(', ')}) ; liste électorale et répertoire des lieux de vote 2025 (CEI). Document produit par IGC Gestion le ${dfr(today())}.` });
   const nom = `Etude_strategie_${(t[3] ? t[3] + '_' : '') + zoneN.replace(/[^A-Za-z0-9]+/g, '_').slice(0, 40)}_${annee}`;
   return { M, titre: `Étude et stratégie électorale — ${zoneN}`, nom };
 }
@@ -2108,6 +2126,13 @@ function annexeStrat(html){
     .replace('II/ Estimations : participation et voix à obtenir', 'Annexe 2 — Scénarios de participation (méthode des cellules)')
     .replace('III/ Stratégie électorale : système de réseautage', 'Annexe 3 — Réseau de cellules lieu par lieu')
     .replace('III/ (suite) Suivi et évaluation', 'Annexe 4 — Suivi et évaluation');
+}
+/* V1.21 — volet « Outils de terrain » : seulement ce que l'étude ne contient pas (réseau de cellules, plan, contrôle, tableau de bord) */
+function outilsTerrain(html){
+  const k = html.indexOf('III/ Stratégie électorale : système de réseautage'), d = k > 0 ? html.lastIndexOf('<h2', k) : -1;
+  return `<p class="small muted">Méthode des cellules d'IGC Gestion, pour l'organisation fine du terrain ; l'objectif de voix y est calculé sur les suffrages exprimés.</p>` + (d >= 0 ? html.slice(d) : html)
+    .replace('III/ Stratégie électorale : système de réseautage', 'Réseau de cellules lieu par lieu')
+    .replace('III/ (suite) Suivi et évaluation', 'Suivi et évaluation');
 }
 function etudeFrag(M, doc){
   const h = s => esc(s), runs = r => r.map(([x, b]) => b ? `<b>${h(x)}</b>` : h(x)).join('');
@@ -2126,7 +2151,7 @@ function etudeFrag(M, doc){
 function stratEcran(i){
   if (!LV) return `<div class="card"><p class="small muted">Chargement du répertoire des lieux de vote…</p></div>` + stratCorps(i);
   let etude = ''; try { etude = etudeFrag(etudeModele(i).M, false); } catch (e) { etude = `<p class="small muted">Étude indisponible pour ce territoire.</p>`; }
-  return `<div class="card" style="margin-bottom:12px">${etude}</div><details class="card" style="margin-bottom:12px"><summary style="cursor:pointer;font-weight:700">📎 Annexes — détail du réseau (cellules lieu par lieu, plan, contrôle, tableau de bord)</summary>${annexeStrat(stratCorps(i))}</details>`;
+  return `<div class="card" style="margin-bottom:12px">${etude}</div><details class="card" style="margin-bottom:12px"><summary style="cursor:pointer;font-weight:700">🧰 Outils de terrain (cellules lieu par lieu, plan d’action, contrôle, tableau de bord)</summary>${outilsTerrain(stratCorps(i))}</details>`;
 }
 /* V1.20 — électeurs non-résidents : saisis une fois par zone (la CEI ne les publie pas), synchronisés, repris dans l'étude */
 const nonResCle = i => { const t = elT(i); return elNorm(String(t[4]).replace(/\(.*?\)/g, '')) + '_' + (t[3] || TY(t[0])); };
@@ -2137,6 +2162,52 @@ function saveNonRes(i){
   if (lignes.some(l => !l || !l[0] || !(l[1] > 0))) return toast('Une ligne n’est pas lisible : écrivez « Commune ; nombre »');
   DATA.nonRes = DATA.nonRes || {}; DATA.nonRes[nonResCle(i)] = { u: now(), lignes };
   save(`Non-résidents ${elT(i)[4]} : ${lignes.length} commune(s)`); toast('Non-résidents enregistrés'); majStrat(i);
+}
+/* V1.21 — étude régionale : travail par département (règle de Moaye, 15/11/2026).
+   Régionales : publiées pour la région entière. Législatives : circonscriptions rattachées à leur département par le répertoire CEI 2025.
+   Présidentielles : résultats publiés par département (élection générale). */
+function depsDe(D){
+  const g = {}; D.L.forEach(x => { const n = LV.S[x[2]], a = g[n] || (g[n] = { nom: n, L: [], bv: 0, el: 0, circ: new Set() }); a.L.push(x); a.bv += x[7]; a.el += x[8]; a.circ.add(x[0]); });
+  return Object.values(g).map(a => { a.L.sort((p, q) => q[8] - p[8]); return a; }).sort((a, b) => b.el - a.el);
+}
+function etudeDepartements(i, D, M){
+  const t = elT(i), dps = depsDe(D), pc = (a, b) => P1(a / (b || 1) * 100), reg0 = t[2];
+  const noms = {}; ELEC.C.forEach(c => { const k = partiCle(c[1]); if (k && !noms[k]) noms[k] = String(c[1]).split('/')[0].trim(); });
+  const cn = k => k === 'INDEPENDANT' ? 'Indép.' : (noms[k] || k);
+  M.push({ t: 'h2', x: 'A-bis - Etude par département' });
+  M.push({ t: 'p', r: Rn(`La région compte **${dps.length} départements**. Pour chacun : ses données électorales, le rappel des élections législatives et de l’élection présidentielle antérieures, puis une conclusion. Les résultats des régionales sont publiés pour la région entière (tableaux ci-dessus).`) });
+  const synth = [];
+  dps.forEach((dp, n) => {
+    M.push({ t: 'tt', x: `DÉPARTEMENT DE ${dp.nom}` });
+    M.push({ t: 'table', sq: 1, head: ['Lieux de vote', 'Bureaux de vote', 'Électorat 2025', 'Part de la région'], rows: [[F(dp.L.length), F(dp.bv), F(dp.el), pc(dp.el, D.tot)]], w: [2200, 2200, 2400, 2226], rd: [2, 3] });
+    /* législatives : circonscriptions du département, par année */
+    const leg = {};
+    ELEC.T.forEach((u, j) => { if (TY(u[0]) !== 0 || !dp.circ.has(u[3])) return; const a = leg[u[0]] || (leg[u[0]] = { e: u[0], ins: 0, vot: 0, p: {}, n: 0 }); a.ins += u[6] || 0; a.vot += u[7] || 0; a.n++; elC(j).forEach(c => { const k = partiCle(c[1]) || 'AUTRE'; a.p[k] = (a.p[k] || 0) + c[3]; }); });
+    const LG = Object.values(leg).sort((a, b) => anneeDe(a.e) - anneeDe(b.e));
+    if (LG.length){
+      M.push({ t: 'p', r: [[`Élections législatives antérieures (${[...dp.circ].length} circonscription${dp.circ.size > 1 ? 's' : ''})`, 1]] });
+      M.push({ t: 'table', sq: 1, head: ['Scrutin', 'Inscrits', 'Votants', 'Taux', '1er', 'Voix', '2e', 'Voix'], rows: LG.map(a => { const q = Object.entries(a.p).sort((x, y) => y[1] - x[1]); return [ELEC.E[a.e], F(a.ins), F(a.vot), pc(a.vot, a.ins), q[0] ? cn(q[0][0]) : '—', q[0] ? F(q[0][1]) : '—', q[1] ? cn(q[1][0]) : '—', q[1] ? F(q[1][1]) : '—']; }), w: [1700, 1100, 1050, 850, 1150, 1000, 1150, 1026], rd: [3] });
+    }
+    /* présidentielles : résultats publiés par département */
+    const PR = []; ELEC.T.forEach((u, j) => { if (TY(u[0]) === 4 && u[1] && u[2] === reg0 && elNorm(String(u[4]).replace(/\(.*?\)/g, '')) === elNorm(dp.nom)) PR.push({ u, cs: elC(j).slice().sort((a, b) => b[3] - a[3]) }); });
+    PR.sort((a, b) => anneeDe(a.u[0]) - anneeDe(b.u[0]));
+    if (PR.length){
+      M.push({ t: 'p', r: [['Élection présidentielle (élection générale)', 1]] });
+      M.push({ t: 'table', sq: 1, head: ['Scrutin', 'Inscrits', 'Votants', 'Taux', 'En tête', 'Voix', '%'], rows: PR.map(o => [ELEC.E[o.u[0]], F(o.u[6]), F(o.u[7]), pc(o.u[7], o.u[6]), o.cs[0] ? cn(partiCle(o.cs[0][1]) || o.cs[0][1]) : '—', o.cs[0] ? F(o.cs[0][3]) : '—', o.cs[0] ? pc(o.cs[0][3], o.u[9] || o.u[7]) : '—']), w: [1900, 1200, 1150, 900, 1600, 1150, 1126], rd: [3] });
+    }
+    /* conclusion du département */
+    const tx = LG.filter(a => a.ins).map(a => ({ l: ELEC.E[a.e], v: a.vot / a.ins * 100 })).concat(PR.map(o => ({ l: ELEC.E[o.u[0]], v: o.u[6] ? o.u[7] / o.u[6] * 100 : 0 })));
+    const mx = tx.slice().sort((a, b) => b.v - a.v)[0], mn = tx.slice().sort((a, b) => a.v - b.v)[0], der = LG[LG.length - 1];
+    const tete = der ? Object.entries(der.p).sort((x, y) => y[1] - x[1]) : [];
+    const items = [Rn(`Poids électoral : **${pc(dp.el, D.tot)}** de l’électorat de la région (${F(dp.el)} électeurs, ${F(dp.L.length)} lieux de vote).`)];
+    if (mx) items.push(Rn(`Participation : maxi **${P1(mx.v)}** (${mx.l.toLowerCase()})${mn && mn !== mx ? `, mini ${P1(mn.v)} (${mn.l.toLowerCase()})` : ''}.`));
+    if (tete[0]) items.push(Rn(`Aux ${ELEC.E[der.e].toLowerCase()}, ${cn(tete[0][0])} arrive en tête avec ${F(tete[0][1])} voix${tete[1] ? ` devant ${cn(tete[1][0])} (${F(tete[1][1])})` : ''}.`));
+    items.push(Rn(n === 0 ? 'Premier département de la région par le nombre d’électeurs : priorité dans l’organisation du réseau.' : `Rang ${n + 1} sur ${dps.length} départements par le nombre d’électeurs.`));
+    M.push({ t: 'p', r: [['Conclusion', 1]] }); M.push({ t: 'ul', items });
+    synth.push([dp.nom, F(dp.el), pc(dp.el, D.tot), mx ? P1(mx.v) : '—', tete[0] ? cn(tete[0][0]) : '—']);
+  });
+  M.push({ t: 'p', r: [['Synthèse des départements', 1]] });
+  M.push({ t: 'table', sq: 1, head: ['Département', 'Électorat 2025', 'Part', 'Meilleure participation', 'En tête aux dernières législatives'], rows: synth, w: [2226, 1600, 1100, 1900, 2200], la: [0], rd: [2] });
 }
 function exportEtudeWord(i){
   if (!LV){ toast('Répertoire des lieux de vote en cours de chargement…'); chargeLV(); return; }
