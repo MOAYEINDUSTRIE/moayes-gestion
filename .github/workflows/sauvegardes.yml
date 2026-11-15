@@ -1,0 +1,71 @@
+name: Sauvegardes automatiques vers Drive
+
+# Chaque nuit, copie les données Firebase des applications (MOAYE, IGC, END) dans le Google Drive
+# d'impactglobalconsulting11@gmail.com, dossier « MOAYES sauvegardes », via l'application Apps Script de Moaye.
+# Lecture seule sur Firebase : rien n'est modifié dans la base.
+# Secrets nécessaires : FIREBASE_SERVICE_ACCOUNT (déjà présent), SAUVEGARDE_URL et SAUVEGARDE_JETON.
+on:
+  schedule:
+    - cron: '17 2 * * *'   # chaque nuit à 02 h 17 (heure d'Abidjan = UTC)
+  workflow_dispatch:
+
+concurrency:
+  group: sauvegardes
+  cancel-in-progress: false
+
+jobs:
+  sauvegarder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Copier les données vers Drive
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          URL: ${{ secrets.SAUVEGARDE_URL }}
+          JETON: ${{ secrets.SAUVEGARDE_JETON }}
+        run: |
+          if [ -z "$SA" ] || [ -z "$URL" ] || [ -z "$JETON" ]; then
+            echo "::error::Secrets manquants (FIREBASE_SERVICE_ACCOUNT, SAUVEGARDE_URL ou SAUVEGARDE_JETON) : aucune sauvegarde faite."
+            exit 1
+          fi
+          pip install --quiet google-auth requests
+          python - <<'PY'
+          import json, os, sys, datetime, requests
+          from google.oauth2 import service_account
+          from google.auth.transport.requests import Request
+          cred = service_account.Credentials.from_service_account_info(json.loads(os.environ['SA']), scopes=[
+              'https://www.googleapis.com/auth/firebase.database',
+              'https://www.googleapis.com/auth/userinfo.email'])
+          cred.refresh(Request())
+          BASE = 'https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app/'
+          jour = datetime.datetime.utcnow().strftime('%Y-%m-%d')
+          # (préfixe du fichier, chemin Firebase, contrôle minimal : la sauvegarde doit contenir ces clés)
+          cibles = [('MOAYES', 'moayes/v2_data', ['ventes', 'clients']),
+                    ('IGC', 'moayes/igc_data', ['societe']),
+                    ('END', 'end', [])]
+          erreurs = 0
+          for nom, chemin, cles in cibles:
+              try:
+                  r = requests.get(BASE + chemin + '.json', headers={'Authorization': 'Bearer ' + cred.token}, timeout=120)
+                  r.raise_for_status()
+                  data = r.json()
+                  if not isinstance(data, dict) or any(k not in data for k in cles):
+                      raise ValueError('données absentes ou incomplètes')
+                  if nom == 'MOAYES':
+                      v = data.get('ventes'); n = len(v) if isinstance(v, (list, dict)) else 0
+                      if n < 100: raise ValueError(f'seulement {n} ventes : sauvegarde refusée par prudence')
+                  contenu = json.dumps(data, ensure_ascii=False, indent=1)
+                  fichier = f'{nom}_sauvegarde_{jour}.json'
+                  p = requests.post(os.environ['URL'], data=json.dumps({'jeton': os.environ['JETON'], 'nom': fichier, 'contenu': contenu}).encode('utf-8'),
+                                    headers={'Content-Type': 'text/plain;charset=utf-8'}, timeout=180, allow_redirects=True)
+                  rep = p.text[:200]
+                  if p.status_code != 200 or not rep.startswith('OK'):
+                      raise RuntimeError(f'Drive a répondu {p.status_code} : {rep}')
+                  print(f'✔ {fichier} : {len(contenu)//1024} Ko — {rep}')
+              except Exception as e:
+                  erreurs += 1
+                  print(f'::error::{nom} ({chemin}) : {e}')
+          sys.exit(1 if erreurs else 0)
+          PY
