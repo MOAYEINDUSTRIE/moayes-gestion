@@ -71,7 +71,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
 <div id="toast"></div>
 <script>
 'use strict';
-const VERSION = 'V1.3';
+const VERSION = 'V1.4';
 const REPO_RAW = 'https://raw.githubusercontent.com/MOAYEINDUSTRIE/moayes-gestion/registre-paris/';
 const ODDS = 'https://api.the-odds-api.com/v4';
 const PERIME_MIN = 20;          // au-delà, les cotes sont considérées comme anciennes
@@ -175,8 +175,9 @@ VIEWS.jour = () => {
   if (!AGENT || AGENT.charge) return h + '<div class="card">Chargement du rapport de l\'agent…</div>';
   const etat = AGENT.err ? '<div class="alert r">Impossible de joindre le registre de l\'agent (pas d\'internet ?). Touchez « Actualiser ».</div>'
     : AGENT.horsLigne ? `<div class="alert a">Hors ligne : affichage des données du ${new Date(AGENT.maj).toLocaleString('fr-FR', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'})}.</div>` : '';
-  const sel = AGENT.reg.filter(r => r.date_emission === today());
-  const att = AGENT.reg.filter(r => (r.issue || 'EN_ATTENTE') === 'EN_ATTENTE' && r.date_emission !== today());
+  const duJour = r => r.date_emission === today() || String(r.coup_envoi_local || '').slice(0, 10) === today();
+  const sel = AGENT.reg.filter(duJour);
+  const att = AGENT.reg.filter(r => (r.issue || 'EN_ATTENTE') === 'EN_ATTENTE' && !duJour(r));
   const jr = AGENT.jdate === today() ? '' : `<div class="alert a">Le rapport d'aujourd'hui n'est pas encore publié (l'agent passe vers 8 h). Dernier rapport : ${AGENT.jdate ? frDate(AGENT.jdate) : 'aucun'}.</div>`;
   return h + etat + `<div class="card"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Sélections de l'agent — ${frDate(today())}</h3><button class="btn sm" onclick="chargerAgent(true)">↻ Actualiser</button></div>
     <div style="margin-top:10px">${sel.length ? sel.map(carteSel).join('') : (AGENT.jdate === today() ? '<div class="alert b" style="margin:0">Aucun pari recommandé aujourd\'hui. Ne pas parier est aussi une décision gagnante.</div>' : '<div class="alert a" style="margin:0">Pas encore de sélection pour aujourd\'hui.</div>')}</div>
@@ -189,8 +190,59 @@ function carteSel(r){
   return `<div class="match"><div class="row" style="justify-content:space-between"><b>${esc(r.match)}</b><span class="tag ${iss === 'GAGNÉ' ? 'g' : iss === 'PERDU' ? 'r' : 'a'}">${esc(iss)}</span></div>
   <div class="small muted">${esc(r.competition)} · ${esc(r.coup_envoi_local)} ${esc(r.fuseau)}</div>
   <div class="small" style="margin-top:6px"><span class="tag b">${esc(r.marche)}</span> cote <b>${esc(r.cote)}</b> (${esc(r.bookmaker_source_cote)}) · probabilité ${esc(r.proba_estimee)} · confiance ${esc(r.confiance_100)}/100 · valeur ${esc(r.valeur_attendue)}</div>
+  ${iss === 'EN_ATTENTE' ? fiche(r) : ''}
   <div class="small muted" style="margin-top:4px">${esc(r.methode)}</div>
   ${iss === 'EN_ATTENTE' ? `<div class="act" style="margin-top:8px"><span class="small muted" style="flex:1">Vérifiez la cote chez votre bookmaker : elle a pu changer.</span><button class="btn sm p" onclick="parier(ACT[${i}])">Parier</button></div>` : ''}</div>`;
+}
+
+/* ---------- fiche « Comment jouer » (déduite du marché écrit par l'agent) ---------- */
+function equipes(m){ const t = String(m || '').split(/\s+[-–]\s+/); return [t[0] || 'équipe à domicile', t[1] || 'équipe à l\'extérieur']; }
+function fiche(r){
+  const m = String(r.marche || ''), ml = m.toLowerCase(), [dom, ext] = equipes(r.match), cote = num(r.cote);
+  const seuil = (ml.match(/(\d+)[,.]5/) || [])[1], n = seuil !== undefined ? +seuil + 1 : null;
+  let type = m, ou = '', gagne = '', perd = '';
+  if (/corner/.test(ml) && n !== null){
+    const eq = [dom, ext].find(e => ml.includes(e.toLowerCase()));
+    if (/plus/.test(ml)){
+      type = eq ? `${eq} obtient au moins ${n} corners (seuls ses corners comptent)` : `Au moins ${n} corners dans le match (les deux équipes additionnées)`;
+      ou = eq ? `« Corners ${eq} » (ou « Corners – équipe ${eq === dom ? 'à domicile' : 'à l\'extérieur'} ») → « Plus de ${seuil},5 »` : `« Corners – Total » → « Plus de ${seuil},5 »`;
+      gagne = `${n} corners ou plus`; perd = `${n - 1} corners ou moins`;
+    } else {
+      type = eq ? `${eq} obtient au plus ${n - 1} corners` : `Au plus ${n - 1} corners dans le match (les deux équipes additionnées)`;
+      ou = eq ? `« Corners ${eq} » → « Moins de ${seuil},5 »` : `« Corners – Total » → « Moins de ${seuil},5 »`;
+      gagne = `${n - 1} corners ou moins`; perd = `${n} corners ou plus`;
+    }
+  } else if (/but/.test(ml) && n !== null){
+    if (/plus/.test(ml)){
+      type = `Au moins ${n} but${n > 1 ? 's' : ''} dans le match (buts des deux équipes additionnés)`;
+      ou = `« Total de buts » (ou « Plus/Moins ») → « Plus de ${seuil},5 »`;
+      gagne = n === 1 ? 'n\'importe quel score sauf 0-0' : n === 2 ? '1-1, 2-0, 0-2, 2-1… (2 buts ou plus)' : `${n} buts ou plus (ex. 2-1, 3-0)`;
+      perd = n === 1 ? '0-0' : n === 2 ? '0-0, 1-0, 0-1' : `${n - 1} buts ou moins (ex. 1-1, 2-0)`;
+    } else {
+      type = `Au plus ${n - 1} buts dans le match (buts des deux équipes additionnés)`;
+      ou = `« Total de buts » (ou « Plus/Moins ») → « Moins de ${seuil},5 »`;
+      gagne = `${n - 1} buts ou moins au total`; perd = `${n} buts ou plus au total`;
+    }
+  } else if (/1x\b|ou nul/.test(ml) && !/x2/.test(ml)){
+    type = `${dom} gagne OU match nul`; ou = '« Double chance » → « 1X »'; gagne = `${dom} gagne ou match nul`; perd = `${ext} gagne`;
+  } else if (/x2\b/.test(ml)){
+    type = `${ext} gagne OU match nul`; ou = '« Double chance » → « X2 »'; gagne = `${ext} gagne ou match nul`; perd = `${dom} gagne`;
+  } else if (/victoire/.test(ml)){
+    const eq = ml.includes(ext.toLowerCase()) ? ext : dom;
+    type = `Victoire de ${eq}`; ou = `« 1X2 » → « ${eq === dom ? '1' : '2'} »`; gagne = `${eq} gagne`; perd = 'match nul ou défaite de ' + eq;
+  } else if (/deux équipes marquent/.test(ml)){
+    const non = /non/.test(ml);
+    type = non ? 'Au moins une équipe ne marque pas' : 'Les deux équipes marquent'; ou = `« Les deux équipes marquent » → « ${non ? 'Non' : 'Oui'} »`;
+    gagne = non ? '0-0, 1-0, 2-0…' : '1-1, 2-1…'; perd = non ? '1-1, 2-1…' : '0-0, 1-0, 2-0…';
+  }
+  return `<div class="alert b" style="margin:8px 0 0">
+    <b>Comment jouer</b>
+    <div class="small" style="margin-top:4px">🎯 <b>Pari :</b> ${esc(type)}</div>
+    ${ou ? `<div class="small">📍 <b>Chez le bookmaker :</b> ${esc(ou)}</div>` : ''}
+    ${gagne ? `<div class="small">✅ <b>Gagné si :</b> ${esc(gagne)}</div><div class="small">❌ <b>Perdu si :</b> ${esc(perd)}</div>` : ''}
+    <div class="small">⏱ Temps réglementaire seulement (90 min + arrêts de jeu)</div>
+    ${cote > 1 ? `<div class="small">💰 1 000 F misés → <b>+${F(1000 * (cote - 1))} F</b> de gain si c'est gagné</div>` : ''}
+  </div>`;
 }
 
 /* ---------- cotes en temps réel (The Odds API) ---------- */
