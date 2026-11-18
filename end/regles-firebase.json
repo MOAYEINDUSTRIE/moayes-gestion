@@ -3,7 +3,8 @@
     "moayes": {
       "igc_data": {
         ".read": "auth != null && auth.provider == 'password' && auth.token.email == 'impactglobalconsulting11@gmail.com'",
-        ".write": "auth != null && auth.provider == 'password' && auth.token.email == 'impactglobalconsulting11@gmail.com'"
+        ".write": "auth != null && auth.provider == 'password' && auth.token.email == 'impactglobalconsulting11@gmail.com' && newData.exists()",
+        ".validate": "newData.hasChild('societe')"
       },
       "v2_data": {
         ".read": "(auth != null && auth.provider == 'password' && auth.token.email == 'moayepos@gmail.com') || (auth != null && auth.provider == 'password' && root.child('moayes/v2_comptes/'+auth.uid+'/actif').val() === true)",

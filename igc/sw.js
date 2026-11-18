@@ -1,6 +1,6 @@
 /* IGC Gestion — fonctionnement hors ligne (page d'abord demandée au réseau). */
-const CACHE = 'igc-shell-36';
-const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './img/atlas-banniere.jpg', './img/logo-igc.jpg', './img/embleme-igc.jpg', './data/elections-2026-11-15.json', './data/lieux-vote-2025.json'];
+const CACHE = 'igc-shell-37';
+const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './img/atlas-banniere.jpg', './img/logo-igc.jpg', './img/embleme-igc.jpg', './data/elections-2026-11-15.json', './data/lieux-vote-2025.json', './vendor/firebase-app-compat.js?v=13.4.0', './vendor/firebase-database-compat.js?v=13.4.0', './vendor/firebase-auth-compat.js?v=13.4.0'];
 const LIBS = ['www.gstatic.com'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(n => n.startsWith('igc-') && n !== CACHE).map(n => caches.delete(n)))).then(() => self.clients.claim())); });

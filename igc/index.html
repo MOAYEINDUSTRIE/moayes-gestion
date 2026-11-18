@@ -9,9 +9,12 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://*.firebasedatabase.app https://*.firebaseio.com https://apis.google.com; connect-src 'self' https://*.firebasedatabase.app wss://*.firebasedatabase.app https://*.firebaseio.com wss://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src https://moayes-industrie.firebaseapp.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="no-referrer">
+<!-- Bibliothèques Firebase 13.4.0 hébergées avec l'application (plus de script chargé depuis un site tiers) -->
+<script src="vendor/firebase-app-compat.js?v=13.4.0"></script>
+<script src="vendor/firebase-database-compat.js?v=13.4.0"></script>
+<script src="vendor/firebase-auth-compat.js?v=13.4.0"></script>
 <style>
 :root{--bg:#f3f4f7;--card:#fff;--ink:#16202e;--muted:#667085;--line:#e3e6ec;--pri:#14213a;--pri2:#24365c;--gold:#c9962a;--gold2:#f6ead0;--ok:#1d7a46;--okb:#e3f3e9;--ko:#b42318;--kob:#fdecea;--wa:#a15c07;--wab:#fdf3e1}
 *{box-sizing:border-box}
@@ -179,7 +182,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  IGC Gestion  ===================== */
-const VERSION = 'V1.29';
+const VERSION = 'V1.30';
 /* règle de Moaye (16/11/2026, rappel de la méthode du 10/11) : on travaille lieu de vote par lieu de vote ;
    2 cellules pour 1 000 électeurs, à parité, au moins 1 cellule de femmes et 1 d'hommes par lieu ; cellule = 1 responsable + 25 membres = 26 personnes.
    Électeurs acquis = cellules × 26 (la base électorale). */
@@ -214,6 +217,16 @@ const mois = d => (d || '').slice(0,7);
 const MOIS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
 const moisLib = m => m ? MOIS_FR[+m.slice(5,7)-1] + ' ' + m.slice(0,4) : '';
 function toast(t){ document.querySelectorAll('.toast').forEach(x => x.remove()); const d = document.createElement('div'); d.className = 'toast'; d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 2600); }
+/* Codes PIN (V1.30) : PBKDF2-SHA-256, 210 000 itérations, sel aléatoire propre à chaque code. Les anciennes empreintes SHA-256 sont reconnues puis converties à la première connexion réussie. */
+const PBKDF_IT = 210000;
+const b64 = u => btoa(String.fromCharCode(...new Uint8Array(u)));
+async function pbkdf(pin, selB64, it){
+  const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveBits']);
+  const sel = Uint8Array.from(atob(selB64), c => c.charCodeAt(0));
+  return b64(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: sel, iterations: it }, k, 256));
+}
+async function hashPin(role, pin){ const sel = b64(crypto.getRandomValues(new Uint8Array(16))); return 'p2$' + PBKDF_IT + '$' + sel + '$' + await pbkdf(role + ':' + pin, sel, PBKDF_IT); }
+const egal = (a, b) => { if (a.length !== b.length) return false; let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i); return d === 0; };
 async function sha(s){ const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('igc|' + s)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2,'0')).join(''); }
 
 /* montant en lettres (français) */
@@ -340,13 +353,28 @@ const aRecevoir = () => facturesActives().reduce((s, f) => s + Math.max(0, etatF
 
 /* ---------- session / accès ---------- */
 let SESSION = null;
-try { SESSION = JSON.parse(sessionStorage.getItem('igc_session')); } catch(e){}
+try { SESSION = JSON.parse(sessionStorage.getItem('igc_session')); if (!SESSION || !SESSION.role || now() - (SESSION.t || 0) > 12 * 3600 * 1000) { SESSION = null; sessionStorage.removeItem('igc_session'); } } catch(e){ SESSION = null; }
 const DEFAULT_PINS = { gerant:'1234', cogerant:'5678', assistant:'0000' };
 async function checkPin(role, pin){
   const h = DATA._pins[role];
-  if (h) return h === await sha(role + ':' + pin);
-  return pin === DEFAULT_PINS[role];
+  if (!h) return pin === DEFAULT_PINS[role];
+  if (h.startsWith('p2$')){ const [, it, sel, emp] = h.split('$'); return egal(emp, await pbkdf(role + ':' + pin, sel, +it)); }
+  if (!egal(h, await sha(role + ':' + pin))) return false;
+  DATA._pins[role] = await hashPin(role, pin); save('Code PIN renforcé (' + ROLES[role].nom + ')'); /* ancienne empreinte convertie */
+  return true;
 }
+/* verrouillage progressif après des codes faux, et déconnexion après 15 minutes sans activité */
+const VERROU_KEY = 'igc_verrou', INACTIF_MS = 15 * 60 * 1000;
+const verrou = () => { try { return JSON.parse(localStorage.getItem(VERROU_KEY)) || { n: 0, jusqua: 0 }; } catch(e){ return { n: 0, jusqua: 0 }; } };
+function noterEchec(role){
+  const v = verrou(); v.n++; if (v.n >= 5) v.jusqua = now() + Math.min(15 * 60, 30 * 2 ** (v.n - 5)) * 1000;
+  localStorage.setItem(VERROU_KEY, JSON.stringify(v));
+  DATA.audit.unshift({ t: now(), u: '', a: 'Code PIN refusé (' + (ROLES[role] ? ROLES[role].nom : role) + ', ' + v.n + ' échec(s) de suite) — ' + (navigator.userAgent.match(/\(([^)]*)\)/) || ['', 'appareil inconnu'])[1].slice(0, 60) }); DATA.audit = DATA.audit.slice(0, 300);
+  if (v.n === 5 || v.n === 10) save(); else try { localStorage.setItem(KEY, JSON.stringify(DATA)); } catch(e){}
+}
+let DERNIERE_ACTIVITE = now();
+['click', 'keydown', 'touchstart', 'scroll'].forEach(ev => document.addEventListener(ev, () => { DERNIERE_ACTIVITE = now(); }, { passive: true }));
+setInterval(() => { if (SESSION && now() - DERNIERE_ACTIVITE > INACTIF_MS){ logout(); toast('Session fermée après 15 minutes sans activité'); } }, 30000);
 const can = () => SESSION && ROLES[SESSION.role] && ROLES[SESSION.role].all;
 
 /* ---------- Firebase (chemin moayes/igc_data) ---------- */
@@ -390,8 +418,9 @@ function fbInit(){
     fbSession().then(u => {
       if (u && !u.isAnonymous) return fbAttach();
       FB_PROPOSER = true; if (SESSION) render();
-      // accès provisoire, tant que la base n'est pas verrouillée sur le compte du cabinet
-      (u ? Promise.resolve() : FBAPP().auth().signInAnonymously()).then(fbAttach).catch(e => setFb('r', 'Connexion refusée'));
+      // V1.30 : plus de connexion anonyme ; la base n'ouvre qu'au compte du cabinet
+      if (u && u.isAnonymous) FBAPP().auth().signOut().catch(() => {});
+      setFb('', 'Compte non connecté');
     });
   } catch(e){ setFb('r', 'Erreur'); }
 }
@@ -525,8 +554,9 @@ const pinAff = () => (PINVOIR ? esc(PIN) : '•'.repeat(PIN.length)) || '<span c
 async function pinKey(k){
   if (k === '⌫') PIN = PIN.slice(0, -1);
   else if (k === 'OK'){
-    if (await checkPin(PINROLE, PIN)){ SESSION = { role: PINROLE, t: now() }; sessionStorage.setItem('igc_session', JSON.stringify(SESSION)); PIN = ''; const h = location.hash.slice(1); VIEW = VIEWS[h] ? h : 'tableau'; render(); if (!DATA._pins[PINROLE]) toast('Pensez à changer votre code PIN dans Paramètres'); return; }
-    PIN = ''; PIN_ECHECS++; if (PIN_ECHECS >= 2 && !fbCompteTxt()) fbCompte('Code refusé : cet appareil n\'a peut-être pas reçu vos codes PIN. Connectez le compte du cabinet, puis retapez votre code.'); else toast('Code incorrect');
+    const v = verrou(); if (v.jusqua > now()){ PIN = ''; $('#dots').innerHTML = pinAff(); return toast('Trop d\'essais : réessayez dans ' + Math.ceil((v.jusqua - now()) / 1000) + ' s'); }
+    if (await checkPin(PINROLE, PIN)){ localStorage.removeItem(VERROU_KEY); DERNIERE_ACTIVITE = now(); SESSION = { role: PINROLE, t: now() }; sessionStorage.setItem('igc_session', JSON.stringify(SESSION)); PIN = ''; const h = location.hash.slice(1); VIEW = VIEWS[h] ? h : 'tableau'; render(); if (!DATA._pins[PINROLE]) setTimeout(() => modal(`<h2>Changez votre code PIN</h2><p class="small">Vous êtes entré avec le code de départ, connu de tous. Choisissez votre propre code (6 à 8 chiffres conseillés).</p>${pinForm(false)}<div class="act"><button class="btn" onclick="closeModal()">Plus tard</button></div>`), 300); return; }
+    noterEchec(PINROLE); PIN = ''; PIN_ECHECS++; if (PIN_ECHECS >= 2 && !fbCompteTxt()) fbCompte('Code refusé : cet appareil n\'a peut-être pas reçu vos codes PIN. Connectez le compte du cabinet, puis retapez votre code.'); else toast('Code incorrect');
   } else if (PIN.length < 8) PIN += k;
   $('#dots').innerHTML = pinAff();
 }
@@ -1293,7 +1323,7 @@ function lvCorps(i){
 }
 function lvExport(i){
   const t = elT(i), L = [...(lvDe(i) || [])].sort((a, b) => b[8] - a[8]), tot = L.reduce((s, x) => s + x[8], 0), obj = lvObjectif(i);
-  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const q = v => { let x = String(v ?? ''); if (typeof v === 'string' && /^[=+\-@\t\r]/.test(x) && isNaN(+x)) x = "'" + x; return '"' + x.replace(/"/g, '""') + '"'; }; /* pas de formule dans les cellules exportées */
   const rows = [['Région','Circonscription','Département','Sous-préfecture','Commune','Code LV','Lieu de vote','Bureaux de vote','Électeurs 2025','Part (%)','Objectif de voix (prorata)'],
     ...L.map(x => [LV.S[x[1]], x[0], LV.S[x[2]], LV.S[x[3]], LV.S[x[4]], x[5], x[6], x[7], x[8], (x[8] / tot * 100).toFixed(2).replace('.', ','), obj ? Math.round(obj * x[8] / tot) : ''])];
   saveFile(`Lieux_de_vote_2025_${(t[3] ? t[3] + '_' : '') + t[4].replace(/[^A-Za-z0-9]+/g, '_').slice(0, 40)}.csv`, 'text/csv', '﻿' + rows.map(r => r.map(q).join(';')).join('\r\n'));
@@ -1518,7 +1548,7 @@ function imprimerStrat(i){
 function bvExport(i){
   const t = elT(i), L = [...(lvDe(i) || [])].sort((a, b) => String(a[5]).localeCompare(String(b[5]))), cs = elC(i), tot = L.reduce((s, x) => s + x[8], 0), obj = cs.length ? diagCalc(i).objectif : 0;
   const cols = cs.length > 4 ? cs.slice(0, 3).map(c => c[1] + ' (PV)').concat(['Autres listes (PV)']) : cs.map(c => c[1] + ' (PV)');
-  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const q = v => { let x = String(v ?? ''); if (typeof v === 'string' && /^[=+\-@\t\r]/.test(x) && isNaN(+x)) x = "'" + x; return '"' + x.replace(/"/g, '""') + '"'; }; /* pas de formule dans les cellules exportées */
   const rows = [['Identifiant bureau','Code circonscription','Commune','Code lieu','Lieu de vote','N° bureau','Inscrits estimés','Statut inscrits','Objectif de voix (prorata)','Délégué titulaire (code)','Délégué suppléant (code)','Votants (PV)','Nuls (PV)','Blancs (PV)','Exprimés (PV)', ...cols, 'Statut PV']];
   L.forEach(x => { const base = Math.floor(x[8] / x[7]), reste = x[8] - base * x[7];
     for (let b = 1; b <= x[7]; b++){ const ins = base + (b <= reste ? 1 : 0); rows.push([`${x[0]}-${x[5]}-${String(b).padStart(2, '0')}`, x[0], LV.S[x[4]], x[5], x[6], b, ins, 'ESTIMÉ (répartition égale)', obj ? Math.round(obj * ins / tot) : '', '', '', '', '', '', '', ...cols.map(() => ''), 'À COLLECTER']); } });
@@ -2366,7 +2396,8 @@ function pinForm(all){
 }
 async function savePin(){
   const r = val('pin_r'), p = val('pin_n'); if (!/^\d{4,8}$/.test(p)) return toast('4 à 8 chiffres');
-  DATA._pins[r] = await sha(r + ':' + p); save('Code PIN modifié (' + ROLES[r].nom + ')'); toast('Code changé'); render();
+  if (/^(\d)\1+$/.test(p) || '0123456789012345678'.includes(p) || '9876543210987654321'.includes(p) || p === DEFAULT_PINS[r]) return toast('Code trop facile à deviner : évitez 1111, 1234, 0000…');
+  DATA._pins[r] = await hashPin(r, p); save('Code PIN modifié (' + ROLES[r].nom + ')'); toast('Code changé'); render();
 }
 function saveSociete(){
   Object.assign(DATA.societe, { nom: val('s_nom'), sigle: val('s_sig'), forme: val('s_fo'), capital: num(val('s_ca')), rccm: val('s_rc'), cc: val('s_cc'), adresse: val('s_ad'), tel: val('s_te'), email: val('s_em'), banque: val('s_ba'), rib: val('s_ri'), tvaTaux: num(val('s_tv')) || 18, tvaDefaut: $('#s_td').checked, mentions: val('s_me') });
@@ -2693,7 +2724,7 @@ function saveFile(name, mime, text){
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: mime })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
 function exportCSV(kind){
-  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const q = v => { let x = String(v ?? ''); if (typeof v === 'string' && /^[=+\-@\t\r]/.test(x) && isNaN(+x)) x = "'" + x; return '"' + x.replace(/"/g, '""') + '"'; }; /* pas de formule dans les cellules exportées */
   let rows;
   if (kind === 'factures') rows = [['Numéro','Date','Échéance','Client','Objet','HT','TVA','TTC','Encaissé','Reste','État'], ...DATA.factures.map(f => { const t = totaux(f), e = etatF(f); return [f.num, dfr(f.date), dfr(f.echeance), cli(f.clientId).nom, f.objet, t.base, t.tva, t.ttc, payeF(f), e.reste || 0, e.t]; })];
   else if (kind === 'paiements') rows = [['Date','Facture','Client','Mode','Référence','Montant'], ...DATA.paiements.map(p => { const f = get('factures', p.factureId) || {}; return [dfr(p.date), f.num, cli(f.clientId).nom, p.mode, p.ref, p.montant]; })];
@@ -2704,8 +2735,10 @@ function exportCSV(kind){
 function exportJSON(){ saveFile(`IGC_sauvegarde_${today()}.json`, 'application/json', JSON.stringify(DATA, null, 1)); toast('Sauvegarde téléchargée'); }
 function importJSON(file){
   if (!file) return;
+  if (file.size > 25 * 1024 * 1024) return toast('Fichier trop lourd (25 Mo au maximum)');
+  if (!/\.json$/i.test(file.name) && file.type !== 'application/json') return toast('Choisissez une sauvegarde .json d\'IGC Gestion');
   const r = new FileReader();
-  r.onload = () => { try { const d = JSON.parse(r.result); if (!d.societe) throw 0; if (!confirm('Fusionner cette sauvegarde avec les données actuelles ?')) return; mergeData(d); save('Restauration d\'une sauvegarde'); toast('Sauvegarde restaurée'); render(); } catch(e){ toast('Fichier invalide'); } };
+  r.onload = () => { try { const d = JSON.parse(r.result); if (!d || typeof d !== 'object' || Array.isArray(d) || !d.societe || typeof d.societe !== 'object' || COLS.some(c => d[c] != null && typeof d[c] !== 'object')) throw 0; if (!confirm('Fusionner cette sauvegarde avec les données actuelles ?')) return; mergeData(d); save('Restauration d\'une sauvegarde'); toast('Sauvegarde restaurée'); render(); } catch(e){ toast('Fichier invalide'); } };
   r.readAsText(file);
 }
 
