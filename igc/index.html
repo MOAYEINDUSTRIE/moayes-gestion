@@ -1275,10 +1275,28 @@ function lvRafraichir(){ const z = $('#lvcard'); if (z && LV_I !== null){ z.inne
 function lvMajListe(i){ const z = $('#lvliste'); if (z){ z.innerHTML = lvListe(i); lignesMobiles(z); } }
 /* L : [circonscription, région, département, sous-préfecture, commune, code LV, lieu de vote, bureaux, électeurs] */
 const LV_ALIAS = { 'NAPIE': 'NAPIELEDOUGOU' };
+/* Mairie (Moaye, 20/11/2026) : la commune seule, sans les villages de la sous-préfecture du même nom.
+   Le répertoire CEI range ces villages sous le nom de la commune ; on retire les lieux des circonscriptions législatives
+   où ce nom n'apparaît que comme sous-préfecture (ex. Toumodi : 021 « Toumodi, commune » gardée, 022 « Toumodi, sous-préfecture » retirée). */
+let LEG_NOMS = null;
+function legNoms(){
+  if (LEG_NOMS) return LEG_NOMS; LEG_NOMS = {};
+  ELEC.T.forEach(t => { if (TY(t[0]) === 0 && t[3] && !(t[3] in LEG_NOMS)) LEG_NOMS[t[3]] = elNorm(t[4]).replace(/SOUS PREFECTURES?/g, m => m.endsWith('S') ? 'SOUSPREFS' : 'SOUSPREF'); });
+  return LEG_NOMS;
+}
+function communeSeule(L, k){
+  if (!k || new Set(L.map(x => x[0])).size < 2) return L;
+  const N = legNoms(), re = new RegExp('\\b' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'g');
+  const spSeul = code => { const n = N[code] || ''; let m, vu = false; re.lastIndex = 0;
+    while ((m = re.exec(n))){ vu = true; const kw = n.slice(m.index + m[0].length).match(/COMMUNES?|VILLE|SOUSPREFS?/); if (kw && kw[0] !== 'SOUSPREF' && kw[0] !== 'SOUSPREFS') return false; }
+    return vu; };
+  const G = L.filter(x => !spSeul(x[0]));
+  return G.length ? G : L;
+}
 function lvDe(i){
   const t = elT(i); if (!LV) return null;
   if (TY(t[0]) === 0) return LV.parC[t[3]] || [];
-  if (TY(t[0]) === 2){ const k = elNorm(t[4]); return LV.parCom[k] || LV.parCom[LV_ALIAS[k] || ''] || []; }
+  if (TY(t[0]) === 2){ const k = elNorm(t[4]), kk = LV.parCom[k] ? k : (LV_ALIAS[k] || ''); return communeSeule(LV.parCom[kk] || [], kk); }
   const nm = elNorm(String(t[4]).replace(/\(.*?\)/g, ''));
   if (TY(t[0]) === 3 || !t[1]) return LV.parReg[nm] || [];
   return LV.parDep[nm] || LV.parCom[nm] || [];
