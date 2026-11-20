@@ -2331,7 +2331,7 @@ function strategieDepartements(i, D, M, X, src){
     return { dp, der, q, exp, voixCamp, part, cl, best, abst: der ? Math.max(0, der.ins - der.vot) : 0, absTx: der && der.ins ? (der.ins - der.vot) / der.ins : 0 };
   });
   const raw = R.reduce((s, r) => s + r.dp.el * r.best, 0) || 1;
-  R.forEach(r => { r.vot = Math.round(r.dp.el * r.best * X.VOT / raw); r.vise = { Bastion: 0.60, 'Disputé': 0.52, Conquête: 0.40, Dominé: 0.51 }[r.cl]; });
+  R.forEach(r => { r.vot = Math.round(r.dp.el * r.best * X.VOT / raw); r.vise = { Bastion: 0.60, 'Disputé': 0.52, Conquête: 0.40, Dominé: 0.50 }[r.cl]; });
   const somme = R.reduce((s, r) => s + r.vot * r.vise, 0), f = somme < X.GAGNER * 1.05 ? X.GAGNER * 1.05 / (somme || 1) : 1;
   R.forEach(r => { r.vise = Math.min(0.75, r.vise * f); r.obj = campOk ? Math.ceil(r.vot * r.vise) : obj50(r.vot); if (!campOk) r.vise = r.obj / (r.vot || 1); r.aGagner = Math.max(0, r.obj - r.voixCamp); r.coord = coordDe(r.dp.L); r.acq = celDe(r.dp.L) * tailleCel(); r.parM = r.acq ? Math.max(1, ceil((r.obj - r.acq) / r.acq)) : 0; });
   if (campOk) R.forEach(r => { r.prio = r.cl === 'Disputé' ? 1 : r.cl === 'Bastion' ? 2 : 3; });
