@@ -1,0 +1,32 @@
+name: Tests IGC Gestion
+on:
+  pull_request:
+    paths: ['igc/**', 'end/**', 'tests/**', '.github/workflows/tests-igc.yml']
+  push:
+    branches: [main]
+    paths: ['igc/**', 'end/**', 'tests/**']
+permissions:
+  contents: read
+jobs:
+  tests:
+    name: Garde-fous et tests (téléphone + ordinateur)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Garde-fous (version, cache, clés, données d'électeurs, fonctions)
+        run: bash tests/garde-fous.sh origin/main
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm, cache-dependency-path: tests/package-lock.json }
+      - name: Installer les outils de test
+        working-directory: tests
+        run: npm ci && npx playwright install --with-deps chromium
+      - name: Tests automatiques
+        working-directory: tests
+        run: npx playwright test
+        env: { CI: '1' }
+      - name: Rapport des tests
+        if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: rapport-tests, path: tests/rapport, retention-days: 14 }
