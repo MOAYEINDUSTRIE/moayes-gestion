@@ -182,7 +182,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  IGC Gestion  ===================== */
-const VERSION = 'V1.31';
+const VERSION = 'V1.32';
 /* règle de Moaye (16/11/2026, rappel de la méthode du 10/11) : on travaille lieu de vote par lieu de vote ;
    2 cellules pour 1 000 électeurs, à parité, au moins 1 cellule de femmes et 1 d'hommes par lieu ; cellule = 1 responsable + 25 membres = 26 personnes.
    Électeurs acquis = cellules × 26 (la base électorale). */
@@ -269,7 +269,7 @@ function enLettres(n){
 
 /* ---------- données ---------- */
 function blank(){
-  return { societe:{ nom:'IMPACT GLOBAL CONSULTING', sigle:'IGC', forme:'SARL', capital:1000000, rccm:'', cc:'', adresse:'Abidjan, Côte d\'Ivoire', tel:'', email:'', banque:'', rib:'', tvaTaux:18, tvaDefaut:false, mentions:'' },
+  return { societe:{ nom:'IMPACT GLOBAL CONSULTING', sigle:'IGC', forme:'SARL', capital:1000000, rccm:'', cc:'', idu:'', impots:'', cnps:'', gerant:'', cogerant:'', adresse:'Abidjan, Côte d\'Ivoire', tel:'', email:'', banque:'', rib:'', tvaTaux:18, tvaDefaut:false, mentions:'' },
     clients:[], devis:[], missions:[], factures:[], paiements:[], depenses:[], ordres:[], catalogue:[], dossiers:[], comptesRendus:[],
     soldes:{ caisse:0, banque:0, mobile:0, date:today() }, compteurs:{}, _del:{}, _pins:{}, audit:[], _lastSaved:0, nonRes:{} };
 }
@@ -278,6 +278,17 @@ function load(){
   try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.societe) return sanitize(d); } catch(e){}
   return blank();
 }
+/* Identité légale d'IGC (Moaye, 21/11/2026) : RCCM du Tribunal de commerce d'Abidjan (immatriculation du 11/11/2026)
+   et certificat d'immatriculation unique du CEPICI du 18/11/2026. Ne remplit que les champs vides : ce qui est saisi dans Paramètres l'emporte. */
+const IGC_LEGAL = { rccm: 'CI-ABJ-03-2026-B12-07790', idu: 'CI-2026-0080678 D', impots: 'SAID II Plateaux 1', cnps: 'Cocody',
+  gerant: 'YAO épse N\'DEFFOU Titiana Victoire', cogerant: 'GOLI Kouakou',
+  adresse: 'Abidjan, Cocody Angré, Pétro Ivoire, près de Baobab Microfinance — Îlot 332, lot 4172', tel: '+225 07 48 83 39 52', email: 'impactglobalconsulting11@gmail.com' };
+function remplirSociete(){
+  const s = DATA.societe; let n = 0;
+  Object.entries(IGC_LEGAL).forEach(([k, v]) => { if (!String(s[k] || '').trim() || (k === 'adresse' && /^Abidjan, Côte d.Ivoire$/.test(s[k]))){ s[k] = v; n++; } });
+  return n;
+}
+const legalLigne = s => [s.rccm ? 'RCCM ' + esc(s.rccm) : '', s.idu ? 'IDU ' + esc(s.idu) : '', s.cc ? 'CC ' + esc(s.cc) : ''].filter(Boolean).join(' · ');
 function sanitize(d){
   const b = blank();
   for (const k of Object.keys(b)) if (d[k] === undefined) d[k] = b[k];
@@ -489,6 +500,7 @@ function fbAttach(){
         const r = snap.val();
         if (r && r.societe){
           const ch = mergeData(r);
+          if (remplirSociete()){ save('Identité légale du cabinet complétée (RCCM, IDU, siège, gérance)'); if (SESSION) render(); return; }
           try { localStorage.setItem(KEY, JSON.stringify(DATA)); } catch(e){}
           if (ch && SESSION) render();
           const localNewer = JSON.stringify(stripForCompare(DATA)) !== JSON.stringify(stripForCompare(sanitize(r)));
@@ -2405,7 +2417,9 @@ VIEWS.parametres = () => {
   return `<div class="card" style="margin-bottom:12px"><h3>🏢 Informations du cabinet (imprimées sur devis et factures)</h3><div class="f">
     <div><label>Raison sociale</label><input id="s_nom" value="${esc(s.nom)}"></div><div><label>Sigle</label><input id="s_sig" value="${esc(s.sigle)}"></div>
     <div><label>Forme</label><input id="s_fo" value="${esc(s.forme)}"></div><div><label>Capital (F)</label><input id="s_ca" inputmode="numeric" value="${esc(s.capital)}"></div>
-    <div><label>RCCM</label><input id="s_rc" value="${esc(s.rccm)}"></div><div><label>N° compte contribuable</label><input id="s_cc" value="${esc(s.cc)}"></div>
+    <div><label>RCCM</label><input id="s_rc" value="${esc(s.rccm)}"></div><div><label>IDU (identifiant unique CEPICI)</label><input id="s_idu" value="${esc(s.idu)}"></div>
+    <div><label>N° compte contribuable (si distinct de l'IDU)</label><input id="s_cc" value="${esc(s.cc)}"></div><div><label>Centre des impôts</label><input id="s_imp" value="${esc(s.impots)}"></div>
+    <div><label>Gérante</label><input id="s_ger" value="${esc(s.gerant)}"></div><div><label>Cogérant</label><input id="s_coger" value="${esc(s.cogerant)}"></div>
     <div class="full"><label>Adresse</label><input id="s_ad" value="${esc(s.adresse)}"></div>
     <div><label>Téléphone</label><input id="s_te" value="${esc(s.tel)}"></div><div><label>E-mail</label><input id="s_em" value="${esc(s.email)}"></div>
     <div><label>Banque</label><input id="s_ba" value="${esc(s.banque)}"></div><div><label>RIB / IBAN</label><input id="s_ri" value="${esc(s.rib)}"></div>
@@ -2429,7 +2443,7 @@ async function savePin(){
   DATA._pins[r] = await hashPin(r, p); save('Code PIN modifié (' + ROLES[r].nom + ')'); toast('Code changé'); render();
 }
 function saveSociete(){
-  Object.assign(DATA.societe, { nom: val('s_nom'), sigle: val('s_sig'), forme: val('s_fo'), capital: num(val('s_ca')), rccm: val('s_rc'), cc: val('s_cc'), adresse: val('s_ad'), tel: val('s_te'), email: val('s_em'), banque: val('s_ba'), rib: val('s_ri'), tvaTaux: num(val('s_tv')) || 18, tvaDefaut: $('#s_td').checked, mentions: val('s_me') });
+  Object.assign(DATA.societe, { nom: val('s_nom'), sigle: val('s_sig'), forme: val('s_fo'), capital: num(val('s_ca')), rccm: val('s_rc'), idu: val('s_idu'), cc: val('s_cc'), impots: val('s_imp'), gerant: val('s_ger'), cogerant: val('s_coger'), adresse: val('s_ad'), tel: val('s_te'), email: val('s_em'), banque: val('s_ba'), rib: val('s_ri'), tvaTaux: num(val('s_tv')) || 18, tvaDefaut: $('#s_td').checked, mentions: val('s_me') });
   save('Informations du cabinet modifiées'); toast('Enregistré'); render();
 }
 
@@ -2462,7 +2476,7 @@ function printDoc(type, id){
   .tot{margin-left:auto;width:270px;margin-top:10px}.tot div{display:flex;justify-content:space-between;padding:3px 0}.tot .g{font-weight:800;font-size:15px;border-top:2px solid #14213a;padding-top:6px}
   .ft{margin-top:26px;border-top:1px solid #d7dbe3;padding-top:8px;font-size:10.5px;color:#555;text-align:center}.sig{display:flex;justify-content:space-between;margin-top:34px}
   </style></head><body>
-  <div class="hd"><div class="lg"><img src="${LOGO_IGC}" alt="${esc(s.sigle || 'IGC')}" style="width:64px;height:64px;border-radius:10px"><div><b style="font-size:15px">${esc(s.nom)}</b><br>${esc(s.forme)} au capital de ${F(s.capital)} F CFA<br>${esc(s.adresse)}<br>${esc(s.tel)} ${s.email ? '· ' + esc(s.email) : ''}</div></div>
+  <div class="hd"><div class="lg"><img src="${LOGO_IGC}" alt="${esc(s.sigle || 'IGC')}" style="width:64px;height:64px;border-radius:10px"><div><b style="font-size:15px">${esc(s.nom)}</b><br>${esc(s.forme)} au capital de ${F(s.capital)} F CFA<br>${esc(s.adresse)}<br>${esc(s.tel)} ${s.email ? '· ' + esc(s.email) : ''}${legalLigne(s) ? '<br>' + legalLigne(s) : ''}</div></div>
     <div style="text-align:right"><h1>${isF ? 'FACTURE' : 'DEVIS'}</h1><b>N° ${esc(d.num)}</b><br>Date : ${dfr(d.date)}${isF && d.echeance ? '<br>Échéance : ' + dfr(d.echeance) : ''}${!isF ? '<br>Valable ' + (d.validite || 30) + ' jours' : ''}</div></div>
   <div style="display:flex;gap:14px;margin-top:14px"><div class="box" style="flex:1"><span style="color:#667085;font-size:11px">OBJET</span><br><b>${esc(d.objet)}</b></div>
     <div class="box" style="flex:1"><span style="color:#667085;font-size:11px">${isF ? 'FACTURÉ À' : 'CLIENT'}</span><br><b>${esc(c.nom)}</b>${c.contact ? '<br>À l\'attention de ' + esc(c.contact) : ''}${c.adresse ? '<br>' + esc(c.adresse) : ''}${c.cc ? '<br>CC : ' + esc(c.cc) : ''}</div></div>
@@ -2473,7 +2487,7 @@ function printDoc(type, id){
   ${d.notes ? `<p style="white-space:pre-wrap">${esc(d.notes)}</p>` : ''}
   ${isF && (s.banque || s.rib) ? `<div class="box" style="margin-top:8px"><b>Règlement par virement</b> : ${esc(s.banque)} — ${esc(s.rib)}</div>` : ''}
   <div class="sig"><div>${!isF ? 'Bon pour accord (client)<br>Date, cachet et signature' : ''}</div><div style="text-align:center">La Gérance<br><br><br>________________</div></div>
-  <div class="ft">${esc(s.nom)} — ${esc(s.forme)} au capital de ${F(s.capital)} F CFA${s.rccm ? ' — RCCM ' + esc(s.rccm) : ''}${s.cc ? ' — CC ' + esc(s.cc) : ''}${s.mentions ? '<br>' + esc(s.mentions) : ''}</div>
+  <div class="ft">${esc(s.nom)} — ${esc(s.forme)} au capital de ${F(s.capital)} F CFA — Siège : ${esc(s.adresse)}${legalLigne(s) ? ' — ' + legalLigne(s) : ''}${s.impots ? ' — Centre des impôts : ' + esc(s.impots) : ''}${s.mentions ? '<br>' + esc(s.mentions) : ''}</div>
   </body></html>`;
   if (window.AndroidBridge && AndroidBridge.printHtml){ AndroidBridge.printHtml(html, d.num); return; }
   const w = window.open('', '_blank');
@@ -2578,10 +2592,10 @@ function docIGC(titre, sousTitre, corps){
   .ft{margin-top:26px;border-top:1px solid #d7dbe3;padding-top:8px;font-size:10.5px;color:#555;text-align:center}.sig{display:flex;justify-content:space-between;margin-top:34px;gap:30px}.sig>div{flex:1;text-align:center}
   .pre{white-space:pre-wrap}.ck{display:inline-block;width:11px;height:11px;border:1.4px solid #14213a;border-radius:2px;margin-right:6px;vertical-align:-1px;text-align:center;font-size:10px;line-height:10px}
   </style></head><body>
-  <div class="hd"><div class="lg"><img src="${LOGO_IGC}" alt="${esc(s.sigle || 'IGC')}" style="width:64px;height:64px;border-radius:10px"><div><b style="font-size:15px">${esc(s.nom)}</b><br>${esc(s.forme)} au capital de ${F(s.capital)} F CFA<br>${esc(s.adresse)}<br>${esc(s.tel)} ${s.email ? '· ' + esc(s.email) : ''}</div></div>
+  <div class="hd"><div class="lg"><img src="${LOGO_IGC}" alt="${esc(s.sigle || 'IGC')}" style="width:64px;height:64px;border-radius:10px"><div><b style="font-size:15px">${esc(s.nom)}</b><br>${esc(s.forme)} au capital de ${F(s.capital)} F CFA<br>${esc(s.adresse)}<br>${esc(s.tel)} ${s.email ? '· ' + esc(s.email) : ''}${legalLigne(s) ? '<br>' + legalLigne(s) : ''}</div></div>
     <div style="text-align:right"><h1>${esc(titre)}</h1>${sousTitre || ''}</div></div>
   ${corps}
-  <div class="ft">${esc(s.nom)} — ${esc(s.forme)} au capital de ${F(s.capital)} F CFA${s.rccm ? ' — RCCM ' + esc(s.rccm) : ''}${s.cc ? ' — CC ' + esc(s.cc) : ''} — Document confidentiel</div>
+  <div class="ft">${esc(s.nom)} — ${esc(s.forme)} au capital de ${F(s.capital)} F CFA — Siège : ${esc(s.adresse)}${legalLigne(s) ? ' — ' + legalLigne(s) : ''}${s.impots ? ' — Centre des impôts : ' + esc(s.impots) : ''} — Document confidentiel</div>
   </body></html>`;
 }
 function imprimer(html, nom){
@@ -2602,7 +2616,7 @@ function contratMission(type, id){
   const numC = 'IGC-CM-' + ((dv && dv.num) || (m && m.id) || '').replace(/^IGC-D-/, '');
   const lignes = dv && dv.lignes.length ? `<table><thead><tr><th>Prestation</th><th class="n">Qté</th><th class="n">Prix unitaire</th><th class="n">Montant</th></tr></thead><tbody>${dv.lignes.map(l => `<tr><td>${esc(l.d)}</td><td class="n">${l.q}</td><td class="n">${F(l.pu)}</td><td class="n">${F(num(l.q) * num(l.pu))}</td></tr>`).join('')}</tbody></table>` : '';
   const corps = `
-  <div style="display:flex;gap:14px;margin-top:14px"><div class="box" style="flex:1"><span style="color:#667085;font-size:11px">LE CABINET</span><br><b>${esc(s.nom)}</b><br>${esc(s.forme)} au capital de ${F(s.capital)} F CFA${s.rccm ? '<br>RCCM ' + esc(s.rccm) : ''}<br>${esc(s.adresse)}<br>représenté par sa Gérance</div>
+  <div style="display:flex;gap:14px;margin-top:14px"><div class="box" style="flex:1"><span style="color:#667085;font-size:11px">LE CABINET</span><br><b>${esc(s.nom)}</b><br>${esc(s.forme)} au capital de ${F(s.capital)} F CFA${s.rccm ? '<br>RCCM ' + esc(s.rccm) : ''}<br>${esc(s.adresse)}${s.idu ? '<br>IDU ' + esc(s.idu) : ''}<br>représenté par ${s.gerant ? 'Mme ' + esc(s.gerant) + ', Gérante' + (s.cogerant ? ', et M. ' + esc(s.cogerant) + ', Cogérant' : '') : 'sa Gérance'}</div>
   <div class="box" style="flex:1"><span style="color:#667085;font-size:11px">LE CLIENT</span><br><b>${esc(c.nom)}</b>${c.contact ? '<br>représenté par ' + esc(c.contact) : ''}${c.adresse ? '<br>' + esc(c.adresse) : ''}${c.cc ? '<br>CC : ' + esc(c.cc) : ''}</div></div>
   <h2>Article 1 — Objet</h2><p>Le Client confie au Cabinet, qui l'accepte, la mission suivante : <b>${esc(objet)}</b>${dv ? ', telle que décrite dans le devis n° ' + esc(dv.num) + ' du ' + dfr(dv.date) + ', qui fait partie du présent contrat' : ''}.</p>
   <h2>Article 2 — Prestations</h2>${lignes || '<p>Prestations définies d\'un commun accord entre les parties.</p>'}
@@ -2773,6 +2787,7 @@ function importJSON(file){
 
 /* ---------- démarrage ---------- */
 seedCatalogue();
+if (remplirSociete()) save('Identité légale du cabinet complétée (RCCM, IDU, siège, gérance)');
 render();
 fbInit();
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
