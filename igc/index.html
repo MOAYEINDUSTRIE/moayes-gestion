@@ -183,7 +183,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  IGC Gestion  ===================== */
-const VERSION = 'V1.33';
+const VERSION = 'V1.34';
 /* règle de Moaye (16/11/2026, rappel de la méthode du 10/11) : on travaille lieu de vote par lieu de vote ;
    2 cellules pour 1 000 électeurs, à parité, au moins 1 cellule de femmes et 1 d'hommes par lieu ; cellule = 1 responsable + 25 membres = 26 personnes.
    Électeurs acquis = cellules × 26 (la base électorale). */
@@ -637,7 +637,7 @@ function ecouterV2(base){
   }, refus);
   ra.on('child_removed', snap => { delete FB_SRV.audit[snap.key]; });
   attentes.push(ra.once('value'));
-  Promise.all(attentes).then(() => { FB_PRET = true; MESURES.syncPrete = now(); apresReception(); fbPush(true); }).catch(refus);
+  Promise.all(attentes).then(() => { FB_PRET = true; MESURES.syncPrete = now(); migrerCatalogue(); apresReception(); fbPush(true); }).catch(refus);
 }
 let ANCIEN_VU = 0;
 function ecouterAncien(db){
@@ -861,7 +861,7 @@ const commonDocFields = (d, cid) => `
   <div><label style="display:flex;gap:8px;align-items:center;margin-top:22px"><input id="x_tva" type="checkbox" style="width:auto" ${(d.tva ?? DATA.societe.tvaDefaut) ? 'checked' : ''} onchange="majTot()"> Appliquer la TVA (${DATA.societe.tvaTaux} %)</label></div>
   <div class="full"><div class="tot" id="x_tot"></div></div>
   <div class="full"><label>Conditions / notes (imprimées)</label><textarea id="x_notes">${esc(d.notes || '')}</textarea></div>`;
-function readDoc(){ return { clientId: val('x_cli'), date: val('x_date') || today(), objet: val('x_obj'), lignes: LIG.filter(l => l.d || num(l.pu)).map(l => ({ d: l.d, q: num(l.q) || 1, pu: num(l.pu) })), remise: num(val('x_remise')), tva: $('#x_tva').checked, notes: val('x_notes') }; }
+function readDoc(){ return { clientId: val('x_cli'), date: val('x_date') || today(), objet: val('x_obj'), lignes: LIG.filter(l => l.d || num(l.pu)).map(l => Object.assign({ d: l.d, q: num(l.q) || 1, pu: num(l.pu) }, l.m ? { m: l.m } : {})), remise: num(val('x_remise')), tva: $('#x_tva').checked, notes: val('x_notes') }; }
 
 /* ----- devis ----- */
 const DST = { brouillon:['Brouillon',''], envoye:['Envoyé','w'], accepte:['Accepté','g'], refuse:['Refusé','r'] };
@@ -2694,7 +2694,7 @@ function printDoc(type, id){
   <div style="display:flex;gap:14px;margin-top:14px"><div class="box" style="flex:1"><span style="color:#667085;font-size:11px">OBJET</span><br><b>${esc(d.objet)}</b></div>
     <div class="box" style="flex:1"><span style="color:#667085;font-size:11px">${isF ? 'FACTURÉ À' : 'CLIENT'}</span><br><b>${esc(c.nom)}</b>${c.contact ? '<br>À l\'attention de ' + esc(c.contact) : ''}${c.adresse ? '<br>' + esc(c.adresse) : ''}${c.cc ? '<br>CC : ' + esc(c.cc) : ''}</div></div>
   <table><thead><tr><th>Désignation</th><th class="n">Qté</th><th class="n">Prix unitaire</th><th class="n">Montant</th></tr></thead><tbody>
-  ${d.lignes.map(l => `<tr><td>${esc(l.d)}</td><td class="n">${l.q}</td><td class="n">${F(l.pu)}</td><td class="n">${F(num(l.q) * num(l.pu))}</td></tr>`).join('')}</tbody></table>
+  ${d.lignes.map(l => `<tr><td>${esc(l.d)}${l.m ? `<br><span style="font-size:10.5px;color:#777">${esc(l.m)}</span>` : ''}</td><td class="n">${l.q}</td><td class="n">${F(l.pu)}</td><td class="n">${F(num(l.q) * num(l.pu))}</td></tr>`).join('')}</tbody></table>
   <div class="tot"><div><span>Total HT</span><b>${F(t.ht)} F</b></div>${t.remise ? `<div><span>Remise</span><b>− ${F(t.remise)} F</b></div><div><span>Net HT</span><b>${F(t.base)} F</b></div>` : ''}${t.tva ? `<div><span>TVA ${s.tvaTaux} %</span><b>${F(t.tva)} F</b></div>` : ''}<div class="g"><span>Total ${t.tva ? 'TTC' : ''}</span><span>${F(t.ttc)} F CFA</span></div></div>
   <p>Arrêté${isF ? 'e' : ''} ${isF ? 'la présente facture' : 'le présent devis'} à la somme de : <b>${enLettres(t.ttc)} francs CFA</b>${t.tva ? ' TTC' : ''}.</p>
   ${d.notes ? `<p style="white-space:pre-wrap">${esc(d.notes)}</p>` : ''}
@@ -2711,53 +2711,102 @@ function printDoc(type, id){
 
 /* =====================  Catalogue des prestations (V1.24)  ===================== */
 /* Grille de départ proposée le 15/11/2026, retenue par la gérance ; chaque prix reste modifiable. */
-const CAT_FAM = ['Électoral','Communication','Conseil stratégique','Création de structures','Formation','Frais annexes'];
+/* V1.34 : familles = les 5 métiers de l'objet social (statuts d'IGC) + frais annexes ; rubrique = sous-titre des statuts */
+const M1 = 'Communication politique et électorale', M2 = 'Communication institutionnelle et affaires publiques', M3 = 'Communication d\'entreprise et corporate',
+      M4 = 'Consultance stratégique et advisory', M5 = 'Communication générale', MA = 'Frais annexes';
+const CAT_FAM = [M1, M2, M3, M4, M5, MA];
+const RUBRIQUES = {
+  [M1]: ['Positionnement et image', 'Prise de parole média', 'Campagnes électorales'],
+  [M2]: ['Accompagnement public', 'Réputation & diplomatie', 'Influence et relations publiques'],
+  [M3]: ['Image de marque et valeurs', 'Accompagnement au changement'],
+  [M4]: ['Audits et études', 'Conseil exécutif', 'Formations exécutives'],
+  [M5]: ['Branding et design', 'Communication digitale', 'Événementiel et protocoles', 'Formations', 'Relations presse'],
+  [MA]: ['Frais annexes']
+};
 const UNITES = ['Forfait','Journée','Mois','Lieu de vote','Unité','Personne','Jour','Heure'];
+/* code, métier, désignation, unité, prix, bas, haut, remarque, rubrique */
 const CATALOGUE_IGC = [
-  ['ELE-01','Électoral','Étude et stratégie électorale — commune (municipales)','Forfait',2500000,1500000,4000000,'Scrutins retenus : municipales seules.'],
-  ['ELE-02','Électoral','Étude et stratégie électorale — circonscription (législatives)','Forfait',4000000,2500000,6000000,'Municipales + législatives.'],
-  ['ELE-03','Électoral','Étude et stratégie électorale — région (régionales)','Forfait',8000000,5000000,12000000,'Régionales + législatives, département par département.'],
-  ['ELE-04','Électoral','Étude et stratégie électorale — présidentielle (national)','Forfait',40000000,25000000,60000000,'Présidentielles + législatives.'],
-  ['ELE-05','Électoral','Mise en place du réseau de coordinations','Lieu de vote',75000,50000,100000,'Une coordination par bureau de vote (par tranche de 500 électeurs), 2 cellules par coordination. Hors frais de terrain.'],
-  ['ELE-06','Électoral','Formation des coordinateurs','Journée',500000,300000,800000,'Groupe jusqu\'à 30 personnes. Salle et restauration à part.'],
-  ['ELE-07','Électoral','Direction et suivi de campagne','Mois',2000000,1000000,3500000,'Pilotage, tableaux de bord, réunions hebdomadaires.'],
-  ['ELE-08','Électoral','Plan de communication de campagne','Forfait',1500000,1000000,2500000,'Messages, slogan, calendrier, conception des supports.'],
-  ['ELE-09','Électoral','Gestion des réseaux sociaux de campagne','Mois',500000,300000,1000000,'Hors budget de publicité sponsorisée.'],
-  ['COM-01','Communication','Stratégie de communication institutionnelle','Forfait',2500000,1500000,4000000,'Diagnostic, plan annuel, messages clés.'],
-  ['COM-02','Communication','Communication corporate / image de marque','Forfait',1500000,800000,3000000,'Identité, charte, positionnement.'],
-  ['COM-03','Communication','Animation des réseaux sociaux','Mois',350000,200000,600000,'Hors publicité sponsorisée.'],
-  ['COM-04','Communication','Organisation d\'événement — honoraires','Forfait',1000000,500000,2000000,'Conception et coordination ; logistique facturée à part.'],
-  ['COM-05','Communication','Relations presse (communiqué, diffusion)','Unité',250000,150000,400000,'Achat d\'espace à part.'],
-  ['CON-01','Conseil stratégique','Journée de conseil','Journée',250000,150000,400000,''],
-  ['CON-02','Conseil stratégique','Diagnostic organisationnel','Forfait',1000000,500000,2000000,''],
-  ['CON-03','Conseil stratégique','Plan stratégique / business plan','Forfait',1000000,500000,2500000,''],
-  ['CRE-01','Création de structures','Création d\'entreprise (SARL, SAS) — accompagnement CEPICI','Forfait',250000,150000,400000,'Frais officiels en sus, à vérifier au CEPICI.'],
-  ['CRE-02','Création de structures','Création de coopérative (SCOOPS ou SCOOP-CA)','Forfait',400000,250000,700000,'Frais officiels en sus.'],
-  ['CRE-03','Création de structures','Création de cabinet de conseil','Forfait',350000,200000,500000,'Statuts, immatriculation, offre de services.'],
-  ['CRE-04','Création de structures','Montage d\'une formation payante','Forfait',600000,300000,1000000,'Programme, supports, prix, plan commercial.'],
-  ['CRE-05','Création de structures','Conception d\'application de gestion','Forfait',3000000,1500000,8000000,'Cahier des charges et développement ; maintenance à part.'],
-  ['FOR-01','Formation','Formation (groupe jusqu\'à 20)','Journée',400000,250000,600000,''],
-  ['FOR-02','Formation','Formation — tarif par participant','Personne',50000,25000,100000,'Sessions ouvertes.'],
-  ['ANX-01','Frais annexes','Déplacement hors Abidjan (per diem)','Jour',40000,25000,60000,'Hébergement et repas ; transport à part.'],
+  ['ELE-01',M1,'Étude et stratégie électorale — commune (municipales)','Forfait',2500000,1500000,4000000,'Scrutins retenus : municipales seules.','Campagnes électorales'],
+  ['ELE-02',M1,'Étude et stratégie électorale — circonscription (législatives)','Forfait',4000000,2500000,6000000,'Municipales + législatives.','Campagnes électorales'],
+  ['ELE-03',M1,'Étude et stratégie électorale — région (régionales)','Forfait',8000000,5000000,12000000,'Régionales + législatives, département par département.','Campagnes électorales'],
+  ['ELE-04',M1,'Étude et stratégie électorale — présidentielle (national)','Forfait',40000000,25000000,60000000,'Présidentielles + législatives.','Campagnes électorales'],
+  ['ELE-05',M1,'Mise en place du réseau de coordinations','Lieu de vote',75000,50000,100000,'Une coordination par bureau de vote (par tranche de 500 électeurs), 2 cellules par coordination. Hors frais de terrain.','Campagnes électorales'],
+  ['ELE-06',M1,'Formation des coordinateurs','Journée',500000,300000,800000,'Groupe jusqu\'à 30 personnes. Salle et restauration à part.','Campagnes électorales'],
+  ['ELE-07',M1,'Direction et suivi de campagne','Mois',2000000,1000000,3500000,'Pilotage, tableaux de bord, réunions hebdomadaires.','Campagnes électorales'],
+  ['ELE-08',M1,'Plan de communication de campagne','Forfait',1500000,1000000,2500000,'Messages, slogan, calendrier, conception des supports.','Campagnes électorales'],
+  ['ELE-09',M1,'Gestion des réseaux sociaux de campagne','Mois',500000,300000,1000000,'Hors budget de publicité sponsorisée.','Campagnes électorales'],
+  ['ELE-10',M1,'Positionnement et image du candidat','Forfait',1500000,1000000,3000000,'Diagnostic d\'image, positionnement, éléments de langage. Prix de départ proposé le 21/11/2026, modifiable.','Positionnement et image'],
+  ['ELE-11',M1,'Préparation aux médias (prise de parole, débats)','Journée',300000,200000,500000,'Entraînement filmé, simulations d\'interview. Prix de départ proposé le 21/11/2026, modifiable.','Prise de parole média'],
+  ['COM-01',M2,'Stratégie de communication institutionnelle','Forfait',2500000,1500000,4000000,'Diagnostic, plan annuel, messages clés.','Accompagnement public'],
+  ['INS-01',M2,'Accompagnement d\'une institution ou collectivité','Mois',1000000,500000,2000000,'Conseil et production au mois. Prix de départ proposé le 21/11/2026, modifiable.','Accompagnement public'],
+  ['INS-02',M2,'Gestion de la réputation et veille','Mois',500000,300000,1000000,'Veille médias et réseaux, alertes, réponses. Prix de départ proposé le 21/11/2026, modifiable.','Réputation & diplomatie'],
+  ['INS-03',M2,'Diplomatie publique et relations avec les partenaires','Forfait',1500000,800000,3000000,'Prix de départ proposé le 21/11/2026, modifiable.','Réputation & diplomatie'],
+  ['INS-04',M2,'Stratégie d\'influence et relations publiques','Forfait',2000000,1000000,4000000,'Cartographie des acteurs, plan d\'action. Prix de départ proposé le 21/11/2026, modifiable.','Influence et relations publiques'],
+  ['COM-02',M3,'Communication corporate / image de marque','Forfait',1500000,800000,3000000,'Identité, charte, positionnement.','Image de marque et valeurs'],
+  ['COR-01',M3,'Accompagnement au changement (communication interne)','Forfait',2000000,1000000,4000000,'Réorganisation, fusion, nouveau projet. Prix de départ proposé le 21/11/2026, modifiable.','Accompagnement au changement'],
+  ['COR-02',M3,'Communication de crise','Forfait',1500000,800000,3000000,'Cellule de crise, messages, porte-parole. Prix de départ proposé le 21/11/2026, modifiable.','Accompagnement au changement'],
+  ['CON-01',M4,'Journée de conseil','Journée',250000,150000,400000,'','Conseil exécutif'],
+  ['CON-02',M4,'Diagnostic organisationnel','Forfait',1000000,500000,2000000,'','Audits et études'],
+  ['CON-03',M4,'Plan stratégique / business plan','Forfait',1000000,500000,2500000,'','Conseil exécutif'],
+  ['CON-04',M4,'Audit de communication','Forfait',1500000,800000,3000000,'Prix de départ proposé le 21/11/2026, modifiable.','Audits et études'],
+  ['CON-05',M4,'Étude d\'opinion ou étude de terrain','Forfait',3000000,1500000,6000000,'Conception, terrain, analyse ; frais d\'enquêteurs à part. Prix de départ proposé le 21/11/2026, modifiable.','Audits et études'],
+  ['CON-06',M4,'Accompagnement d\'un dirigeant','Mois',750000,400000,1500000,'Séances régulières de conseil personnel. Prix de départ proposé le 21/11/2026, modifiable.','Conseil exécutif'],
+  ['CON-07',M4,'Formation exécutive (séminaire de dirigeants)','Journée',750000,500000,1500000,'Prix de départ proposé le 21/11/2026, modifiable.','Formations exécutives'],
+  ['CRE-01',M4,'Création d\'entreprise (SARL, SAS) — accompagnement CEPICI','Forfait',250000,150000,400000,'Frais officiels en sus, à vérifier au CEPICI.','Conseil exécutif'],
+  ['CRE-02',M4,'Création de coopérative (SCOOPS ou SCOOP-CA)','Forfait',400000,250000,700000,'Frais officiels en sus.','Conseil exécutif'],
+  ['CRE-03',M4,'Création de cabinet de conseil','Forfait',350000,200000,500000,'Statuts, immatriculation, offre de services.','Conseil exécutif'],
+  ['GEN-01',M5,'Création de logo et charte graphique','Forfait',750000,400000,1500000,'Prix de départ proposé le 21/11/2026, modifiable.','Branding et design'],
+  ['GEN-02',M5,'Conception de supports (affiche, dépliant, kakémono)','Unité',150000,75000,300000,'Impression à part. Prix de départ proposé le 21/11/2026, modifiable.','Branding et design'],
+  ['COM-03',M5,'Animation des réseaux sociaux','Mois',350000,200000,600000,'Hors publicité sponsorisée.','Communication digitale'],
+  ['GEN-03',M5,'Site internet vitrine','Forfait',1000000,600000,2500000,'Nom de domaine et hébergement à part. Prix de départ proposé le 21/11/2026, modifiable.','Communication digitale'],
+  ['CRE-05',M5,'Conception d\'application de gestion','Forfait',3000000,1500000,8000000,'Cahier des charges et développement ; maintenance à part.','Communication digitale'],
+  ['COM-04',M5,'Organisation d\'événement — honoraires','Forfait',1000000,500000,2000000,'Conception et coordination ; logistique facturée à part.','Événementiel et protocoles'],
+  ['GEN-04',M5,'Protocole et maîtrise de cérémonie','Jour',300000,200000,500000,'Prix de départ proposé le 21/11/2026, modifiable.','Événementiel et protocoles'],
+  ['FOR-01',M5,'Formation (groupe jusqu\'à 20)','Journée',400000,250000,600000,'','Formations'],
+  ['FOR-02',M5,'Formation — tarif par participant','Personne',50000,25000,100000,'Sessions ouvertes.','Formations'],
+  ['CRE-04',M5,'Montage d\'une formation payante','Forfait',600000,300000,1000000,'Programme, supports, prix, plan commercial.','Formations'],
+  ['COM-05',M5,'Relations presse (communiqué, diffusion)','Unité',250000,150000,400000,'Achat d\'espace à part.','Relations presse'],
+  ['ANX-01',MA,'Déplacement hors Abidjan (per diem)','Jour',40000,25000,60000,'Hébergement et repas ; transport à part.','Frais annexes'],
 ];
+/* anciennes familles (jusqu'à V1.33) → métier des statuts */
+const ANCIENNE_FAM = { 'Électoral': M1, 'Communication': M5, 'Conseil stratégique': M4, 'Création de structures': M4, 'Formation': M5, 'Frais annexes': MA };
+/* reclassement V1.34 : ne touche que les prestations encore rangées dans une ancienne famille, et ajoute les nouvelles.
+   Lancé après la synchronisation, pour ne jamais écraser une modification faite sur un autre appareil. */
+function migrerCatalogue(){
+  const ref = Object.fromEntries(CATALOGUE_IGC.map(r => ['P-' + r[0], r]));
+  let n = 0, a = 0;
+  for (const p of DATA.catalogue){
+    if (!(p.cat in ANCIENNE_FAM)) continue;
+    const r = ref[p.id], cat = r ? r[1] : ANCIENNE_FAM[p.cat], rub = r ? r[8] : '';
+    if (p.cat === cat && (p.rub || '') === rub) continue;
+    p.cat = cat; if (rub && !p.rub) p.rub = rub; p.u = now(); n++;
+  }
+  for (const r of CATALOGUE_IGC){
+    const id = 'P-' + r[0];
+    if (DATA._del[id] || DATA.catalogue.some(x => x.id === id)) continue;
+    DATA.catalogue.push({ id, code: r[0], cat: r[1], d: r[2], unite: r[3], pu: r[4], bas: r[5], haut: r[6], note: r[7], rub: r[8], actif: true, u: now() }); a++;
+  }
+  if (n || a) save('Catalogue rangé selon les 5 métiers des statuts (' + n + ' reclassée(s), ' + a + ' ajoutée(s))');
+}
 /* identifiants fixes (P-code) : deux appareils qui installent la grille ne créent pas de doublons ; toute modification l'emporte (u = 1) */
 function seedCatalogue(){
   if (DATA._catSeed) return;
-  CATALOGUE_IGC.forEach(([code, cat, d, unite, pu, bas, haut, note]) => {
+  CATALOGUE_IGC.forEach(([code, cat, d, unite, pu, bas, haut, note, rub]) => {
     const id = 'P-' + code;
     if (DATA._del[id] || DATA.catalogue.some(x => x.id === id)) return;
-    DATA.catalogue.push({ id, code, cat, d, unite, pu, bas, haut, note, actif: true, u: 1 });
+    DATA.catalogue.push({ id, code, cat, d, unite, pu, bas, haut, note, rub, actif: true, u: 1 });
   });
   DATA._catSeed = 1;
   try { localStorage.setItem(KEY, JSON.stringify(DATA)); } catch(e){}
 }
-const catTrie = () => [...DATA.catalogue].sort((a, b) => (CAT_FAM.indexOf(a.cat) - CAT_FAM.indexOf(b.cat)) || String(a.code).localeCompare(String(b.code)));
+const rubIdx = p => { const L = RUBRIQUES[p.cat] || []; const i = L.indexOf(p.rub); return i < 0 ? 99 : i; };
+const catTrie = () => [...DATA.catalogue].sort((a, b) => ((CAT_FAM.indexOf(a.cat) + 1 || 99) - (CAT_FAM.indexOf(b.cat) + 1 || 99)) || (rubIdx(a) - rubIdx(b)) || String(a.code).localeCompare(String(b.code)));
 const catLib = p => p.d + (p.unite && p.unite !== 'Forfait' ? ' (par ' + p.unite.toLowerCase() + ')' : '');
 const catOpts = () => `<option value="">＋ Ajouter une prestation du catalogue…</option>` + CAT_FAM.map(f => { const L = catTrie().filter(p => p.cat === f && p.actif !== false); return L.length ? `<optgroup label="${esc(f)}">${L.map(p => `<option value="${p.id}">${esc(p.code + ' — ' + p.d + ' — ' + F(p.pu) + ' F / ' + (p.unite || 'forfait').toLowerCase())}</option>`).join('')}</optgroup>` : ''; }).join('');
 function ajoutCatalogue(id){
   const p = get('catalogue', id); if (!p) return;
   const vide = LIG.findIndex(l => !l.d && !num(l.pu));
-  const l = { d: catLib(p), q: 1, pu: p.pu };
+  const l = { d: catLib(p), q: 1, pu: p.pu, m: p.cat !== MA ? p.cat : '' };
   if (vide >= 0) LIG[vide] = l; else LIG.push(l);
   $('#lig').innerHTML = lignesHTML(); majTot();
   toast('Prix ' + FCFA(p.pu) + ' repris : modifiable sur la ligne');
@@ -2766,16 +2815,17 @@ function ajoutCatalogue(id){
 let CATF = 'toutes';
 VIEWS.catalogue = () => {
   const L = catTrie().filter(p => CATF === 'toutes' || p.cat === CATF);
-  return `<div class="bar"><select onchange="CATF=this.value;render()"><option value="toutes">Toutes les familles</option>${CAT_FAM.map(f => `<option ${CATF === f ? 'selected' : ''}>${esc(f)}</option>`).join('')}</select><span class="grow"></span>${can() ? `<button class="btn p" onclick="editPresta()">+ Prestation</button>` : ''}</div>
-  <div class="card"><p class="small muted" style="margin-top:0">Prix en F CFA hors taxes, honoraires seuls. Dans un devis ou une facture, choisissez la prestation dans la liste : le prix se met tout seul et reste modifiable sur la ligne.</p>
-  ${tbl([['Code'],['Prestation'],['Famille'],['Unité'],['Prix','n'],['Fourchette','n']], L.map(p => `<tr class="click" onclick="editPresta('${p.id}')"><td>${esc(p.code)}</td><td><b>${esc(p.d)}</b>${p.actif === false ? ' <span class="tag">masquée</span>' : ''}${p.note ? `<br><span class="small muted">${esc(p.note)}</span>` : ''}</td><td>${esc(p.cat)}</td><td>${esc(p.unite)}</td><td class="n"><b>${FCFA(p.pu)}</b></td><td class="n small">${p.bas || p.haut ? F(p.bas) + ' – ' + F(p.haut) : ''}</td></tr>`), 'Catalogue vide.')}</div>`;
+  return `<div class="bar"><select onchange="CATF=this.value;render()"><option value="toutes">Tous les métiers</option>${CAT_FAM.map(f => `<option ${CATF === f ? 'selected' : ''}>${esc(f)}</option>`).join('')}</select><span class="grow"></span>${can() ? `<button class="btn p" onclick="editPresta()">+ Prestation</button>` : ''}</div>
+  <div class="card"><p class="small muted" style="margin-top:0">Prestations rangées selon les 5 métiers de l'objet social d'IGC (statuts). Prix en F CFA hors taxes, honoraires seuls. Dans un devis ou une facture, choisissez la prestation dans la liste : le prix se met tout seul et reste modifiable sur la ligne.</p>
+  ${tbl([['Code'],['Prestation'],['Métier · rubrique'],['Unité'],['Prix','n'],['Fourchette','n']], L.map(p => `<tr class="click" onclick="editPresta('${p.id}')"><td>${esc(p.code)}</td><td><b>${esc(p.d)}</b>${p.actif === false ? ' <span class="tag">masquée</span>' : ''}${p.note ? `<br><span class="small muted">${esc(p.note)}</span>` : ''}</td><td>${esc(p.cat)}${p.rub && p.rub !== p.cat ? `<br><span class="small muted">${esc(p.rub)}</span>` : ''}</td><td>${esc(p.unite)}</td><td class="n"><b>${FCFA(p.pu)}</b></td><td class="n small">${p.bas || p.haut ? F(p.bas) + ' – ' + F(p.haut) : ''}</td></tr>`), 'Catalogue vide.')}</div>`;
 };
 function editPresta(id){
-  const p = id ? get('catalogue', id) : { cat: CATF !== 'toutes' ? CATF : 'Conseil stratégique', unite: 'Forfait', actif: true };
+  const p = id ? get('catalogue', id) : { cat: CATF !== 'toutes' ? CATF : M4, unite: 'Forfait', actif: true };
   const ro = !can();
   modal(`<h2>${id ? 'Prestation ' + esc(p.code) : 'Nouvelle prestation'}</h2>${ro ? '<p class="small muted">Lecture seule : seuls le gérant et la cogérante modifient le catalogue.</p>' : ''}<div class="f">
     <div><label>Code</label><input id="p_code" value="${esc(p.code)}" placeholder="ex. CON-04" ${ro ? 'disabled' : ''}></div>
-    <div><label>Famille</label><select id="p_cat" ${ro ? 'disabled' : ''}>${opts(CAT_FAM, p.cat)}</select></div>
+    <div><label>Métier (objet social)</label><select id="p_cat" ${ro ? 'disabled' : ''} onchange="$('#p_rubl').innerHTML=(RUBRIQUES[this.value]||[]).map(r=>'<option>'+esc(r)+'</option>').join('')">${opts(CAT_FAM, p.cat)}</select></div>
+    <div><label>Rubrique</label><input id="p_rub" list="p_rubl" value="${esc(p.rub)}" placeholder="ex. Communication digitale" ${ro ? 'disabled' : ''}><datalist id="p_rubl">${(RUBRIQUES[p.cat] || []).map(r => `<option>${esc(r)}</option>`).join('')}</datalist></div>
     <div class="full"><label>Désignation (imprimée sur le devis) *</label><input id="p_d" value="${esc(p.d)}" ${ro ? 'disabled' : ''}></div>
     <div><label>Unité</label><select id="p_u" ${ro ? 'disabled' : ''}>${opts(UNITES, p.unite)}</select></div>
     <div><label>Prix unitaire HT (F) *</label><input id="p_pu" inputmode="numeric" value="${esc(p.pu ?? '')}" ${ro ? 'disabled' : ''}></div>
@@ -2788,7 +2838,7 @@ function editPresta(id){
 }
 function savePresta(id){
   const d = val('p_d'), pu = num(val('p_pu')); if (!d || !pu) return toast('Désignation et prix obligatoires');
-  const p = Object.assign(id ? get('catalogue', id) : { id: uid('P') }, { code: val('p_code').toUpperCase(), cat: val('p_cat'), d, unite: val('p_u'), pu, bas: num(val('p_bas')), haut: num(val('p_haut')), note: val('p_note'), actif: $('#p_act').checked });
+  const p = Object.assign(id ? get('catalogue', id) : { id: uid('P') }, { code: val('p_code').toUpperCase(), cat: val('p_cat'), rub: val('p_rub'), d, unite: val('p_u'), pu, bas: num(val('p_bas')), haut: num(val('p_haut')), note: val('p_note'), actif: $('#p_act').checked });
   put('catalogue', p, (id ? 'Modification' : 'Création') + ' prestation ' + (p.code || d) + ' : ' + FCFA(pu)); closeModal(); toast('Catalogue mis à jour'); render();
 }
 
@@ -2827,7 +2877,7 @@ function contratMission(type, id){
   const objet = (dv && dv.objet) || (m && m.titre) || '';
   const t = dv ? totaux(dv) : null, montant = t ? t.ttc : num(m && m.montant);
   const numC = 'IGC-CM-' + ((dv && dv.num) || (m && m.id) || '').replace(/^IGC-D-/, '');
-  const lignes = dv && dv.lignes.length ? `<table><thead><tr><th>Prestation</th><th class="n">Qté</th><th class="n">Prix unitaire</th><th class="n">Montant</th></tr></thead><tbody>${dv.lignes.map(l => `<tr><td>${esc(l.d)}</td><td class="n">${l.q}</td><td class="n">${F(l.pu)}</td><td class="n">${F(num(l.q) * num(l.pu))}</td></tr>`).join('')}</tbody></table>` : '';
+  const lignes = dv && dv.lignes.length ? `<table><thead><tr><th>Prestation</th><th class="n">Qté</th><th class="n">Prix unitaire</th><th class="n">Montant</th></tr></thead><tbody>${dv.lignes.map(l => `<tr><td>${esc(l.d)}${l.m ? `<br><span style="font-size:10.5px;color:#777">${esc(l.m)}</span>` : ''}</td><td class="n">${l.q}</td><td class="n">${F(l.pu)}</td><td class="n">${F(num(l.q) * num(l.pu))}</td></tr>`).join('')}</tbody></table>` : '';
   const corps = `
   <div style="display:flex;gap:14px;margin-top:14px"><div class="box" style="flex:1"><span style="color:#667085;font-size:11px">LE CABINET</span><br><b>${esc(s.nom)}</b><br>${esc(s.forme)} au capital de ${F(s.capital)} F CFA${s.rccm ? '<br>RCCM ' + esc(s.rccm) : ''}<br>${esc(s.adresse)}${s.idu ? '<br>IDU ' + esc(s.idu) : ''}<br>représenté par ${s.gerant ? 'Mme ' + esc(s.gerant) + ', Gérante' + (s.cogerant ? ', et M. ' + esc(s.cogerant) + ', Cogérant' : '') : 'sa Gérance'}</div>
   <div class="box" style="flex:1"><span style="color:#667085;font-size:11px">LE CLIENT</span><br><b>${esc(c.nom)}</b>${c.contact ? '<br>représenté par ' + esc(c.contact) : ''}${c.adresse ? '<br>' + esc(c.adresse) : ''}${c.cc ? '<br>CC : ' + esc(c.cc) : ''}</div></div>
@@ -2999,7 +3049,7 @@ function importJSON(file){
 }
 
 /* ---------- démarrage ---------- */
-seedCatalogue();
+seedCatalogue(); setTimeout(() => { if (!FB_PRET) migrerCatalogue(); }, 20000);
 if (remplirSociete()) save('Identité légale du cabinet complétée (RCCM, IDU, siège, gérance)');
 render();
 fbInit();
