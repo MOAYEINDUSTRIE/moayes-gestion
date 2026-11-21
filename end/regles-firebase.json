@@ -6,6 +6,40 @@
         ".write": "auth != null && auth.provider == 'password' && auth.token.email == 'impactglobalconsulting11@gmail.com' && newData.exists()",
         ".validate": "newData.hasChild('societe')"
       },
+      "igc": {
+        ".read": "auth != null && auth.provider == 'password' && auth.token.email == 'impactglobalconsulting11@gmail.com'",
+        ".write": "auth != null && auth.provider == 'password' && auth.token.email == 'impactglobalconsulting11@gmail.com' && newData.exists()",
+        ".validate": "newData.hasChild('meta')",
+        "meta": {
+          ".validate": "newData.hasChild('societe') && newData.child('_lastSaved').isNumber()"
+        },
+        "c": {
+          "$col": {
+            ".validate": "$col.matches(/^(clients|devis|missions|factures|paiements|depenses|ordres|catalogue|dossiers|comptesRendus)$/)",
+            "$id": {
+              ".validate": "newData.child('id').val() === $id"
+            }
+          }
+        },
+        "del": {
+          "$id": {
+            ".validate": "newData.isNumber()"
+          }
+        },
+        "audit": {
+          "$k": {
+            ".validate": "newData.hasChildren(['t','a']) && newData.child('a').isString() && newData.child('a').val().length <= 1000"
+          }
+        },
+        "erreurs": {
+          "$k": {
+            ".validate": "newData.hasChildren(['t','m','v']) && newData.child('m').isString() && newData.child('m').val().length <= 400 && (!newData.child('s').exists() || newData.child('s').val().length <= 200)"
+          }
+        },
+        "$autre": {
+          ".validate": false
+        }
+      },
       "v2_data": {
         ".read": "(auth != null && auth.provider == 'password' && auth.token.email == 'moayepos@gmail.com') || (auth != null && auth.provider == 'password' && root.child('moayes/v2_comptes/'+auth.uid+'/actif').val() === true)",
         ".write": "(auth != null && auth.provider == 'password' && auth.token.email == 'moayepos@gmail.com') || (auth != null && auth.provider == 'password' && root.child('moayes/v2_comptes/'+auth.uid+'/actif').val() === true)"

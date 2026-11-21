@@ -9,7 +9,7 @@ module.exports = defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'rapport' }]],
   use: { bypassCSP: true, baseURL: 'http://localhost:8790/igc/', launchOptions: exe, trace: 'retain-on-failure' },
-  webServer: { command: 'python3 -m http.server 8790 -d ..', url: 'http://localhost:8790/igc/index.html', reuseExistingServer: true },
+  webServer: { command: 'python3 -m http.server 8790 -d ..', url: 'http://localhost:8790/igc/index.html', reuseExistingServer: true, stdout: 'ignore', stderr: 'ignore' },
   projects: [
     { name: 'ordinateur', use: { viewport: { width: 1280, height: 850 } } },
     { name: 'telephone', use: { ...devices['Pixel 5'], launchOptions: exe } },

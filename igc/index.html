@@ -126,6 +126,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 @media (max-width:760px){.elsegm button{flex:1 1 30%}}
 #diag .agchk label{display:flex;gap:8px;align-items:flex-start;text-align:left;justify-content:flex-start}#diag .agchk input{flex:none;width:auto;margin-top:3px}
 #elq{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.sysg{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-bottom:12px}.sysg .card{margin:0}
 </style>
 <script>
 /* Œil : afficher / masquer les mots de passe et codes (tous les champs, y compris ceux créés plus tard) */
@@ -182,7 +183,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  IGC Gestion  ===================== */
-const VERSION = 'V1.32';
+const VERSION = 'V1.33';
 /* règle de Moaye (16/11/2026, rappel de la méthode du 10/11) : on travaille lieu de vote par lieu de vote ;
    2 cellules pour 1 000 électeurs, à parité, au moins 1 cellule de femmes et 1 d'hommes par lieu ; cellule = 1 responsable + 25 membres = 26 personnes.
    Électeurs acquis = cellules × 26 (la base électorale). */
@@ -201,7 +202,9 @@ const LOGO_IGC = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAU
 const KEY = 'igc_gestion_v1';
 const FB_CFG = { apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
   databaseURL:"https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app", projectId:"moayes-industrie" };
-const FB_PATH = 'moayes/igc_data';
+const FB_PATH = 'moayes/igc_data';   /* ancien emplacement (une seule fiche) : lu pendant la transition, jamais effacé */
+const FB_BASE = 'moayes/igc';        /* V1.33 : une branche par collection, un nœud par fiche */
+const FB_TRANSITION_JUSQUA = '2027-01-31';
 const COLS = ['clients','devis','missions','factures','paiements','depenses','ordres','catalogue','dossiers','comptesRendus'];
 const ROLES = { gerant:{nom:'Gérant', all:true}, cogerant:{nom:'Cogérante', all:true}, assistant:{nom:'Assistant(e)', all:false} };
 const DOMAINES = ['Communication politique et électorale','Communication institutionnelle','Affaires publiques','Communication corporate','Consultance stratégique','Branding et digital','Événementiel','Applications et start-up','Formation','Autre'];
@@ -220,6 +223,25 @@ const addDays = (d, k) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.get
 const dfr = d => d ? d.split('-').reverse().join('/') : '';
 const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
 const now = () => Date.now();
+/* ---------- V1.33 : journal des erreurs et mesures (page « État du système ») ---------- */
+/* Rien de nominatif : message technique, version, écran, type d'appareil. */
+const ERR_KEY = 'igc_erreurs';
+const MESURES = { debut: performance.now(), pret: 0, rendus: {}, envois: 0, octets: 0, recus: 0, dernierEnvoi: 0, dernierRecu: 0, plusGrosEnvoi: 0 };
+let ERR_A_ENVOYER = [];
+const erreursLocales = () => { try { return JSON.parse(localStorage.getItem(ERR_KEY)) || []; } catch(e){ return []; } };
+function noterErreur(m, src, gravite){
+  try {
+    const e = { id: 'E' + now().toString(36) + Math.random().toString(36).slice(2, 5), t: now(), v: VERSION, g: gravite || 'erreur',
+      m: String(m || 'Erreur inconnue').slice(0, 300), s: String(src || '').slice(0, 160),
+      vue: typeof VIEW !== 'undefined' ? String(VIEW) : '', app: /Mobi|Android|iPhone/i.test(navigator.userAgent) ? 'téléphone' : 'ordinateur' };
+    const L = erreursLocales();
+    if (L.some(x => x.m === e.m && e.t - x.t < 60000)) return;   // pas de doublon dans la minute
+    L.unshift(e); localStorage.setItem(ERR_KEY, JSON.stringify(L.slice(0, 100)));
+    ERR_A_ENVOYER.push(e); if (typeof fbPush === 'function') fbPush();
+  } catch(_){}
+}
+window.addEventListener('error', e => noterErreur(e.message, String(e.filename || '').split('/').pop() + ':' + (e.lineno || '')));
+window.addEventListener('unhandledrejection', e => noterErreur('Promesse rejetée : ' + (e.reason && (e.reason.message || e.reason.code || e.reason)), ''));
 const mois = d => (d || '').slice(0,7);
 const MOIS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
 const moisLib = m => m ? MOIS_FR[+m.slice(5,7)-1] + ' ' + m.slice(0,4) : '';
@@ -478,7 +500,7 @@ async function fbConnexion(){
   try {
     if (typeof firebase === 'undefined') throw { code:'network' };
     FBAPP();
-    if (fbRef){ fbRef.off(); fbRef = null; }
+    fbOff();
     await FBAPP().auth().signInWithEmailAndPassword(e, pw);
     _fbSessionP = Promise.resolve(FBAPP().auth().currentUser);
     closeModal(); toast('🔐 Connecté : ' + e); fbAttach(); render();
@@ -490,12 +512,12 @@ async function fbOubli(){
   try { await FBAPP().auth().sendPasswordResetEmail(e); toast('E-mail envoyé à ' + e + ' (regardez aussi les spams)'); } catch(err){ toast(fbAuthErr(err)); }
 }
 async function fbDeconnexion(){
-  try { if (fbRef){ fbRef.off(); fbRef = null; } await FBAPP().auth().signOut(); } catch(e){}
+  try { fbOff(); await FBAPP().auth().signOut(); } catch(e){}
   _fbSessionP = null; setFb('', 'Déconnecté'); closeModal(); toast('Déconnecté'); render();
 }
-function fbAttach(){
+function fbAttachAncien(){
   try {
-      fbRef = FBAPP().database().ref(FB_PATH);
+      FB_MODE = 'ancien'; fbRef = FBAPP().database().ref(FB_PATH); fbRefs.push(fbRef);
       fbRef.on('value', snap => {
         const r = snap.val();
         if (r && r.societe){
@@ -508,20 +530,157 @@ function fbAttach(){
         } else fbPush(true);
       }, err => {
         const refus = err && err.code === 'PERMISSION_DENIED';
-        setFb('r', refus ? 'Accès refusé' : 'Erreur'); fbRef = null;
+        setFb('r', refus ? 'Accès refusé' : 'Erreur'); fbRef = null; noterErreur('Synchronisation (ancien emplacement) : ' + (err && err.code || err), 'firebase', 'alerte');
         if (refus && !fbCompteTxt() && SESSION && !document.querySelector('.modal-bg')) fbCompte('La base est réservée au compte du cabinet.');
       });
   } catch(e){ setFb('r', 'Erreur'); }
 }
 function stripForCompare(d){ const o = {}; for (const c of COLS) o[c] = d[c].map(x => x.id + ':' + x.u).sort(); o.del = Object.keys(d._del || {}).sort(); return o; }
 let pushT = null;
-function fbPush(now_){
+function fbPushAncien(now_){
   if (!fbRef) return;
   clearTimeout(pushT);
   pushT = setTimeout(() => {
     setFb('w', 'Envoi…');
     fbRef.set(JSON.parse(JSON.stringify(DATA))).then(() => { DIRTY = false; setFb('g', 'Synchronisé'); }).catch(e => setFb('r', e && e.code === 'PERMISSION_DENIED' ? 'Accès refusé' : 'Envoi impossible'));
   }, now_ ? 50 : 600);
+}
+
+/* ---------- V1.33 : synchronisation fiche par fiche (moayes/igc) ----------
+   meta : identité du cabinet, soldes, codes PIN, compteurs ; c/<collection>/<id> : une fiche ;
+   del/<id> : fiches supprimées ; audit/<clé> : journal ; erreurs/<id> : journal technique.
+   Chaque envoi ne contient que les fiches modifiées ; chaque appareil ne reçoit que les fiches changées. */
+let FB_MODE = '', FB_PRET = false, fbRefs = [], FB_SRV = null, pushV2T = null, FB_ENVOI = false;
+function fbOff(){ fbRefs.forEach(r => { try { r.off(); } catch(e){} }); fbRefs = []; fbRef = null; FB_PRET = false; FB_MODE = ''; }
+/* forme canonique : clés triées, sans vide ni null (comme Firebase les rend) */
+function canon(v){
+  if (Array.isArray(v)){ const a = v.map(canon).filter(x => x !== undefined); return a.length ? a : undefined; }
+  if (v && typeof v === 'object'){ const o = {}; Object.keys(v).sort().forEach(k => { const x = canon(v[k]); if (x !== undefined) o[k] = x; }); return Object.keys(o).length ? o : undefined; }
+  return v === null || v === undefined || (typeof v === 'number' && !isFinite(v)) ? undefined : v;
+}
+const emp = v => JSON.stringify(canon(v) ?? null);
+const cleOK = k => typeof k === 'string' && k.length > 0 && k.length < 700 && !/[.#$\[\]\/]/.test(k);
+const auditCle = a => String(a.t) + '_' + (Array.from(String(a.a) + a.u).reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7)).toString(36);
+const metaDe = d => ({ societe: d.societe, soldes: d.soldes, _pins: d._pins || {}, compteurs: d.compteurs || {}, nonRes: d.nonRes || {}, _lastSaved: num(d._lastSaved) });
+const fiche = (col, x) => { if (x && (col === 'devis' || col === 'factures') && !Array.isArray(x.lignes)) x.lignes = Object.values(x.lignes || {}); return x; };
+let memoT = null, rendT = null;
+function apresReception(){
+  MESURES.recus++; MESURES.dernierRecu = now();
+  clearTimeout(memoT); memoT = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(DATA)); } catch(e){} }, 400);
+  if (SESSION){ clearTimeout(rendT); rendT = setTimeout(() => { if (!document.querySelector('.modal-bg')) render(); }, 250); }
+}
+function fbAttach(){
+  fbOff();
+  try {
+    const db = FBAPP().database(), base = db.ref(FB_BASE);
+    fbRef = base; FB_MODE = 'fiches'; FB_PRET = false;
+    FB_SRV = { c: Object.fromEntries(COLS.map(c => [c, {}])), meta: '', del: {}, audit: {} };
+    setFb('w', 'Connexion…');
+    base.child('meta').once('value').then(async m => {
+      if (!m.val()){
+        /* première ouverture en V1.33 : on recopie l'ancien emplacement, sans l'effacer */
+        const anc = (await db.ref(FB_PATH).once('value')).val();
+        if (anc && anc.societe){ mergeData(anc); remplirSociete(); }
+        FB_SRV.migration = true;
+      }
+      ecouterV2(base);
+      if (new Date().toISOString().slice(0, 10) <= FB_TRANSITION_JUSQUA) ecouterAncien(db);
+    }).catch(err => {
+      if (err && err.code === 'PERMISSION_DENIED'){ noterErreur('Nouvel emplacement refusé par les règles : retour à l\'ancien', 'firebase', 'alerte'); fbOff(); return fbAttachAncien(); }
+      setFb('r', 'Erreur'); noterErreur('Synchronisation : ' + (err && err.code || err), 'firebase');
+    });
+  } catch(e){ setFb('r', 'Erreur'); noterErreur('Synchronisation : ' + e, 'firebase'); }
+}
+function ecouterV2(base){
+  const refus = err => { const r = err && err.code === 'PERMISSION_DENIED'; setFb('r', r ? 'Accès refusé' : 'Erreur'); noterErreur('Synchronisation : ' + (err && err.code || err), 'firebase', 'alerte');
+    if (r && !fbCompteTxt() && SESSION && !document.querySelector('.modal-bg')) fbCompte('La base est réservée au compte du cabinet.'); };
+  const attentes = [];
+  const rm = base.child('meta'); fbRefs.push(rm);
+  rm.on('value', snap => {
+    const m = snap.val(); if (!m) return;
+    FB_SRV.meta = emp(metaDe(m));
+    let ch = false;
+    if (num(m._lastSaved) > num(DATA._lastSaved)){
+      for (const k of ['societe', 'soldes', '_pins']) if (m[k] && JSON.stringify(DATA[k]) !== JSON.stringify(m[k])){ DATA[k] = m[k]; ch = true; }
+      DATA._lastSaved = num(m._lastSaved);
+    }
+    for (const k in m.compteurs || {}) if (num(m.compteurs[k]) > num(DATA.compteurs[k])){ DATA.compteurs[k] = m.compteurs[k]; ch = true; }
+    for (const k in m.nonRes || {}){ const r = m.nonRes[k], l = DATA.nonRes[k]; if (r && (!l || num(r.u) > num(l.u))){ DATA.nonRes[k] = r; ch = true; } }
+    if (ch){ if (remplirSociete()) save('Identité légale du cabinet complétée (RCCM, IDU, siège, gérance)'); apresReception(); }
+  }, refus);
+  attentes.push(rm.once('value'));
+  const rd = base.child('del'); fbRefs.push(rd);
+  const surDel = snap => { const id = snap.key, t = num(snap.val()); FB_SRV.del[id] = t;
+    if (num(DATA._del[id]) < t) DATA._del[id] = t;
+    let ch = false; for (const c of COLS){ const n = DATA[c].length; DATA[c] = DATA[c].filter(x => !(x.id === id && num(x.u) <= t)); if (DATA[c].length !== n) ch = true; }
+    if (ch) apresReception(); };
+  rd.on('child_added', surDel, refus); rd.on('child_changed', surDel);
+  attentes.push(rd.once('value'));
+  for (const c of COLS){
+    const rc = base.child('c/' + c); fbRefs.push(rc);
+    const idx = new Map(DATA[c].map(y => [y.id, y]));   /* recherche rapide : pas de parcours complet à chaque fiche reçue */
+    const surFiche = snap => {
+      const x = fiche(c, snap.val()); if (!x || !x.id) return;
+      FB_SRV.c[c][x.id] = emp(x);
+      if (num(DATA._del[x.id]) >= num(x.u)) return;
+      let l = idx.get(x.id); if (l && DATA[c].indexOf(l) < 0 && !(l = DATA[c].find(y => y.id === x.id))) idx.delete(x.id);
+      if (!l){ DATA[c].push(x); idx.set(x.id, x); apresReception(); }
+      else if (num(x.u) > num(l.u)){ DATA[c][DATA[c].indexOf(l)] = x; idx.set(x.id, x); apresReception(); }
+    };
+    rc.on('child_added', surFiche, refus); rc.on('child_changed', surFiche);
+    rc.on('child_removed', snap => { delete FB_SRV.c[c][snap.key]; });
+    attentes.push(rc.once('value'));
+  }
+  const ra = base.child('audit'); fbRefs.push(ra);
+  ra.on('child_added', snap => { const a = snap.val(); FB_SRV.audit[snap.key] = num(a && a.t);
+    if (a && a.a && !DATA.audit.some(b => b.t === a.t && b.a === a.a)){ DATA.audit.push(a); DATA.audit.sort((p, q) => q.t - p.t); DATA.audit = DATA.audit.slice(0, 300); }
+  }, refus);
+  ra.on('child_removed', snap => { delete FB_SRV.audit[snap.key]; });
+  attentes.push(ra.once('value'));
+  Promise.all(attentes).then(() => { FB_PRET = true; MESURES.syncPrete = now(); apresReception(); fbPush(true); }).catch(refus);
+}
+let ANCIEN_VU = 0;
+function ecouterAncien(db){
+  /* transition : un appareil resté en V1.32 écrit encore dans l'ancien emplacement ; ses saisies sont reprises ici */
+  const r = db.ref(FB_PATH); fbRefs.push(r);
+  r.on('value', snap => { const v = snap.val(); if (!v || !v.societe || num(v._lastSaved) <= ANCIEN_VU) return; ANCIEN_VU = num(v._lastSaved);
+    if (mergeData(v)){ apresReception(); if (FB_PRET) fbPush(); } }, () => {});
+}
+function fbPush(now_){
+  if (FB_MODE === 'ancien') return fbPushAncien(now_);
+  if (FB_MODE !== 'fiches' || !fbRef || !FB_PRET) return;
+  DIRTY = true; clearTimeout(pushV2T);
+  pushV2T = setTimeout(envoyerV2, now_ ? 50 : 600);
+}
+function envoyerV2(){
+  if (FB_ENVOI){ pushV2T = setTimeout(envoyerV2, 300); return; }
+  const up = {}, apres = [];
+  for (const c of COLS){
+    const vus = new Set();
+    for (const x of DATA[c]){
+      if (!cleOK(x.id)){ noterErreur('Identifiant de fiche invalide (' + c + ')', 'synchro'); continue; }
+      vus.add(x.id); if (!num(x.u)) x.u = 1;
+      const e = emp(x); if (FB_SRV.c[c][x.id] !== e){ up['c/' + c + '/' + x.id] = JSON.parse(JSON.stringify(x)); apres.push(() => { FB_SRV.c[c][x.id] = e; }); }
+    }
+    for (const id in FB_SRV.c[c]) if (!vus.has(id) && DATA._del[id]){ up['c/' + c + '/' + id] = null; apres.push(() => { delete FB_SRV.c[c][id]; }); }
+  }
+  for (const id in DATA._del || {}) if (cleOK(id) && num(DATA._del[id]) > num(FB_SRV.del[id])){ const t = num(DATA._del[id]); up['del/' + id] = t; apres.push(() => { FB_SRV.del[id] = t; }); }
+  const m = metaDe(DATA), em = emp(m); if (em !== FB_SRV.meta){ up.meta = JSON.parse(JSON.stringify(m)); apres.push(() => { FB_SRV.meta = em; }); }
+  const cles = new Set();
+  for (const a of DATA.audit){ const k = auditCle(a); cles.add(k); if (!(k in FB_SRV.audit)){ up['audit/' + k] = a; apres.push(() => { FB_SRV.audit[k] = a.t; }); } }
+  Object.keys(FB_SRV.audit).sort((p, q) => FB_SRV.audit[q] - FB_SRV.audit[p]).slice(400).forEach(k => { if (!cles.has(k)) up['audit/' + k] = null; });   /* journal limité à 400 lignes */
+  const errs = ERR_A_ENVOYER.splice(0); errs.forEach(e => { up['erreurs/' + e.id] = e; });
+  if (FB_SRV.migration && !up.meta){ up.meta = JSON.parse(JSON.stringify(m)); }
+  const n = Object.keys(up).length;
+  if (!n){ DIRTY = false; setFb('g', 'Synchronisé'); return; }
+  const octets = JSON.stringify(up).length;
+  FB_ENVOI = true; setFb('w', 'Envoi…');
+  fbRef.update(up).then(() => {
+    apres.forEach(f => f()); FB_SRV.migration = false;
+    MESURES.envois++; MESURES.octets += octets; MESURES.dernierEnvoi = now(); MESURES.plusGrosEnvoi = Math.max(MESURES.plusGrosEnvoi, octets); MESURES.dernierEnvoiTaille = octets; MESURES.dernierEnvoiFiches = n;
+    DIRTY = false; setFb('g', 'Synchronisé');
+  }).catch(e => { ERR_A_ENVOYER.unshift(...errs); setFb('r', e && e.code === 'PERMISSION_DENIED' ? 'Accès refusé' : 'Envoi impossible'); noterErreur('Envoi refusé : ' + (e && (e.code || e.message) || e), 'synchro', 'alerte'); })
+    .finally(() => { FB_ENVOI = false; });
 }
 window.addEventListener('online', () => fbPush(true));
 window.addEventListener('offline', () => setFb('', 'Hors ligne'));
@@ -531,7 +690,7 @@ const MENU = [
   ['Pilotage', [['tableau','📊','Tableau de bord'],['atlas','🧭','ATLAS IA — Commandement'],['elec','🗳️','Base électorale'],['agents','🤖','Agents IA']]],
   ['Commercial', [['clients','👥','Clients'],['catalogue','🏷️','Catalogue des prestations'],['devis','📝','Devis'],['missions','🎯','Missions'],['dossiers','🗂️','Dossiers'],['comptesRendus','🗒️','Comptes rendus']]],
   ['Finances', [['factures','🧾','Factures'],['paiements','💰','Encaissements'],['depenses','💸','Dépenses'],['tresorerie','🏦','Trésorerie'],['rapports','📈','Rapports']]],
-  ['Système', [['parametres','⚙️','Paramètres'],['aide','❓','Mode d\'emploi']]],
+  ['Système', [['parametres','⚙️','Paramètres'],['systeme','📈','État du système'],['aide','❓','Mode d\'emploi']]],
 ];
 const TABS = [['tableau','📊','Accueil'],['factures','🧾','Factures'],['devis','📝','Devis'],['clients','👥','Clients'],['__menu','☰','Menu']];
 let VIEW = 'tableau', ARG = null;
@@ -539,8 +698,8 @@ function go(v, a){ VIEW = v; ARG = a ?? null; $('.side') && $('.side').classList
 window.__back = () => { if ($('.modal-bg')){ closeModal(); return true; } if (VIEW !== 'tableau'){ go('tableau'); return true; } return false; };
 
 function render(){
-  const root = $('#root');
-  if (!SESSION){ root.innerHTML = loginHTML(); return; }
+  const root = $('#root'), t0 = performance.now();
+  if (!SESSION){ root.innerHTML = loginHTML(); if (!MESURES.pret) MESURES.pret = Math.round(performance.now()); return; }
   if (FB_PROPOSER && !fbCompteTxt()){ FB_PROPOSER = false; setTimeout(() => { if (!document.querySelector('.modal-bg') && !fbCompteTxt()) fbCompte(); }, 1200); }
   const titre = VIEW === 'ordre' ? 'Mission ATLAS IA' : VIEW === 'circo' ? 'Fiche électorale' : VIEW === 'strategie' ? 'Stratégie de réseau' : (MENU.flatMap(g => g[1]).find(m => m[0] === VIEW) || [,,'Fiche'])[2];
   const body = (VIEWS[VIEW] || VIEWS.tableau)(ARG);
@@ -554,6 +713,9 @@ function render(){
     <nav class="tabbar">${TABS.map(([k, i, t]) => `<a class="${VIEW === k ? 'on' : ''}" onclick="${k === '__menu' ? "$('.side').classList.add('open')" : `go('${k}')`}"><span>${i}</span>${t}</a>`).join('')}</nav>
   </div>`;
   lignesMobiles(document);
+  const ms = Math.round(performance.now() - t0), r = MESURES.rendus[VIEW] || (MESURES.rendus[VIEW] = { n: 0, total: 0, max: 0 });
+  r.n++; r.total += ms; r.max = Math.max(r.max, ms); if (!MESURES.pret) MESURES.pret = Math.round(performance.now());
+  if (ms > 3000) noterErreur('Écran lent : ' + VIEW + ' (' + ms + ' ms)', 'mesure', 'alerte');
 }
 document.addEventListener('click', e => { const s = $('.side.open'); if (s && !s.contains(e.target) && !e.target.closest('.menu-btn') && !e.target.closest('.tabbar')) s.classList.remove('open'); });
 
@@ -2447,6 +2609,57 @@ function saveSociete(){
   save('Informations du cabinet modifiées'); toast('Enregistré'); render();
 }
 
+/* ----- V1.33 : état du système (journal, mesures, sécurité) ----- */
+const hfr = t => t ? new Date(t).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
+const Ko = n => n >= 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' Mo' : Math.max(1, Math.round(n / 1024)) + ' Ko';
+let ERR_SRV = null;
+function chargerErreursSrv(){
+  if (FB_MODE !== 'fiches' || !fbRef) return;
+  const r = fbRef.child('erreurs');
+  r.orderByKey().limitToLast(100).once('value').then(s => { ERR_SRV = Object.values(s.val() || {}).sort((a, b) => b.t - a.t); if (VIEW === 'systeme') render(); }).catch(() => {});
+  if (can()){ /* ménage : erreurs de plus de 30 jours */
+    r.orderByKey().endAt('E' + (now() - 30 * 864e5).toString(36)).once('value').then(s => { const v = s.val(); if (v){ const up = {}; Object.keys(v).forEach(k => up[k] = null); r.update(up).catch(() => {}); } }).catch(() => {});
+  }
+}
+function rapportSysteme(){
+  const L = [...(ERR_SRV || []), ...erreursLocales()].filter((e, i, a) => a.findIndex(x => x.id === e.id) === i).sort((a, b) => b.t - a.t);
+  const tailles = COLS.map(c => c + ' : ' + DATA[c].length + ' fiches, ' + Ko(JSON.stringify(DATA[c]).length));
+  return ['État du système — IGC Gestion ' + VERSION + ' — ' + new Date().toLocaleString('fr-FR'), 'Synchronisation : ' + FBST.t + ' (' + (FB_MODE === 'fiches' ? 'fiche par fiche' : FB_MODE || 'aucune') + ')',
+    'Envois : ' + MESURES.envois + ' (' + Ko(MESURES.octets) + '), dernier ' + hfr(MESURES.dernierEnvoi), 'Démarrage : ' + MESURES.pret + ' ms', ...tailles, '', 'Erreurs (' + L.length + ') :',
+    ...L.slice(0, 30).map(e => hfr(e.t) + ' · ' + e.v + ' · ' + e.app + ' · ' + (e.vue || '') + ' · ' + e.m)].join('\n');
+}
+VIEWS.systeme = () => {
+  if (!can()) return `<div class="card"><p>Réservé à la gérance.</p></div>`;
+  if (ERR_SRV === null){ ERR_SRV = []; setTimeout(chargerErreursSrv, 0); }
+  const loc = erreursLocales(), L = [...ERR_SRV, ...loc].filter((e, i, a) => a.findIndex(x => x.id === e.id) === i).sort((a, b) => b.t - a.t);
+  const j7 = now() - 7 * 864e5, j1 = now() - 864e5;
+  const err7 = L.filter(e => e.t > j7), err1 = L.filter(e => e.t > j1);
+  const au7 = DATA.audit.filter(a => a.t > j7), pin7 = au7.filter(a => /Code PIN refusé/.test(a.a)).length;
+  const tot = COLS.reduce((s, c) => s + JSON.stringify(DATA[c]).length, 0), loc0 = (() => { try { return (localStorage.getItem(KEY) || '').length; } catch(e){ return 0; } })();   /* caractères ; limite des navigateurs ≈ 5 millions */
+  const R = Object.entries(MESURES.rendus).map(([v, r]) => [v, Math.round(r.total / r.n), r.max, r.n]).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const voy = (ok, warn) => ok ? '<span class="pill g">bon</span>' : warn ? '<span class="pill w">à surveiller</span>' : '<span class="pill r">à corriger</span>';
+  setTimeout(async () => { try { const e = await navigator.storage.estimate(); const el = $('#sys_sto'); if (el) el.textContent = Ko(e.usage || 0) + ' utilisés sur ' + Ko(e.quota || 0); } catch(_){}
+    try { const k = (await caches.keys()).filter(n => n.startsWith('igc-')); const el = $('#sys_cache'); if (el) el.textContent = k.join(', ') || 'aucun'; } catch(_){} }, 0);
+  return `<div class="bar"><span class="grow muted small">Suivi technique de l'application : rien de nominatif n'est enregistré.</span>
+    <button class="btn sm" onclick="navigator.clipboard.writeText(rapportSysteme()).then(()=>toast('Rapport copié'))">📋 Copier le rapport</button>
+    <button class="btn sm" onclick="ERR_SRV=null;render()">↻ Actualiser</button></div>
+  <div class="sysg">
+    <div class="card"><h3>Version</h3><p><b>${VERSION}</b> · cache hors ligne : <span id="sys_cache">…</span></p>
+      <p class="small"><a href="https://github.com/MOAYEINDUSTRIE/moayes-gestion/actions" target="_blank" rel="noopener">Tests automatiques et audit hebdomadaire ↗</a></p></div>
+    <div class="card"><h3>Synchronisation ${voy(FBST.c === 'g', FBST.c === 'w')}</h3><p>${esc(FBST.t)} · ${FB_MODE === 'fiches' ? 'fiche par fiche (V1.33)' : FB_MODE === 'ancien' ? 'ancien emplacement (une seule fiche)' : 'non connectée'}</p>
+      <p class="small">Compte : ${esc(fbCompteTxt() || '—')}<br>Envois cette session : ${MESURES.envois} (${Ko(MESURES.octets)}) · dernier : ${hfr(MESURES.dernierEnvoi)}${MESURES.dernierEnvoiTaille ? ' — ' + Ko(MESURES.dernierEnvoiTaille) + ', ' + MESURES.dernierEnvoiFiches + ' élément(s)' : ''}<br>Réceptions : ${MESURES.recus} · dernière : ${hfr(MESURES.dernierRecu)}</p></div>
+    <div class="card"><h3>Erreurs ${voy(!err1.length, err7.length < 5)}</h3><p><b>${err1.length}</b> sur 24 h · <b>${err7.length}</b> sur 7 jours</p><p class="small">Tous appareils du cabinet (30 derniers jours conservés).</p></div>
+    <div class="card"><h3>Sécurité ${voy(pin7 < 5, pin7 < 15)}</h3><p>Codes PIN refusés sur 7 jours : <b>${pin7}</b></p><p class="small">Actions enregistrées au journal sur 7 jours : ${au7.length}</p></div>
+  </div>
+  <div class="sysg">
+    <div class="card"><h3>Données ${voy(loc0 < 3e6, loc0 < 4.5e6)}</h3>${tbl([['Collection'], ['Fiches', 'n'], ['Taille', 'n']], [...COLS.map(c => `<tr><td>${c}</td><td class="n">${F(DATA[c].length)}</td><td class="n">${Ko(JSON.stringify(DATA[c]).length)}</td></tr>`), `<tr><td><b>Total</b></td><td class="n"><b>${F(COLS.reduce((s, c) => s + DATA[c].length, 0))}</b></td><td class="n"><b>${Ko(tot)}</b></td></tr>`])}
+      <p class="small">Copie sur cet appareil : ${(loc0 / 1e6).toFixed(1).replace('.', ',')} million(s) de caractères sur ≈ 5 possibles${loc0 > 3e6 ? ' — <b>prévoir l\'allègement de la copie locale</b>' : ''} · stockage : <span id="sys_sto">…</span></p></div>
+    <div class="card"><h3>Vitesse ${voy(MESURES.pret < 2500 && !R.some(r => r[1] > 1500), MESURES.pret < 5000)}</h3><p>Démarrage : <b>${F(MESURES.pret)} ms</b></p>
+      ${tbl([['Écran'], ['Moyenne', 'n'], ['Maximum', 'n'], ['Ouvertures', 'n']], R.map(r => `<tr><td>${esc(r[0])}</td><td class="n">${F(r[1])} ms</td><td class="n">${F(r[2])} ms</td><td class="n">${r[3]}</td></tr>`), 'Ouvrez quelques écrans pour mesurer leur vitesse.')}</div>
+  </div>
+  <div class="card"><h3>Journal des erreurs (${L.length})</h3>${L.length ? tbl([['Date'], ['Version'], ['Appareil'], ['Écran'], ['Message']], L.slice(0, 50).map(e => `<tr><td>${hfr(e.t)}</td><td>${esc(e.v)}</td><td>${esc(e.app)}</td><td>${esc(e.vue || '')}</td><td>${e.g === 'alerte' ? '⚠️ ' : '❌ '}${esc(e.m)}<br><span class="small muted">${esc(e.s || '')}</span></td></tr>`)) : '<p class="muted">Aucune erreur enregistrée. ✅</p>'}
+    ${loc.length ? `<div class="act"><button class="btn sm" onclick="if(confirm('Effacer les erreurs gardées sur cet appareil ?')){localStorage.removeItem(ERR_KEY);render()}">Effacer les erreurs de cet appareil</button></div>` : ''}</div>`;
+};
 /* ----- aide ----- */
 VIEWS.aide = () => `<div class="card"><h3>Mode d'emploi en 6 gestes</h3><ol>
   <li><b>Base électorale → stratégie</b> : choisissez l'onglet du scrutin (législatives ou municipales), touchez la circonscription ou la commune, puis <b>📊 Stratégie de réseau</b>. Méthode IGC (20/11/2026) : une coordination par bureau de vote et par tranche de 500 électeurs du bureau, 2 cellules par coordination (1 de femmes, 1 d'hommes), cellule = 1 responsable + 25 membres, objectif = 50 % + 1 voix, électeurs à trouver par membre = objectif ÷ base électorale. Indiquez la participation attendue : tout se calcule seul. Indiquez le nom du candidat et l'année du scrutin : 📝 Word, 📄 PDF et 🖨 Fiche technique produisent l'« Étude et stratégie électorale » selon le squelette du cabinet (I étude caractéristique, II stratégie électorale proposée, III matérialisation, IV conclusion), suivie en annexe du détail du réseau ; l'écran suit le même plan ; l'ancien « Document d'orientation stratégique » reste disponible (boutons « ancien modèle »), avec la même règle des coordinations par bureau de vote, en trois parties (I/ analyse du fichier électoral : élections antérieures, lieux de vote, tranches d'âge, secteurs d'activité ; II/ estimations : taux de participation estimé à 30 % au maximum, modifiable, et voix à obtenir, 50 % + 1 ; III/ stratégie électorale : système de réseautage autour des lieux de vote, avec suivi et évaluation) — l'origine politique des candidats se saisit dans « Hypothèses » (choisir « Enregistrer en PDF » dans la fenêtre d'impression) ; 📊 Excel donne le classeur de terrain (cellules numérotées, membres, électeurs fidélisés, visites) ; 🖨 Fiche technique imprime l'écran.</li>

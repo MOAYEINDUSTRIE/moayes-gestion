@@ -1,0 +1,10 @@
+# Recherche de secrets dans tout l'historique (audit hebdomadaire).
+# La configuration web Firebase (apiKey « AIza… » dans les pages) est publique par conception :
+# elle est protégée par les règles de la base et la restriction de la clé, pas par le secret.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Configuration web Firebase publique"
+regexTarget = "line"
+regexes = ['''apiKey\s*:\s*["']AIza[0-9A-Za-z_\-]{35}["']''']
