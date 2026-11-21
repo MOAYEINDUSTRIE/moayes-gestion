@@ -688,7 +688,7 @@ window.addEventListener('offline', () => setFb('', 'Hors ligne'));
 /* ---------- navigation ---------- */
 const MENU = [
   ['Pilotage', [['tableau','📊','Tableau de bord'],['atlas','🧭','ATLAS IA — Commandement'],['elec','🗳️','Base électorale'],['agents','🤖','Agents IA']]],
-  ['Commercial', [['clients','👥','Clients'],['catalogue','🏷️','Catalogue des prestations'],['devis','📝','Devis'],['missions','🎯','Missions'],['dossiers','🗂️','Dossiers'],['comptesRendus','🗒️','Comptes rendus']]],
+  ['Commercial', [['clients','👥','Clients'],['catalogue','🏷️','Catalogue des prestations'],['devis','📝','Devis'],['missions','🎯','Missions'],['production','🏭','Atelier des livrables'],['dossiers','🗂️','Dossiers'],['comptesRendus','🗒️','Comptes rendus']]],
   ['Finances', [['factures','🧾','Factures'],['paiements','💰','Encaissements'],['depenses','💸','Dépenses'],['tresorerie','🏦','Trésorerie'],['rapports','📈','Rapports']]],
   ['Système', [['parametres','⚙️','Paramètres'],['systeme','📈','État du système'],['aide','❓','Mode d\'emploi']]],
 ];
@@ -701,7 +701,7 @@ function render(){
   const root = $('#root'), t0 = performance.now();
   if (!SESSION){ root.innerHTML = loginHTML(); if (!MESURES.pret) MESURES.pret = Math.round(performance.now()); return; }
   if (FB_PROPOSER && !fbCompteTxt()){ FB_PROPOSER = false; setTimeout(() => { if (!document.querySelector('.modal-bg') && !fbCompteTxt()) fbCompte(); }, 1200); }
-  const titre = VIEW === 'ordre' ? 'Mission ATLAS IA' : VIEW === 'circo' ? 'Fiche électorale' : VIEW === 'strategie' ? 'Stratégie de réseau' : (MENU.flatMap(g => g[1]).find(m => m[0] === VIEW) || [,,'Fiche'])[2];
+  const titre = VIEW === 'ordre' ? 'Mission ATLAS IA' : VIEW === 'circo' ? 'Fiche électorale' : VIEW === 'strategie' ? 'Stratégie de réseau' : VIEW === 'prod' ? 'Atelier des livrables' : (MENU.flatMap(g => g[1]).find(m => m[0] === VIEW) || [,,'Fiche'])[2];
   const body = (VIEWS[VIEW] || VIEWS.tableau)(ARG);
   root.innerHTML = `<div class="app">
     <aside class="side"><div class="brand"><img class="logo" src="img/embleme-igc.jpg" alt="IGC"><div><b>IGC Gestion</b><small>Impact Global Consulting</small></div></div>
@@ -929,7 +929,7 @@ function editMission(id){
     <div><label>Avancement : <b id="m_av_l">${num(m.avancement)} %</b></label><input id="m_av" type="range" min="0" max="100" step="5" value="${num(m.avancement)}" oninput="$('#m_av_l').textContent=this.value+' %'"></div>
     <div class="full"><label>Livrables, étapes, notes</label><textarea id="m_n">${esc(m.notes)}</textarea></div></div>
     <div class="act">${id && can() ? `<button class="btn d" onclick="if(confirm('Supprimer cette mission ?')){del('missions','${id}','Suppression mission');closeModal();render()}">Supprimer</button>` : ''}
-    ${id ? `<button class="btn" onclick="closeModal();editFacture(null,'${m.clientId}',{objet:${esc(JSON.stringify(m.titre))},missionId:'${id}'})">+ Facture</button><button class="btn" onclick="contratMission('missions','${id}')">📄 Contrat</button><button class="btn" onclick="closeModal();editCR(null,{clientId:'${m.clientId}',missionId:'${id}',objet:${esc(JSON.stringify(m.titre))}})">🗒️ Compte rendu</button>` : ''}
+    ${id ? `<button class="btn" onclick="closeModal();editFacture(null,'${m.clientId}',{objet:${esc(JSON.stringify(m.titre))},missionId:'${id}'})">+ Facture</button><button class="btn" onclick="contratMission('missions','${id}')">📄 Contrat</button><button class="btn" onclick="closeModal();${m.prod ? `go('prod','${id}')` : `nouvelleProd('${id}')`}">🏭 Production</button><button class="btn" onclick="closeModal();editCR(null,{clientId:'${m.clientId}',missionId:'${id}',objet:${esc(JSON.stringify(m.titre))}})">🗒️ Compte rendu</button>` : ''}
     <button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" onclick="saveMission('${id || ''}')">Enregistrer</button></div>`);
 }
 function saveMission(id){
@@ -2841,6 +2841,318 @@ function savePresta(id){
   const p = Object.assign(id ? get('catalogue', id) : { id: uid('P') }, { code: val('p_code').toUpperCase(), cat: val('p_cat'), rub: val('p_rub'), d, unite: val('p_u'), pu, bas: num(val('p_bas')), haut: num(val('p_haut')), note: val('p_note'), actif: $('#p_act').checked });
   put('catalogue', p, (id ? 'Modification' : 'Création') + ' prestation ' + (p.code || d) + ' : ' + FCFA(pu)); closeModal(); toast('Catalogue mis à jour'); render();
 }
+
+/* =====================  ATELIER DES LIVRABLES (V1.34)  ===================== */
+/* Chaque prestation du catalogue suit une méthode : étapes, collecte, grille d'évaluation (le cas échéant),
+   analyse automatique des scores, rédaction par ATLAS IA (copier-coller dans le Projet IGC), livrable Word/PDF,
+   procès-verbal de livraison. Les chiffres viennent uniquement de ce qui est saisi : aucune valeur inventée. */
+const NIV = ['Absent', 'Faible', 'Moyen', 'Bon', 'Excellent'];
+const Gr = (...axes) => axes.map(([a, ...c]) => ({ a, c }));
+const GRILLES = {
+  com: Gr(['Stratégie et pilotage', 'Objectifs de communication écrits et chiffrés', 'Responsable de la communication désigné', 'Budget de communication identifié', 'Plan de communication annuel suivi'],
+    ['Identité et image', 'Charte graphique appliquée', 'Cohérence des supports', 'Message central clair', 'Image perçue conforme à l\'image voulue'],
+    ['Communication interne', 'Circulation de l\'information', 'Réunions et outils internes', 'Écoute et remontée des agents'],
+    ['Communication externe et médias', 'Relations avec la presse', 'Site internet à jour', 'Réseaux sociaux animés', 'Porte-parole préparé'],
+    ['Mesure et veille', 'Indicateurs suivis', 'Veille médias et réseaux', 'Évaluation des actions menées']),
+  orga: Gr(['Gouvernance et stratégie', 'Vision et objectifs formalisés', 'Organes de décision qui fonctionnent', 'Suivi des décisions'],
+    ['Organisation et processus', 'Organigramme à jour', 'Rôles et responsabilités clairs', 'Procédures écrites', 'Délais de traitement maîtrisés'],
+    ['Ressources humaines', 'Effectifs adaptés aux missions', 'Compétences et formation', 'Climat social', 'Évaluation du personnel'],
+    ['Finances et contrôle', 'Budget prévisionnel', 'Comptabilité à jour', 'Contrôle interne', 'Trésorerie suivie'],
+    ['Outils et systèmes', 'Outils de gestion adaptés', 'Archivage et sécurité des données'],
+    ['Clients et usagers', 'Connaissance des besoins', 'Traitement des réclamations', 'Mesure de la satisfaction']),
+  reputation: Gr(['Présence médiatique', 'Fréquence des mentions', 'Tonalité des articles', 'Relais d\'opinion favorables'],
+    ['Réseaux sociaux', 'Comptes officiels actifs', 'Tonalité des commentaires', 'Réactivité aux messages'],
+    ['Parties prenantes', 'Relations avec les autorités', 'Relations avec les partenaires', 'Relations avec les populations'],
+    ['Gestion des risques', 'Veille organisée', 'Procédure de réponse', 'Porte-parole désigné']),
+  crise: Gr(['Organisation', 'Cellule de crise définie', 'Rôles et suppléants', 'Annuaire d\'urgence'],
+    ['Préparation', 'Scénarios de crise identifiés', 'Messages types préparés', 'Exercices réalisés'],
+    ['Réaction', 'Délai de première réponse', 'Porte-parole formé', 'Coordination interne'],
+    ['Après la crise', 'Retour d\'expérience', 'Plan de reconstruction de l\'image']),
+  marque: Gr(['Plateforme de marque', 'Mission et valeurs écrites', 'Promesse claire', 'Différence par rapport aux concurrents'],
+    ['Identité visuelle', 'Logo et charte', 'Cohérence des supports'],
+    ['Expérience', 'Accueil et service', 'Tenue des engagements'],
+    ['Notoriété', 'Connaissance de la marque', 'Recommandation par les clients']),
+  changement: Gr(['Projet', 'Raisons du changement expliquées', 'Objectifs compris'],
+    ['Encadrement', 'Adhésion des responsables', 'Relais formés'],
+    ['Agents', 'Information reçue', 'Craintes exprimées et traitées', 'Participation'],
+    ['Pilotage', 'Calendrier tenu', 'Indicateurs de suivi']),
+  positionnement: Gr(['Notoriété', 'Connu dans la circonscription', 'Reconnu dans les médias'],
+    ['Crédibilité', 'Bilan ou parcours valorisé', 'Compétence perçue', 'Intégrité perçue'],
+    ['Proximité', 'Présence sur le terrain', 'Écoute des populations', 'Ancrage local'],
+    ['Message', 'Message central clair', 'Propositions concrètes', 'Cohérence des prises de parole'],
+    ['Présence numérique', 'Pages officielles actives', 'Réactivité']),
+  medias: Gr(['Posture', 'Attitude et regard', 'Tenue et gestuelle'],
+    ['Message', 'Messages clés placés', 'Réponses courtes et claires', 'Exemples concrets'],
+    ['Maîtrise', 'Questions difficiles', 'Gestion du temps de parole', 'Calme face à la contradiction'],
+    ['Voix', 'Débit', 'Articulation']),
+  formation: Gr(['Évaluation par les participants (moyenne sur 4)', 'Contenu', 'Animation', 'Organisation', 'Utilité pour le travail', 'Objectifs atteints']),
+};
+const ETAPES_P = {
+  audit: [['Cadrage', ['Réunion de lancement tenue', 'Lettre de mission ou contrat signé', 'Liste des documents demandés au client']],
+    ['Collecte', ['Documents reçus et classés', 'Entretiens réalisés', 'Observations sur le terrain']],
+    ['Évaluation', ['Grille d\'évaluation remplie', 'Constats validés par la gérance']],
+    ['Rédaction', ['Rapport rédigé', 'Relecture par la gérance']],
+    ['Restitution', ['Rapport présenté au client', 'Procès-verbal de livraison signé']],
+    ['Clôture', ['Facture émise', 'Avis du client recueilli']]],
+  etude: [['Cadrage', ['Problématique validée avec le client', 'Contrat signé']],
+    ['Conception', ['Questionnaire ou guide d\'entretien rédigé', 'Échantillon défini', 'Outils testés']],
+    ['Terrain', ['Enquêteurs formés', 'Collecte réalisée', 'Contrôle qualité des réponses']],
+    ['Analyse', ['Données saisies et vérifiées', 'Résultats calculés']],
+    ['Rédaction', ['Rapport d\'étude rédigé', 'Relecture par la gérance']],
+    ['Restitution', ['Résultats présentés au client', 'Procès-verbal de livraison signé', 'Facture émise']]],
+  strategie: [['Cadrage', ['Réunion de lancement tenue', 'Contrat signé', 'Objectifs du client écrits']],
+    ['Diagnostic', ['Existant analysé', 'Entretiens réalisés', 'Forces, faiblesses, opportunités, menaces listées']],
+    ['Conception', ['Cibles définies', 'Messages clés rédigés', 'Plan d\'action et calendrier', 'Budget estimé']],
+    ['Rédaction', ['Document rédigé', 'Relecture par la gérance']],
+    ['Restitution', ['Présentation au client', 'Ajustements intégrés', 'Procès-verbal de livraison signé']],
+    ['Clôture', ['Facture émise', 'Avis du client recueilli']]],
+  accompagnement: [['Lancement', ['Contrat signé', 'Objectifs de la période fixés', 'Interlocuteur désigné chez le client']],
+    ['Suivi', ['Séances tenues et notées au journal', 'Indicateurs mis à jour']],
+    ['Rapport', ['Rapport de période rédigé', 'Relecture par la gérance', 'Rapport remis au client']],
+    ['Clôture', ['Facture de la période émise', 'Objectifs de la période suivante fixés']]],
+  formation: [['Préparation', ['Besoins analysés avec le client', 'Programme validé', 'Supports prêts', 'Salle et matériel réservés']],
+    ['Session', ['Participants convoqués', 'Feuille d\'émargement signée', 'Session animée']],
+    ['Évaluation', ['Évaluation des participants recueillie', 'Moyennes saisies dans la grille']],
+    ['Clôture', ['Attestations remises', 'Rapport de formation remis', 'Facture émise']]],
+  creation: [['Brief', ['Brief rempli avec le client', 'Contrat signé']],
+    ['Création', ['Recherches et références', 'Pistes proposées au client']],
+    ['Validation', ['Piste choisie par le client', 'Corrections intégrées', 'Bon à tirer ou recette signé']],
+    ['Livraison', ['Fichiers sources livrés', 'Guide d\'utilisation remis', 'Procès-verbal de livraison signé', 'Facture émise']]],
+  evenement: [['Conception', ['Brief et objectifs', 'Concept validé', 'Budget validé']],
+    ['Préparation', ['Rétroplanning', 'Prestataires retenus', 'Invitations envoyées', 'Conducteur rédigé', 'Répétition tenue']],
+    ['Jour J', ['Accueil et protocole en place', 'Déroulé respecté', 'Photos et vidéos réalisées']],
+    ['Bilan', ['Bilan rédigé', 'Procès-verbal de livraison signé', 'Facture émise']]],
+  presse: [['Préparation', ['Angle et annonce définis', 'Communiqué rédigé', 'Communiqué validé par le client']],
+    ['Diffusion', ['Liste des médias établie', 'Communiqué envoyé', 'Relances faites']],
+    ['Bilan', ['Retombées recensées', 'Revue de presse remise', 'Facture émise']]],
+  structure: [['Conseil', ['Entretien avec le porteur de projet', 'Forme juridique recommandée']],
+    ['Dossier', ['Pièces rassemblées', 'Statuts rédigés', 'Frais officiels vérifiés au guichet']],
+    ['Dépôt', ['Dossier déposé', 'Suivi jusqu\'à l\'obtention des documents']],
+    ['Remise', ['Documents remis au client', 'Procès-verbal de livraison signé', 'Facture émise']]],
+  electoral: [['Commande', ['Contrat signé', 'Type de scrutin et zone confirmés']],
+    ['Données', ['Base CEI chargée dans l\'application', 'Scrutins retenus selon le Squelette']],
+    ['Stratégie', ['Calculs vérifiés (participation, objectif 50 % + 1 voix)', 'Coordinations et cellules calculées']],
+    ['Livrable', ['Rapport Word / PDF sorti de la page Stratégie', 'Relecture par la gérance']],
+    ['Restitution', ['Présentation au candidat', 'Procès-verbal de livraison signé', 'Facture émise']]],
+};
+ETAPES_P.reseau = ETAPES_P.electoral;
+const CH = (k, l, t) => [k, l, t || 't'];
+const CHAMPS = {
+  audit: [CH('contexte', 'Contexte et demande du client'), CH('objectifs', 'Objectifs de l\'audit'), CH('perimetre', 'Périmètre (services, sites, période)'), CH('sources', 'Documents examinés et entretiens réalisés (fonctions)'), CH('constats', 'Constats principaux'), CH('attentes', 'Attentes du client pour la suite')],
+  etude: [CH('problematique', 'Problématique et questions de l\'étude'), CH('cible', 'Population étudiée'), CH('methode', 'Méthode (questionnaire, entretiens, échantillon, zone, dates)'), CH('resultats', 'Résultats chiffrés (avec source et date de chaque chiffre)'), CH('limites', 'Limites de l\'étude')],
+  strategie: [CH('situation', 'Situation actuelle'), CH('objectifs', 'Objectifs (chiffrés et datés)'), CH('cibles', 'Publics visés'), CH('forces', 'Forces'), CH('faiblesses', 'Faiblesses'), CH('opportunites', 'Opportunités'), CH('menaces', 'Menaces'), CH('messages', 'Messages clés'), CH('canaux', 'Canaux et actions envisagés'), CH('budget', 'Budget disponible et échéances', 'l')],
+  accompagnement: [CH('periode', 'Période couverte', 'l'), CH('objectifs', 'Objectifs de la période'), CH('journal', 'Journal des séances (date, sujet, décisions)'), CH('indicateurs', 'Indicateurs suivis (valeurs saisies)'), CH('difficultes', 'Difficultés et points d\'attention'), CH('suite', 'Priorités de la période suivante')],
+  formation: [CH('public', 'Public et nombre de participants', 'l'), CH('dates', 'Dates, durée et lieu', 'l'), CH('objectifs', 'Objectifs pédagogiques'), CH('programme', 'Programme (modules)'), CH('deroulement', 'Déroulement et faits marquants'), CH('suite', 'Recommandations pour la suite')],
+  creation: [CH('brief', 'Brief : ce que le client veut'), CH('cibles', 'Publics visés'), CH('valeurs', 'Valeurs et ton à exprimer'), CH('contraintes', 'Contraintes (couleurs, délais, formats, budget)'), CH('pistes', 'Pistes proposées'), CH('retenue', 'Version retenue et corrections'), CH('livrables', 'Fichiers et éléments livrés')],
+  evenement: [CH('objet', 'Objet et objectifs de l\'événement'), CH('infos', 'Date, lieu, participants attendus', 'l'), CH('budget', 'Budget', 'l'), CH('conducteur', 'Conducteur (heure, séquence, responsable)'), CH('logistique', 'Logistique et prestataires (types)'), CH('risques', 'Risques et parades'), CH('bilan', 'Bilan (participation réelle, retombées)')],
+  presse: [CH('annonce', 'Annonce'), CH('citations', 'Citations du porte-parole'), CH('infos', 'Informations pratiques et contact presse'), CH('medias', 'Médias visés (organes)'), CH('retombees', 'Retombées obtenues')],
+  structure: [CH('activite', 'Activité du projet'), CH('porteurs', 'Nombre d\'associés ou de membres, capital', 'l'), CH('forme', 'Forme juridique recommandée et raisons'), CH('pieces', 'Pièces à fournir et pièces reçues'), CH('calendrier', 'Étapes et calendrier'), CH('resultat', 'Documents obtenus (numéros)')],
+  electoral: [CH('scrutin', 'Scrutin et zone', 'l'), CH('notes', 'Notes de la mission')],
+};
+CHAMPS.reseau = CHAMPS.electoral;
+const PLANS = {
+  audit: ['Résumé pour la direction', 'Contexte et objectifs', 'Démarche et périmètre', 'Résultats par axe', 'Points forts', 'Points à améliorer', 'Recommandations et plan d\'action', 'Conclusion'],
+  etude: ['Résumé des résultats', 'Contexte et questions de l\'étude', 'Méthode', 'Résultats', 'Enseignements', 'Recommandations', 'Limites de l\'étude'],
+  strategie: ['Résumé', 'Diagnostic', 'Forces, faiblesses, opportunités et menaces', 'Objectifs', 'Publics visés', 'Messages clés', 'Plan d\'action et calendrier', 'Budget', 'Indicateurs de suivi'],
+  accompagnement: ['Synthèse de la période', 'Objectifs de la période', 'Travaux réalisés', 'Résultats et indicateurs', 'Points d\'attention', 'Priorités de la période suivante'],
+  formation: ['Synthèse', 'Objectifs et public', 'Programme réalisé', 'Évaluation par les participants', 'Recommandations'],
+  creation: ['Rappel du besoin', 'Note d\'intention', 'Solution retenue', 'Règles d\'utilisation', 'Éléments livrés'],
+  evenement: ['Concept et objectifs', 'Organisation', 'Conducteur', 'Logistique', 'Bilan'],
+  presse: ['Communiqué de presse', 'Plan de diffusion', 'Revue des retombées'],
+  structure: ['Recommandation', 'Démarches et pièces', 'Calendrier', 'Documents obtenus'],
+  electoral: [], reseau: [],
+};
+/* code → [type, grille, titre du livrable] ; à défaut, la rubrique choisit le type */
+const METHODES = {
+  'ELE-01': ['electoral'], 'ELE-02': ['electoral'], 'ELE-03': ['electoral'], 'ELE-04': ['electoral'], 'ELE-05': ['reseau', null, 'Réseau de coordinations'],
+  'ELE-06': ['formation', 'formation', 'Rapport de formation des coordinateurs'], 'ELE-07': ['accompagnement', null, 'Rapport de direction de campagne'],
+  'ELE-08': ['strategie', null, 'Plan de communication de campagne'], 'ELE-09': ['accompagnement', null, 'Rapport d\'activité des réseaux sociaux de campagne'],
+  'ELE-10': ['strategie', 'positionnement', 'Positionnement et image du candidat'], 'ELE-11': ['formation', 'medias', 'Bilan de la préparation aux médias'],
+  'COM-01': ['strategie', null, 'Stratégie de communication institutionnelle'], 'INS-01': ['accompagnement', null, 'Rapport d\'accompagnement'],
+  'INS-02': ['audit', 'reputation', 'Rapport de réputation et de veille'], 'INS-03': ['strategie', null, 'Plan de diplomatie publique'],
+  'INS-04': ['strategie', null, 'Stratégie d\'influence et de relations publiques'], 'COM-02': ['audit', 'marque', 'Diagnostic et plateforme de marque'],
+  'COR-01': ['strategie', 'changement', 'Plan d\'accompagnement du changement'], 'COR-02': ['audit', 'crise', 'Plan de communication de crise'],
+  'CON-01': ['accompagnement', null, 'Compte rendu de conseil'], 'CON-02': ['audit', 'orga', 'Rapport de diagnostic organisationnel'],
+  'CON-03': ['strategie', null, 'Plan stratégique'], 'CON-04': ['audit', 'com', 'Rapport d\'audit de communication'], 'CON-05': ['etude', null, 'Rapport d\'étude'],
+  'CON-06': ['accompagnement', null, 'Rapport d\'accompagnement du dirigeant'], 'CON-07': ['formation', 'formation', 'Rapport du séminaire de dirigeants'],
+  'CRE-01': ['structure', null, 'Dossier de création d\'entreprise'], 'CRE-02': ['structure', null, 'Dossier de création de coopérative'], 'CRE-03': ['structure', null, 'Dossier de création du cabinet'],
+  'GEN-01': ['creation', null, 'Charte graphique'], 'GEN-02': ['creation', null, 'Dossier de conception des supports'], 'COM-03': ['accompagnement', null, 'Rapport d\'activité des réseaux sociaux'],
+  'GEN-03': ['creation', null, 'Dossier de livraison du site internet'], 'CRE-05': ['creation', null, 'Dossier de livraison de l\'application'],
+  'COM-04': ['evenement', null, 'Dossier et bilan de l\'événement'], 'GEN-04': ['evenement', null, 'Conducteur et bilan protocolaire'],
+  'FOR-01': ['formation', 'formation', 'Rapport de formation'], 'FOR-02': ['formation', 'formation', 'Rapport de formation'], 'CRE-04': ['creation', null, 'Dossier de la formation'],
+  'COM-05': ['presse', null, 'Communiqué et revue de presse'],
+};
+const RUB_TYPE = { 'Positionnement et image': 'strategie', 'Prise de parole média': 'formation', 'Campagnes électorales': 'strategie', 'Accompagnement public': 'accompagnement',
+  'Réputation & diplomatie': 'strategie', 'Influence et relations publiques': 'strategie', 'Image de marque et valeurs': 'strategie', 'Accompagnement au changement': 'strategie',
+  'Audits et études': 'audit', 'Conseil exécutif': 'accompagnement', 'Formations exécutives': 'formation', 'Branding et design': 'creation', 'Communication digitale': 'creation',
+  'Événementiel et protocoles': 'evenement', 'Formations': 'formation', 'Relations presse': 'presse' };
+function methode(p){
+  p = p || {};
+  const m = METHODES[p.code] || [RUB_TYPE[p.rub] || 'strategie', RUB_TYPE[p.rub] === 'formation' ? 'formation' : null];
+  return { type: m[0], grille: m[1] ? GRILLES[m[1]] : null, livrable: m[2] || p.d || 'Livrable', etapes: ETAPES_P[m[0]], champs: CHAMPS[m[0]], plan: PLANS[m[0]] };
+}
+const prodEtapes = me => me.etapes.flatMap(([ph, L]) => L.map((x, j) => [ph + '|' + j, ph, x]));
+const prodAv = (pr, me) => { const L = prodEtapes(me); return L.length ? Math.round(100 * L.filter(([k]) => pr.et && pr.et[k]).length / L.length) : 0; };
+const niveauDe = p => p == null ? '—' : p < 40 ? 'Critique' : p < 60 ? 'À renforcer' : p < 80 ? 'Satisfaisant' : 'Excellent';
+function prodScores(pr, gr){
+  const ax = (gr || []).map((x, i) => { const v = x.c.map((_, j) => pr.gr && pr.gr[i + '_' + j]).filter(s => s !== undefined && s !== null && s !== '');
+    return { a: x.a, n: v.length, tot: x.c.length, pct: v.length ? Math.round(100 * v.reduce((s, y) => s + num(y), 0) / (4 * v.length)) : null }; });
+  const ok = ax.filter(x => x.pct != null), glob = ok.length ? Math.round(ok.reduce((s, x) => s + x.pct, 0) / ok.length) : null;
+  const crit = (gr || []).flatMap((x, i) => x.c.map((c, j) => ({ a: x.a, c, s: pr.gr && pr.gr[i + '_' + j], com: (pr.gc && pr.gc[i + '_' + j]) || '' }))).filter(x => x.s !== undefined && x.s !== null && x.s !== '');
+  return { ax, glob, forces: crit.filter(x => num(x.s) >= 3), faibles: crit.filter(x => num(x.s) <= 1), saisis: crit.length, total: (gr || []).reduce((s, x) => s + x.c.length, 0) };
+}
+/* ----- rédaction par ATLAS IA : la demande à coller dans Claude (Projet IGC) ----- */
+function promptAtlas(mid){
+  const m = get('missions', mid), pr = m.prod, p = get('catalogue', pr.p) || {}, me = methode(p), c = cli(m.clientId), S = prodScores(pr, me.grille);
+  const L = [`ATLAS IA — Agent « ${p.cat || 'Consultance'} ». Rédige le livrable « ${me.livrable} » pour le client « ${c.nom} » (mission « ${m.titre} »).`, '',
+    'Règles impératives :',
+    '- Français professionnel, adressé au client, au nom d\'Impact Global Consulting.',
+    '- N\'utilise QUE les données ci-dessous. N\'invente aucun chiffre, aucun nom, aucune citation. Si une information manque, écris « à compléter ».',
+    '- Cite la source et la date de chaque chiffre ; marque ESTIMÉ ce qui est estimé.',
+    '- Ne mentionne ni l\'intelligence artificielle, ni ATLAS, ni la méthode interne du cabinet.',
+    '- Aucune donnée nominative d\'électeur. Neutralité politique.',
+    '- Commence chaque section par « ## » suivi du titre exact ci-dessous ; « ### » pour une sous-partie ; « - » pour une liste ; tableaux au format | colonne | colonne |.',
+    '- Réponds uniquement avec le texte du document, sans introduction ni commentaire.', '',
+    'Plan imposé :', ...me.plan.map((t, i) => `${i + 1}. ${t}`), '', 'Données de la mission :',
+    `- Prestation : ${p.d || ''} (${p.cat || ''}${p.rub ? ' — ' + p.rub : ''})`, `- Client : ${c.nom}${c.type ? ' (' + c.type + ')' : ''}`];
+  me.champs.forEach(([k, lib]) => { const v = (pr.ch && pr.ch[k] || '').trim(); L.push(`- ${lib} : ${v || 'à compléter'}`); });
+  if (me.grille){
+    L.push('', `Grille d'évaluation (échelle 0 Absent, 1 Faible, 2 Moyen, 3 Bon, 4 Excellent) — ${S.saisis} critères notés sur ${S.total} :`);
+    me.grille.forEach((x, i) => { const a = S.ax[i]; L.push(`- ${x.a} : ${a.pct == null ? 'non noté' : a.pct + ' % (' + niveauDe(a.pct) + ')'}`);
+      x.c.forEach((cr, j) => { const s = pr.gr && pr.gr[i + '_' + j]; if (s !== undefined && s !== '') L.push(`  • ${cr} : ${s}/4 ${NIV[num(s)]}${pr.gc && pr.gc[i + '_' + j] ? ' — ' + pr.gc[i + '_' + j] : ''}`); }); });
+    if (S.glob != null) L.push(`- Score global : ${S.glob} % (${niveauDe(S.glob)})`);
+    if (S.forces.length) L.push('- Points forts notés : ' + S.forces.map(x => x.c).join(' ; '));
+    if (S.faibles.length) L.push('- Points faibles notés : ' + S.faibles.map(x => x.c).join(' ; '));
+    L.push('Dans « Recommandations », propose un tableau | Action | Priorité | Responsable | Délai | à partir des points faibles.');
+  }
+  return L.join('\n');
+}
+/* ----- texte rédigé (format ##) → blocs du document ----- */
+const runsMd = s => String(s).split(/(\*\*[^*]+\*\*)/).filter(Boolean).map(x => /^\*\*.*\*\*$/.test(x) ? [x.slice(2, -2), 1] : [x.replace(/\*/g, ''), 0]);
+function mdBlocs(txt){
+  const out = []; let ul = null, ol = null, tb = null;
+  const vider = () => { if (ul) out.push({ t: 'ul', items: ul }); if (ol) out.push({ t: 'ol', items: ol });
+    if (tb && tb.length){ const n = Math.max(...tb.map(r => r.length)), w = Array(n).fill(Math.floor(9026 / n)); out.push({ t: 'table', head: tb[0].concat(Array(n - tb[0].length).fill('')), rows: tb.slice(1).map(r => r.concat(Array(n - r.length).fill(''))), w }); }
+    ul = ol = tb = null; };
+  String(txt || '').replace(/\r/g, '').split('\n').forEach(l0 => {
+    const l = l0.trim();
+    if (/^\|.*\|$/.test(l)){ if (/^\|[\s:|-]+\|$/.test(l)) return; if (!tb){ vider(); tb = []; } tb.push(l.slice(1, -1).split('|').map(x => x.trim().replace(/\*\*/g, ''))); return; }
+    if (tb) vider();
+    if (!l){ vider(); return; }
+    let r;
+    if ((r = l.match(/^#{1,2}\s+(.*)/))){ vider(); out.push({ t: 'h1', x: r[1].replace(/\*\*/g, '') }); }
+    else if ((r = l.match(/^#{3,6}\s+(.*)/))){ vider(); out.push({ t: 'h2', x: r[1].replace(/\*\*/g, '') }); }
+    else if ((r = l.match(/^[-*•]\s+(.*)/))){ if (ol) vider(); (ul = ul || []).push(runsMd(r[1])); }
+    else if ((r = l.match(/^\d+[.)]\s+(.*)/))){ if (ul) vider(); (ol = ol || []).push(runsMd(r[1])); }
+    else { vider(); out.push({ t: 'p', r: runsMd(l) }); }
+  });
+  vider(); return out;
+}
+const MOTS_INTERDITS = /\bIA\b|intelligence artificielle|\bATLAS\b|\bClaude\b|IGC Gestion|ChatGPT/i;
+function prodModele(mid){
+  const m = get('missions', mid), pr = m.prod, p = get('catalogue', pr.p) || {}, me = methode(p), c = cli(m.clientId), s = DATA.societe, S = prodScores(pr, me.grille);
+  const M = [{ t: 'cover', titre: me.livrable, sous: c.nom, ligne: (p.cat || '') + (pr.tx ? '' : ' — version de travail'),
+    infos: [['Client', c.nom], ['Mission', m.titre || ''], ['Prestation', p.d || ''], ['Date', dfr(pr.livre || today())], ['Établi par', s.nom]],
+    note: 'Document confidentiel établi par ' + s.nom + ' pour ' + c.nom + '. Toute diffusion à des tiers nécessite l\'accord des deux parties.' }];
+  if (pr.tx) M.push(...mdBlocs(pr.tx));
+  else {
+    M.push({ t: 'h1', x: 'Éléments recueillis' });
+    me.champs.forEach(([k, lib]) => { const v = (pr.ch && pr.ch[k] || '').trim(); if (v){ M.push({ t: 'h2', x: lib }); v.split('\n').filter(Boolean).forEach(x => M.push({ t: 'p', r: [[x, 0]] })); } });
+  }
+  if (me.grille && S.saisis){
+    M.push({ t: 'h1', x: 'Annexe — Résultats de l\'évaluation' },
+      { t: 'p', r: [['Chaque critère est noté de 0 (absent) à 4 (excellent). Le score d\'un axe est la moyenne de ses critères notés, exprimée en pourcentage.', 0]] });
+    if (S.glob != null) M.push({ t: 'box', titre: 'Score global : ' + S.glob + ' % — ' + niveauDe(S.glob), r: [[S.saisis + ' critères évalués sur ' + S.total + '.', 0]] });
+    M.push({ t: 'bars', rows: S.ax.filter(x => x.pct != null).map(x => [x.a, x.pct]) });
+    M.push({ t: 'table', head: ['Axe', 'Critère', 'Note', 'Observation'], w: [2300, 3200, 1100, 2426],
+      rows: me.grille.flatMap((x, i) => x.c.map((cr, j) => { const v = pr.gr && pr.gr[i + '_' + j]; return v === undefined || v === '' ? null : [x.a, cr, v + '/4 ' + NIV[num(v)], (pr.gc && pr.gc[i + '_' + j]) || '']; })).filter(Boolean) });
+  }
+  const nom = (me.livrable + ' — ' + c.nom).replace(/[\\/:*?"<>|]/g, '-');
+  return { M, titre: me.livrable + ' — ' + c.nom, nom };
+}
+function prodVerif(mid){
+  const pr = get('missions', mid).prod;
+  if (pr.tx && MOTS_INTERDITS.test(pr.tx)){ toast('Le texte contient un mot interdit dans un document client (IA, ATLAS, Claude…) : retirez-le d\'abord.'); return false; }
+  return true;
+}
+function prodWord(mid){ if (!prodVerif(mid)) return; const mod = prodModele(mid); saveBinary(mod.nom + '.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', candDocx(null, mod)); toast('Document Word prêt'); }
+function prodPDF(mid){ if (!prodVerif(mid)) return; const mod = prodModele(mid); imprimer(candHTML(null, mod), mod.nom); }
+function prodPV(mid){
+  const m = get('missions', mid), pr = m.prod, p = get('catalogue', pr.p) || {}, me = methode(p), c = cli(m.clientId);
+  imprimer(docIGC('Procès-verbal de livraison', `<div>${esc(c.nom)}</div><div>${dfr(pr.livre || today())}</div>`, `
+    <p>Entre <b>${esc(DATA.societe.nom)}</b> et <b>${esc(c.nom)}</b>, il est constaté la livraison des éléments suivants, au titre de la mission « ${esc(m.titre || '')} » :</p>
+    <table><thead><tr><th>Prestation</th><th>Livrable</th><th>Date de remise</th></tr></thead><tbody><tr><td>${esc(p.d || '')}</td><td>${esc(me.livrable)}</td><td>${dfr(pr.livre || today())}</td></tr></tbody></table>
+    <p>Le client reconnaît avoir reçu ces éléments. Il dispose de huit (8) jours pour formuler par écrit ses réserves motivées ; passé ce délai, la livraison est réputée acceptée.</p>
+    <p><span class="ck"></span>Livraison acceptée sans réserve &nbsp;&nbsp; <span class="ck"></span>Livraison acceptée avec les réserves suivantes :</p><p>………………………………………………………………………………………………………………</p>
+    <div class="sig"><div>Pour le client<br>Nom, date et signature<br><br><br>________________</div><div>Pour ${esc(DATA.societe.nom)}<br>La Gérance<br><br><br>________________</div></div>`), 'PV de livraison');
+}
+/* ----- enregistrement ----- */
+let prodT = null;
+function prodMaj(mid, f, msg, rendre){
+  const m = get('missions', mid); if (!m || !m.prod) return;
+  f(m.prod); m.prod.u = now();
+  const me = methode(get('catalogue', m.prod.p)); m.avancement = prodAv(m.prod, me);
+  clearTimeout(prodT); prodT = setTimeout(() => put('missions', m, msg || ''), rendre ? 0 : 500);
+  if (rendre) render();
+}
+function prodDemarrer(mid, pid){
+  const m = get('missions', mid); if (!m || !pid) return toast('Choisissez la mission et la prestation');
+  m.prod = { p: pid, et: {}, ch: {}, gr: {}, gc: {}, tx: '', u: now() };
+  put('missions', m, 'Production démarrée : ' + (get('catalogue', pid) || {}).d + ' (' + (m.titre || '') + ')'); closeModal(); go('prod', mid);
+}
+function prestaDeMission(m){
+  const dv = m.devisId ? get('devis', m.devisId) : null;
+  if (dv) for (const l of dv.lignes || []){ const p = DATA.catalogue.find(x => catLib(x) === l.d || x.d === l.d); if (p) return p.id; }
+  return '';
+}
+function nouvelleProd(mid){
+  const L = DATA.missions.filter(m => !m.prod);
+  if (!L.length) return toast('Toutes les missions ont déjà leur production. Créez d\'abord une mission.');
+  modal(`<h2>Démarrer une production</h2><div class="f">
+    <div class="full"><label>Mission *</label><select id="pd_m" onchange="const p=prestaDeMission(get('missions',this.value));if(p)$('#pd_p').value=p">${L.map(m => `<option value="${m.id}" ${m.id === mid ? 'selected' : ''}>${esc(m.titre || '')} — ${esc(cli(m.clientId).nom)}</option>`).join('')}</select></div>
+    <div class="full"><label>Prestation (méthode à suivre) *</label><select id="pd_p">${CAT_FAM.filter(f => f !== MA).map(f => `<optgroup label="${esc(f)}">${catTrie().filter(p => p.cat === f).map(p => `<option value="${p.id}">${esc(p.code)} — ${esc(p.d)}</option>`).join('')}</optgroup>`).join('')}</select></div></div>
+    <div class="act"><button class="btn" onclick="closeModal()">Annuler</button><button class="btn p" onclick="prodDemarrer(val('pd_m'),val('pd_p'))">Démarrer</button></div>`);
+  const p0 = prestaDeMission(get('missions', val('pd_m'))); if (p0) $('#pd_p').value = p0;
+}
+VIEWS.production = () => {
+  const L = DATA.missions.filter(m => m.prod).sort((a, b) => num(b.prod.u) - num(a.prod.u));
+  return `<div class="bar"><span class="grow small muted">Chaque prestation suit sa méthode jusqu'au livrable remis et signé.</span><button class="btn p" onclick="nouvelleProd()">+ Démarrer une production</button></div>
+  <div class="card">${tbl([['Mission'], ['Client'], ['Prestation'], ['Étapes', 'n'], ['Livrable'], ['Remis le']], L.map(m => { const p = get('catalogue', m.prod.p) || {}, me = methode(p);
+    return `<tr class="click" onclick="go('prod','${m.id}')"><td><b>${esc(m.titre || '')}</b></td><td>${esc(cli(m.clientId).nom)}</td><td>${esc(p.d || '')}<br><span class="small muted">${esc(p.cat || '')}</span></td><td class="n">${prodAv(m.prod, me)} %</td><td>${me.type === 'electoral' || me.type === 'reseau' ? 'Page Stratégie' : m.prod.tx ? '<span class="pill g">rédigé</span>' : '<span class="pill w">à rédiger</span>'}</td><td>${m.prod.livre ? dfr(m.prod.livre) : '—'}</td></tr>`; }), 'Aucune production en cours. Démarrez-en une depuis une mission.')}</div>`;
+};
+VIEWS.prod = () => {
+  const m = ARG && get('missions', ARG);
+  if (!m || !m.prod) return `<div class="card"><p>Choisissez une production dans l'<a href="#" onclick="go('production');return false">Atelier des livrables</a>.</p></div>`;
+  const pr = m.prod, p = get('catalogue', pr.p) || {}, me = methode(p), c = cli(m.clientId), S = prodScores(pr, me.grille), av = prodAv(pr, me), id = m.id;
+  const elec = me.type === 'electoral' || me.type === 'reseau', interdit = pr.tx && MOTS_INTERDITS.test(pr.tx);
+  const etapes = me.etapes.map(([ph, L2]) => `<div style="margin-bottom:8px"><b class="small">${esc(ph)}</b>${L2.map((x, j) => { const k = ph + '|' + j;
+    return `<label style="display:flex;gap:8px;align-items:flex-start;margin:4px 0;font-weight:400"><input type="checkbox" style="width:auto;margin-top:3px" ${pr.et && pr.et[k] ? 'checked' : ''} onchange="prodMaj('${id}',x=>{x.et=x.et||{};x.et[${esc(JSON.stringify(k))}]=this.checked},null,true)"> ${esc(x)}</label>`; }).join('')}</div>`).join('');
+  const champs = me.champs.map(([k, lib, t]) => `<div class="full"><label>${esc(lib)}</label>${t === 'l' ? `<input value="${esc(pr.ch && pr.ch[k])}" oninput="prodMaj('${id}',x=>{x.ch=x.ch||{};x.ch['${k}']=this.value})">` : `<textarea rows="3" oninput="prodMaj('${id}',x=>{x.ch=x.ch||{};x.ch['${k}']=this.value})">${esc(pr.ch && pr.ch[k])}</textarea>`}</div>`).join('');
+  const grille = me.grille ? `<div class="card" style="margin-bottom:12px"><h3>Grille d'évaluation ${S.glob != null ? `<span class="pill ${S.glob >= 60 ? 'g' : S.glob >= 40 ? 'w' : 'r'}">${S.glob} % — ${niveauDe(S.glob)}</span>` : ''}</h3>
+    <p class="small muted">Notez chaque critère de 0 (absent) à 4 (excellent) d'après les constats. Laissez vide ce qui n'a pas été observé.</p>
+    ${me.grille.map((x, i) => `<div style="margin:10px 0"><b>${esc(x.a)}</b>${S.ax[i].pct != null ? ` <span class="small muted">${S.ax[i].pct} %</span><div style="background:var(--line);height:6px;border-radius:3px;margin:4px 0"><div style="width:${S.ax[i].pct}%;height:6px;border-radius:3px;background:${S.ax[i].pct >= 60 ? '#2e7d32' : S.ax[i].pct >= 40 ? '#c9962a' : '#c62828'}"></div></div>` : ''}
+      ${x.c.map((cr, j) => { const k = i + '_' + j, v = pr.gr && pr.gr[k];
+        return `<div class="f" style="margin:4px 0;align-items:end"><div><label class="small" style="font-weight:400">${esc(cr)}</label><select onchange="prodMaj('${id}',x=>{x.gr=x.gr||{};if(this.value==='')delete x.gr['${k}'];else x.gr['${k}']=+this.value},null,true)"><option value="">— non noté</option>${NIV.map((n, s) => `<option value="${s}" ${v !== undefined && v !== '' && num(v) === s ? 'selected' : ''}>${s} — ${n}</option>`).join('')}</select></div>
+        <div><input placeholder="Observation (facultatif)" value="${esc(pr.gc && pr.gc[k])}" oninput="prodMaj('${id}',x=>{x.gc=x.gc||{};x.gc['${k}']=this.value})"></div></div>`; }).join('')}</div>`).join('')}
+    ${S.saisis ? `<div class="f"><div><b class="small">Points forts (3 ou 4)</b><ul class="small">${S.forces.map(x => `<li>${esc(x.c)} <span class="muted">(${esc(x.a)})</span></li>`).join('') || '<li class="muted">aucun</li>'}</ul></div>
+      <div><b class="small">Points faibles (0 ou 1)</b><ul class="small">${S.faibles.map(x => `<li>${esc(x.c)} <span class="muted">(${esc(x.a)})</span></li>`).join('') || '<li class="muted">aucun</li>'}</ul></div></div>` : ''}</div>` : '';
+  return `<div class="bar"><button class="btn sm" onclick="go('production')">← Atelier</button><span class="grow"></span><button class="btn sm" onclick="editMission('${id}')">Mission</button></div>
+  <div class="card" style="margin-bottom:12px"><h3 style="margin-top:0">${esc(me.livrable)}</h3><p class="small">${esc(c.nom)} · ${esc(m.titre || '')}<br><span class="muted">${esc(p.code || '')} — ${esc(p.d || '')} · ${esc(p.cat || '')}${p.rub ? ' · ' + esc(p.rub) : ''}</span></p>
+    <div style="background:var(--line);height:8px;border-radius:4px"><div style="width:${av}%;height:8px;border-radius:4px;background:#c9962a"></div></div><p class="small muted">${av} % des étapes faites — l'avancement de la mission suit automatiquement.</p></div>
+  <div class="sysg"><div class="card"><h3>1. Étapes</h3>${etapes}</div>
+    <div class="card"><h3>2. Collecte</h3><div class="f">${champs}</div></div></div>
+  ${grille}
+  ${elec ? `<div class="card" style="margin-bottom:12px"><h3>3. Livrable</h3><p class="small">Pour cette prestation, le rapport destiné au candidat sort de la page <b>Stratégie</b> (Word, PDF, fiche technique), calculé sur la base électorale de la CEI.</p><div class="act" style="justify-content:flex-start"><button class="btn p" onclick="go('strategie')">🗳️ Ouvrir la page Stratégie</button></div></div>` : `
+  <div class="card" style="margin-bottom:12px"><h3>3. Rédaction par ATLAS IA</h3>
+    <ol class="small"><li>Touchez <b>Copier la demande</b> : elle contient le plan imposé, les règles du cabinet et toutes les données saisies.</li><li>Ouvrez Claude (Projet IGC), collez, envoyez.</li><li>Copiez la réponse et collez-la ci-dessous. Relisez : vous restez responsable du contenu.</li></ol>
+    <div class="act" style="justify-content:flex-start"><button class="btn g" onclick="copier(promptAtlas('${id}'))">📋 Copier la demande</button><button class="btn" onclick="ouvrirClaude()">Ouvrir Claude</button></div>
+    <div class="f"><div class="full"><label>Texte rédigé (sections commençant par ##)</label><textarea rows="10" oninput="prodMaj('${id}',x=>{x.tx=this.value})" onchange="render()">${esc(pr.tx)}</textarea></div></div>
+    ${interdit ? '<p class="small" style="color:#c62828">⚠️ Le texte contient un mot à retirer avant remise au client (IA, ATLAS, Claude, IGC Gestion…).</p>' : ''}
+    ${pr.tx ? `<p class="small muted">${mdBlocs(pr.tx).filter(b => b.t === 'h1').length} sections reconnues sur ${me.plan.length} prévues.</p>` : '<p class="small muted">Sans texte rédigé, le document sort en « version de travail » avec les éléments recueillis.</p>'}</div>
+  <div class="card" style="margin-bottom:12px"><h3>4. Livrable et restitution</h3>
+    <div class="f"><div><label>Date de remise au client</label><input type="date" value="${pr.livre || ''}" onchange="prodMaj('${id}',x=>{x.livre=this.value},'Production : livrable remis le '+this.value,true)"></div></div>
+    <div class="act" style="justify-content:flex-start"><button class="btn p" onclick="prodWord('${id}')">⬇ Word</button><button class="btn" onclick="prodPDF('${id}')">🖨 PDF</button><button class="btn" onclick="prodPV('${id}')">📄 Procès-verbal de livraison</button></div></div>`}`;
+};
 
 /* =====================  En-tête commun des documents IGC  ===================== */
 function docIGC(titre, sousTitre, corps){
