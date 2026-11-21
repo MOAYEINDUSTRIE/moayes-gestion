@@ -1,0 +1,84 @@
+name: Audit hebdomadaire IGC Gestion
+# Chaque lundi à 03 h 07 (Abidjan) : sécurité (secrets, dépendances, règles de la base, site en ligne)
+# et test de charge sur une copie fictive. En cas d'anomalie, une « issue » est ouverte : GitHub prévient par e-mail.
+on:
+  schedule:
+    - cron: '7 3 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+concurrency: { group: audit-hebdo, cancel-in-progress: false }
+jobs:
+  securite:
+    name: Sécurité
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Secrets dans tout l'historique (gitleaks)
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz | tar xz gitleaks
+          ./gitleaks git --config .gitleaks.toml --redact --no-banner --report-format json --report-path gitleaks.json . \
+            && echo "### ✅ Aucun secret dans l'historique" >> $GITHUB_STEP_SUMMARY \
+            || { echo "### ❌ Secrets possibles dans l'historique" >> $GITHUB_STEP_SUMMARY; python3 -c "import json;[print('-',f['File'],'ligne',f['StartLine'],f['RuleID'],f['Commit'][:7]) for f in json.load(open('gitleaks.json'))]" >> $GITHUB_STEP_SUMMARY; exit 1; }
+      - name: Garde-fous sur l'état actuel
+        run: bash tests/garde-fous.sh HEAD
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Dépendances des tests (npm audit)
+        working-directory: tests
+        run: npm ci --no-audit && npm audit --audit-level=high
+      - name: Version de Firebase hébergée
+        run: |
+          v=$(grep -oE "firebase-app-compat.js\?v=[0-9.]+" igc/index.html | grep -oE "[0-9.]+$"); d=$(npm view firebase version)
+          echo "Firebase hébergé : $v — dernière version : $d" | tee -a $GITHUB_STEP_SUMMARY
+          [ "${v%%.*}" = "${d%%.*}" ] || echo "::warning::Firebase $v a une version majeure de retard ($d) : prévoir la mise à jour."
+      - name: Base Firebase fermée sans compte
+        run: |
+          B=https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app
+          ko=0
+          for p in moayes/igc moayes/igc_data moayes/v2_data moayes/data end ""; do
+            c=$(curl -s -o /dev/null -w '%{http_code}' "$B/$p.json")
+            if [ "$c" = "401" ] || [ "$c" = "403" ]; then echo "✅ /$p : fermé ($c)" >> $GITHUB_STEP_SUMMARY; else echo "❌ /$p : ouvert sans compte ($c)" >> $GITHUB_STEP_SUMMARY; ko=1; fi
+          done
+          exit $ko
+      - name: Site en ligne (HTTPS, en-têtes, fichiers exposés)
+        run: |
+          U=https://moayeindustrie.github.io/moayes-gestion
+          ko=0
+          [ "$(curl -s -o /dev/null -w '%{http_code}' $U/igc/)" = "200" ] && echo "✅ Application en ligne" >> $GITHUB_STEP_SUMMARY || { echo "❌ Application inaccessible" >> $GITHUB_STEP_SUMMARY; ko=1; }
+          r=$(curl -s -o /dev/null -w '%{redirect_url}' http://moayeindustrie.github.io/moayes-gestion/igc/); case "$r" in https://*) echo "✅ HTTP redirigé vers HTTPS" >> $GITHUB_STEP_SUMMARY;; *) echo "❌ Pas de redirection HTTPS" >> $GITHUB_STEP_SUMMARY; ko=1;; esac
+          curl -s $U/igc/ | grep -q 'Content-Security-Policy' && echo "✅ Politique de sécurité du contenu en ligne" >> $GITHUB_STEP_SUMMARY || { echo "❌ Politique de sécurité absente en ligne" >> $GITHUB_STEP_SUMMARY; ko=1; }
+          for f in .git/config .env tests/package.json .github/workflows/sauvegardes.yml; do
+            c=$(curl -s -o /dev/null -w '%{http_code}' "$U/$f"); [ "$c" = "404" ] && echo "✅ $f non publié" >> $GITHUB_STEP_SUMMARY || echo "⚠️ $f accessible en ligne ($c)" >> $GITHUB_STEP_SUMMARY
+          done
+          v=$(curl -s $U/igc/ | grep -oE "const VERSION = 'V[0-9.]+'" | grep -oE "V[0-9.]+"); echo "Version en ligne : $v" >> $GITHUB_STEP_SUMMARY
+          exit $ko
+  charge:
+    name: Test de charge (copie fictive)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm, cache-dependency-path: tests/package-lock.json }
+      - working-directory: tests
+        run: npm ci && npx playwright install --with-deps chromium
+      - name: Charge normale et forte, téléphone et ordinateur
+        working-directory: tests
+        run: npx playwright test -c playwright.charge.config.js
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: rapport-charge, path: tests/rapport-charge, retention-days: 60 }
+  alerte:
+    name: Prévenir en cas d'anomalie
+    needs: [securite, charge]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          gh api repos/${{ github.repository }}/issues -f title="Audit hebdomadaire : anomalie du $(date +%d/%m/%Y)" \
+            -f body="L'audit hebdomadaire d'IGC Gestion a trouvé une anomalie. Détail : ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" -f "labels[]=audit"

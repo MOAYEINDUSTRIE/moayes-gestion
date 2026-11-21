@@ -43,7 +43,8 @@ jobs:
           jour = datetime.datetime.utcnow().strftime('%Y-%m-%d')
           # (préfixe du fichier, chemin Firebase, contrôle minimal : la sauvegarde doit contenir ces clés)
           cibles = [('MOAYES', 'moayes/v2_data', ['ventes', 'clients']),
-                    ('IGC', 'moayes/igc_data', ['societe']),
+                    ('IGC', 'moayes/igc_data', ['societe']),          # ancien emplacement (jusqu'à V1.32)
+                    ('IGC_fiches', 'moayes/igc', ['meta']),           # V1.33 : une fiche par nœud
                     ('END', 'end', [])]
           erreurs = 0
           for nom, chemin, cles in cibles:
