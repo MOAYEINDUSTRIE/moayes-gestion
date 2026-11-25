@@ -1923,7 +1923,7 @@ function waRelance(id){
     ? `Bonjour ${c.nom},\n\n${ent} vous remercie pour votre confiance.\nÀ la date du ${le}, le solde de votre compte client s'élève à ${FC(cr)}.\nNous vous remercions de bien vouloir procéder à son règlement.\n\nCordialement,\n${ent}`
     : cr < 0
       ? `Bonjour ${c.nom},\n\n${ent} vous remercie pour votre confiance.\nÀ la date du ${le}, votre compte client présente une avance de ${FC(-cr)} en votre faveur.\n\nCordialement,\n${ent}`
-      : `Bonjour ${c.nom},\n\n${ent} vous remercie pour votre confiance.\nNous vous confirmons qu'à la date du ${le}, votre compte client est entièrement soldé.\nNous restons à votre disposition pour vos prochaines commandes.\n\nCordialement,\n${ent}`;
+      : `Bonjour ${c.nom},\n\nNous vous informons qu'à la date du ${le}, votre compte client est soldé.\n${ent} vous remercie pour votre fidélité.\n\nCordialement,\n${ent}`;
   openExt(`https://wa.me/${waNum(c.tel)}?text=${encodeURIComponent(msg)}`);
 }
 function waBilan(d){
