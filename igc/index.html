@@ -183,7 +183,7 @@ td.n,th.n{text-align:right;white-space:nowrap}tr.click{cursor:pointer}tr.click:h
 <script>
 'use strict';
 /* =====================  IGC Gestion  ===================== */
-const VERSION = 'V1.34';
+const VERSION = 'V1.35';
 /* règle de Moaye (16/11/2026, rappel de la méthode du 10/11) : on travaille lieu de vote par lieu de vote ;
    2 cellules pour 1 000 électeurs, à parité, au moins 1 cellule de femmes et 1 d'hommes par lieu ; cellule = 1 responsable + 25 membres = 26 personnes.
    Électeurs acquis = cellules × 26 (la base électorale). */
@@ -2752,6 +2752,7 @@ const CATALOGUE_IGC = [
   ['CON-05',M4,'Étude d\'opinion ou étude de terrain','Forfait',3000000,1500000,6000000,'Conception, terrain, analyse ; frais d\'enquêteurs à part. Prix de départ proposé le 21/11/2026, modifiable.','Audits et études'],
   ['CON-06',M4,'Accompagnement d\'un dirigeant','Mois',750000,400000,1500000,'Séances régulières de conseil personnel. Prix de départ proposé le 21/11/2026, modifiable.','Conseil exécutif'],
   ['CON-07',M4,'Formation exécutive (séminaire de dirigeants)','Journée',750000,500000,1500000,'Prix de départ proposé le 21/11/2026, modifiable.','Formations exécutives'],
+  ['CON-08',M4,'Séminaire Collectivités 4.0 — forfait par collectivité','Forfait',1000000,1000000,1000000,'2 représentants, 2 jours à Yamoussoukro, 6 modules, supports, restauration et 2 nuitées (TDR Collectivités 4.0). Transport et fiscalité à préciser dans la convention.','Formations exécutives'],
   ['CRE-01',M4,'Création d\'entreprise (SARL, SAS) — accompagnement CEPICI','Forfait',250000,150000,400000,'Frais officiels en sus, à vérifier au CEPICI.','Conseil exécutif'],
   ['CRE-02',M4,'Création de coopérative (SCOOPS ou SCOOP-CA)','Forfait',400000,250000,700000,'Frais officiels en sus.','Conseil exécutif'],
   ['CRE-03',M4,'Création de cabinet de conseil','Forfait',350000,200000,500000,'Statuts, immatriculation, offre de services.','Conseil exécutif'],
@@ -2974,7 +2975,7 @@ const METHODES = {
   'COR-01': ['strategie', 'changement', 'Plan d\'accompagnement du changement'], 'COR-02': ['audit', 'crise', 'Plan de communication de crise'],
   'CON-01': ['accompagnement', null, 'Compte rendu de conseil'], 'CON-02': ['audit', 'orga', 'Rapport de diagnostic organisationnel'],
   'CON-03': ['strategie', null, 'Plan stratégique'], 'CON-04': ['audit', 'com', 'Rapport d\'audit de communication'], 'CON-05': ['etude', null, 'Rapport d\'étude'],
-  'CON-06': ['accompagnement', null, 'Rapport d\'accompagnement du dirigeant'], 'CON-07': ['formation', 'formation', 'Rapport du séminaire de dirigeants'],
+  'CON-06': ['accompagnement', null, 'Rapport d\'accompagnement du dirigeant'], 'CON-07': ['formation', 'formation', 'Rapport du séminaire de dirigeants'], 'CON-08': ['formation', 'formation', 'Rapport du séminaire Collectivités 4.0'],
   'CRE-01': ['structure', null, 'Dossier de création d\'entreprise'], 'CRE-02': ['structure', null, 'Dossier de création de coopérative'], 'CRE-03': ['structure', null, 'Dossier de création du cabinet'],
   'GEN-01': ['creation', null, 'Charte graphique'], 'GEN-02': ['creation', null, 'Dossier de conception des supports'], 'COM-03': ['accompagnement', null, 'Rapport d\'activité des réseaux sociaux'],
   'GEN-03': ['creation', null, 'Dossier de livraison du site internet'], 'CRE-05': ['creation', null, 'Dossier de livraison de l\'application'],

@@ -1,10 +1,10 @@
 name: Tests IGC Gestion
 on:
   pull_request:
-    paths: ['igc/**', 'end/**', 'tests/**', '.github/workflows/tests-igc.yml']
+    paths: ['igc/**', 'pilotage/**', 'end/**', 'tests/**', '.github/workflows/tests-igc.yml']
   push:
     branches: [main]
-    paths: ['igc/**', 'end/**', 'tests/**']
+    paths: ['igc/**', 'pilotage/**', 'end/**', 'tests/**']
 permissions:
   contents: read
 jobs:

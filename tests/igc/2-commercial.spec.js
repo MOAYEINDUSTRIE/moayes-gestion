@@ -35,14 +35,14 @@ test('catalogue rangé selon les 5 métiers des statuts, ancien classement repri
   const r = await page.evaluate(() => {
     const neuf = { n: DATA.catalogue.length, horsMetier: DATA.catalogue.filter(p => !CAT_FAM.includes(p.cat)).length };
     // appareil resté sur l'ancien classement : 25 prestations, anciennes familles, prix modifié
-    DATA.catalogue = DATA.catalogue.filter(p => !/^P-(ELE-1[01]|INS|COR|CON-0[4-7]|GEN)/.test(p.id)).map(p => ({ ...p, cat: ({ 'P-ELE': 'Électoral', 'P-COM': 'Communication', 'P-CON': 'Conseil stratégique', 'P-CRE': 'Création de structures', 'P-FOR': 'Formation', 'P-ANX': 'Frais annexes' })[p.id.slice(0, 5)], rub: undefined }));
+    DATA.catalogue = DATA.catalogue.filter(p => !/^P-(ELE-1[01]|INS|COR|CON-0[4-8]|GEN)/.test(p.id)).map(p => ({ ...p, cat: ({ 'P-ELE': 'Électoral', 'P-COM': 'Communication', 'P-CON': 'Conseil stratégique', 'P-CRE': 'Création de structures', 'P-FOR': 'Formation', 'P-ANX': 'Frais annexes' })[p.id.slice(0, 5)], rub: undefined }));
     get('catalogue', 'P-CON-01').pu = 300000;
     const avant = DATA.catalogue.length; migrerCatalogue();
     return { neuf, avant, apres: DATA.catalogue.length, horsMetier: DATA.catalogue.filter(p => !CAT_FAM.includes(p.cat)).length,
       app: get('catalogue', 'P-CRE-05'), conseil: get('catalogue', 'P-CON-01'), metiers: CAT_FAM.slice(0, 5) };
   });
-  expect(r.neuf).toEqual({ n: 41, horsMetier: 0 });
-  expect(r.avant).toBe(25); expect(r.apres).toBe(41); expect(r.horsMetier).toBe(0);
+  expect(r.neuf).toEqual({ n: 42, horsMetier: 0 });
+  expect(r.avant).toBe(25); expect(r.apres).toBe(42); expect(r.horsMetier).toBe(0);
   expect(r.app.cat).toBe('Communication générale'); expect(r.app.rub).toBe('Communication digitale');
   expect(r.conseil.pu).toBe(300000);                      // prix modifié conservé
   expect(r.metiers).toEqual(['Communication politique et électorale', 'Communication institutionnelle et affaires publiques', 'Communication d\'entreprise et corporate', 'Consultance stratégique et advisory', 'Communication générale']);
