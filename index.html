@@ -259,7 +259,7 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-b
    charges, ajustements). Aucun solde saisi à la main.
    Format de données identique aux sauvegardes V30.
    ========================================================= */
-const VERSION = 'V2.14';
+const VERSION = 'V2.15';
 const LS_DATA = 'moayes_v2_data', LS_CFG = 'moayes_v2_cfg', LS_PIN = 'moayes_v2_pins', LS_TS = 'moayes_v2_ts';
 const FIREBASE_CONFIG = {
   apiKey:"AIzaSyCFIEAfd7ssJHbUWUYjCCqcgQ5HmUh9XFI", authDomain:"moayes-industrie.firebaseapp.com",
@@ -1917,7 +1917,13 @@ function exportCSV(){
 function waNum(t){ let d = String(t||'').replace(/\D/g,''); if (d.startsWith('00')) d = d.slice(2); if (d.length === 10) d = '225' + d; return d; }
 function waRelance(id){
   const c = clientById(id), cr = creditOf(id);
-  const msg = `Bonjour ${c.nom}, c'est MOAYÉ'S INDUSTRIE. Merci pour votre fidélité. Votre solde à régler est de ${FC(cr)}. Merci de prévoir le règlement. Bonne journée !`;
+  /* on ne demande un règlement que s'il reste réellement une somme due */
+  const ent = (DATA.entreprise||{}).nom || "MOAYÉ'S INDUSTRIE", le = today().split("-").reverse().join("/");
+  const msg = cr > 0
+    ? `Bonjour ${c.nom},\n\n${ent} vous remercie pour votre confiance.\nÀ la date du ${le}, le solde de votre compte client s'élève à ${FC(cr)}.\nNous vous remercions de bien vouloir procéder à son règlement.\n\nCordialement,\n${ent}`
+    : cr < 0
+      ? `Bonjour ${c.nom},\n\n${ent} vous remercie pour votre confiance.\nÀ la date du ${le}, votre compte client présente une avance de ${FC(-cr)} en votre faveur.\n\nCordialement,\n${ent}`
+      : `Bonjour ${c.nom},\n\nNous vous informons qu'à la date du ${le}, votre compte client est soldé.\n${ent} vous remercie pour votre fidélité.\n\nCordialement,\n${ent}`;
   openExt(`https://wa.me/${waNum(c.tel)}?text=${encodeURIComponent(msg)}`);
 }
 function waBilan(d){
