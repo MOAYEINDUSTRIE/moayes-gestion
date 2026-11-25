@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IGC Pilotage 4.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: outil de travail d'un service de planification municipal, sobre et précis
+   IDEA: le registre de suivi du plan de travail annuel (PTA) d'une mairie, avec ses jauges physique et financière
+   PICTURE: le tableau de bord lui-même : deux grandes jauges, la barre par axe, la liste des retards
+   COLOUR and TYPE: bleu IGC #13294b dominant, blanc, or #c9962a pour ce qui compte, rouge pour les retards ; Outfit + Inter
+   LAYOUT: bande bleue avec titre et chiffres clés, onglets, puis contenu sur une colonne large */
+:root{color-scheme:light dark;--bg:light-dark(#f6f7f9,#0c1524);--card:light-dark(#fff,#132036);--ink:light-dark(#13294b,#e8edf5);--mut:light-dark(#5b6b82,#9fb0c8);--line:light-dark(#dde3ec,#24344f);--blue:#13294b;--gold:#c9962a;--red:light-dark(#c62828,#ff6b6b);--green:light-dark(#2e7d32,#5fd17a);--amber:light-dark(#b26a00,#f0b44c)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Inter,system-ui,sans-serif;overflow-x:clip}
+h1,h2,h3{font-family:Outfit,Inter,sans-serif;line-height:1.1;margin:0}
+.top{background:var(--blue);color:#fff;padding:22px max(5vw,16px) 0}
+.brand{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.logo{width:42px;height:42px;border-radius:50%;border:2px solid var(--gold);display:grid;place-items:center;font:700 14px Outfit;color:var(--gold)}
+.top h1{font-size:clamp(26px,4vw,40px)}
+.sub{color:#c9d4e6;font-size:14px}
+.coll{background:transparent;border:0;border-bottom:1px dashed #6d84a8;color:#fff;font:inherit;padding:2px 0;width:min(320px,70vw)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:18px 0}
+.kpi{background:#1c3966;border-radius:10px;padding:12px 14px}
+.kpi b{display:block;font:700 clamp(24px,3.5vw,34px) Outfit;color:#fff}
+.kpi span{font-size:13px;color:#c9d4e6}
+.kpi.g b{color:var(--gold)}.kpi.r b{color:#ff8a80}
+.tabs{display:flex;gap:4px;overflow-x:auto}
+.tabs a{flex:none;color:#c9d4e6;text-decoration:none;padding:12px 16px;border-radius:10px 10px 0 0;font-weight:600}
+.tabs a.on{background:var(--bg);color:var(--ink)}
+main{padding:20px max(5vw,16px) 48px;max-width:1240px;margin:auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+.card h2{font-size:22px;margin-bottom:10px}.card h3{font-size:17px;margin:4px 0 10px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
+.gauge{display:flex;gap:16px;align-items:center}
+.gauge svg{width:120px;height:120px;flex:none}
+.big{font:700 40px Outfit}
+.row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,2fr) 52px;gap:10px;align-items:center;margin:8px 0;font-size:14px}
+.bar{height:10px;background:var(--line);border-radius:5px;position:relative;overflow:hidden}
+.bar i{position:absolute;inset:0 auto 0 0;border-radius:5px}
+.bar i.p{background:var(--blue)}:root[data-theme=dark] .bar i.p{background:#6f9be0}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]) .bar i.p{background:#6f9be0}}
+.bar i.f{background:var(--gold);height:4px;top:auto;bottom:0}
+.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;color:var(--mut);font-weight:600;border-bottom:2px solid var(--line);padding:8px 6px}
+td{border-bottom:1px solid var(--line);padding:8px 6px;vertical-align:top}
+tr.click{cursor:pointer}tr.click:hover td{background:light-dark(#f2f5fa,#18284a)}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}
+.s-ok{background:light-dark(#e3f3e5,#163a22);color:var(--green)}.s-ret{background:light-dark(#fde5e5,#3e1a1f);color:var(--red)}
+.s-sur{background:light-dark(#fff0d6,#3a2c10);color:var(--amber)}.s-cours{background:light-dark(#e6edf8,#1c2f52);color:var(--ink)}.s-ven{background:var(--line);color:var(--mut)}
+.bar2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+button,.btn{font:600 15px Inter;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:10px 16px;min-height:44px;cursor:pointer}
+button.p{background:var(--blue);color:#fff;border-color:var(--blue)}button.g{background:var(--gold);color:#1a1a1a;border-color:var(--gold)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--gold);outline-offset:1px}
+input,select,textarea{font:16px Inter;width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+label{font-size:13px;color:var(--mut);display:block;margin:8px 0 3px}
+.f{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:4px 14px}.full{grid-column:1/-1}
+.mut{color:var(--mut);font-size:13px}.note{font-size:13px;color:var(--mut);margin-top:8px}
+textarea{min-height:110px}
+.msg{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--blue);color:#fff;padding:10px 18px;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none}
+.msg.on{opacity:1}
+@media(prefers-reduced-motion:reduce){.msg{transition:none}}
+.scroll{overflow-x:auto}
+@media(max-width:600px){table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:8em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:7.5em;margin-inline-start:-8em;white-space:normal;color:var(--mut)}.stack td:empty{display:none}.row{grid-template-columns:1fr 52px}.row .bar{grid-column:1/-1;order:3}}
+</style><script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script></head>
+<body>
+<header class="top">
+  <div class="brand"><div class="logo">IGC</div><div><h1>IGC Pilotage 4.0</h1>
+    <div class="sub">Plan de travail annuel et suivi-évaluation · <input class="coll" id="coll" aria-label="Nom de la collectivité"> · suivi au <input type="date" id="jour" class="coll" style="width:150px" aria-label="Date de suivi"></div></div></div>
+  <div class="kpis" id="kpis"></div>
+  <nav class="tabs" id="tabs"><a href="#tableau">Tableau de bord</a><a href="#pta">PTA et suivi</a><a href="#bilan">Bilan et analyse</a></nav>
+</header>
+<main id="main"></main>
+<div class="msg" id="msg"></div>
+<script>
+{
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const F = n => Math.round(n || 0).toLocaleString('fr-FR').replace(/ | /g, ' ');
+const P = x => Math.round((x || 0) * 100) + ' %';
+const dfr = d => d ? d.split('-').reverse().join('/') : '—';
+const toast = t => { const m = $('#msg'); m.textContent = t; m.classList.add('on'); setTimeout(() => m.classList.remove('on'), 1800); };
+const iso = d => d.toISOString().slice(0, 10);
+const EX = () => ({ coll: 'Commune fictive de Lagunaville', acts: [
+  ['Salubrité et cadre de vie', 'Journées de salubrité dans les quartiers', 'Service technique', '2026-01-15', '2026-12-15', 'Journées organisées', 12, 9, 6000000, 4800000],
+  ['Salubrité et cadre de vie', 'Achat de bacs à ordures pour les marchés', 'Service technique', '2026-02-01', '2026-06-30', 'Bacs installés', 40, 22, 8000000, 7600000],
+  ['Salubrité et cadre de vie', 'Curage des caniveaux principaux', 'Service technique', '2026-03-01', '2026-09-30', 'Kilomètres curés', 15, 15, 12000000, 11200000],
+  ['Services aux usagers', 'Réduire le délai de délivrance des actes d\'état civil', 'Service état civil', '2026-01-10', '2026-12-31', 'Délai moyen (jours) atteint sur la cible', 100, 70, 2500000, 900000],
+  ['Services aux usagers', 'Guichet d\'information aux usagers', 'Secrétariat général', '2026-04-01', '2026-08-31', 'Guichet ouvert (1 = oui)', 1, 0, 3000000, 2700000],
+  ['Services aux usagers', 'Formation des agents d\'accueil', 'Ressources humaines', '2026-05-01', '2026-07-31', 'Agents formés', 20, 20, 1500000, 1450000],
+  ['Infrastructures', 'Réhabilitation de l\'école primaire du centre', 'Service technique', '2026-02-15', '2026-11-30', 'Taux d\'exécution des travaux (%)', 100, 55, 45000000, 30000000],
+  ['Infrastructures', 'Éclairage public de la voie principale', 'Service technique', '2026-06-01', '2026-12-20', 'Lampadaires posés', 60, 18, 25000000, 9000000],
+  ['Infrastructures', 'Construction d\'un hangar au marché', 'Service des marchés', '2027-01-10', '2027-04-30', 'Hangar livré (1 = oui)', 1, 0, 18000000, 0],
+].map((a, i) => ({ id: 'a' + i, axe: a[0], act: a[1], resp: a[2], deb: a[3], ech: a[4], ind: a[5], cible: a[6], real: a[7], budget: a[8], dep: a[9], obs: '' })) });
+let D; try { D = JSON.parse(localStorage.getItem('igc_pilotage')); } catch (e) {}
+if (!D || !Array.isArray(D.acts)) D = EX();
+let JOUR = iso(new Date()), FILTRE = { axe: '', st: '', q: '' }, EDIT = null;
+const sauver = () => { try { localStorage.setItem('igc_pilotage', JSON.stringify(D)); } catch (e) {} };
+const ST = { ok: ['Terminée', 's-ok'], ret: ['En retard', 's-ret'], sur: ['À surveiller', 's-sur'], cours: ['En cours', 's-cours'], ven: ['À venir', 's-ven'] };
+function calc(a){
+  const tp = a.cible > 0 ? a.real / a.cible : 0, tf = a.budget > 0 ? a.dep / a.budget : 0;
+  const t0 = Date.parse(a.deb), t1 = Date.parse(a.ech), t = Date.parse(JOUR);
+  const att = isNaN(t0) || isNaN(t1) || t1 <= t0 ? 0 : Math.min(1, Math.max(0, (t - t0) / (t1 - t0)));
+  let st = 'cours';
+  if (tp >= 1) st = 'ok'; else if (t > t1) st = 'ret'; else if (t < t0 && !a.real) st = 'ven'; else if (tp < att - 0.15) st = 'sur';
+  return { tp, tf, att, st, alerteF: tf > Math.min(1, tp) + 0.2 };
+}
+function synth(L){
+  const C = L.map(calc), bud = L.reduce((s, a) => s + +a.budget, 0), dep = L.reduce((s, a) => s + +a.dep, 0);
+  return { n: L.length, tp: L.length ? C.reduce((s, c) => s + Math.min(1, c.tp), 0) / L.length : 0, tf: bud ? dep / bud : 0, bud, dep,
+    ret: C.filter(c => c.st === 'ret').length, sur: C.filter(c => c.st === 'sur').length, ok: C.filter(c => c.st === 'ok').length };
+}
+const axes = () => [...new Set(D.acts.map(a => a.axe))];
+function jauge(v, col){ const r = 50, c = 2 * Math.PI * r, x = Math.min(1, v);
+  return `<svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="${r}" fill="none" stroke="var(--line)" stroke-width="12"/><circle cx="60" cy="60" r="${r}" fill="none" stroke="${col}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${c * x} ${c}" transform="rotate(-90 60 60)"/></svg>`; }
+function kpis(){ const S = synth(D.acts);
+  $('#kpis').innerHTML = `<div class="kpi"><b>${S.n}</b><span>activités au PTA</span></div><div class="kpi g"><b>${P(S.tp)}</b><span>taux d'exécution physique moyen</span></div>
+  <div class="kpi g"><b>${P(S.tf)}</b><span>taux d'exécution financière</span></div><div class="kpi r"><b>${S.ret}</b><span>activité(s) en retard</span></div>`; }
+function vTableau(){
+  const S = synth(D.acts);
+  const parAxe = axes().map(x => { const s = synth(D.acts.filter(a => a.axe === x)); return `<div class="row"><span>${esc(x)}</span><div class="bar"><i class="p" style="width:${Math.min(100, s.tp * 100)}%"></i><i class="f" style="width:${Math.min(100, s.tf * 100)}%"></i></div><span class="n">${P(s.tp)}</span></div>`; }).join('');
+  const alertes = D.acts.map(a => [a, calc(a)]).filter(([, c]) => c.st === 'ret' || c.st === 'sur' || c.alerteF);
+  return `<div class="grid2"><div class="card"><h3>Exécution physique</h3><div class="gauge">${jauge(S.tp, 'var(--blue)')}<div><div class="big">${P(S.tp)}</div><div class="mut">moyenne des réalisations sur les cibles (plafonnées à 100 %), ${S.ok} activité(s) terminée(s)</div></div></div></div>
+    <div class="card"><h3>Exécution financière</h3><div class="gauge">${jauge(S.tf, 'var(--gold)')}<div><div class="big">${P(S.tf)}</div><div class="mut">${F(S.dep)} F CFA dépensés sur ${F(S.bud)} F CFA prévus (dépenses ÷ budget prévu)</div></div></div></div></div>
+  <div class="card"><h3>Par axe</h3><p class="mut">Barre bleue : exécution physique · trait or : exécution financière</p>${parAxe || '<p class="mut">Aucune activité.</p>'}</div>
+  <div class="card"><h3>Points d'attention (${alertes.length})</h3>${alertes.length ? `<table class="stack"><thead><tr><th>Activité</th><th>Responsable</th><th>Échéance</th><th>Constat</th></tr></thead><tbody>${alertes.map(([a, c]) => `<tr class="click" data-id="${esc(a.id)}"><td>${esc(a.act)}</td><td>${esc(a.resp)}</td><td>${dfr(a.ech)}</td><td>${c.st === 'ret' ? '<span class="pill s-ret">En retard</span> échéance dépassée, ' + P(c.tp) + ' réalisé' : c.st === 'sur' ? '<span class="pill s-sur">À surveiller</span> ' + P(c.tp) + ' réalisé pour ' + P(c.att) + ' du temps écoulé' : ''}${c.alerteF ? ' <span class="pill s-sur">Dépense en avance</span> ' + P(c.tf) + ' du budget pour ' + P(c.tp) + ' réalisé' : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="mut">Aucune alerte à cette date.</p>'}</div>`;
+}
+function ligne(a){ const c = calc(a), s = ST[c.st];
+  return `<tr class="click" data-id="${esc(a.id)}"><td><b>${esc(a.act)}</b><div class="mut">${esc(a.axe)}</div></td><td>${esc(a.resp)}</td><td class="n">${dfr(a.ech)}</td><td class="n">${F(a.real)} / ${F(a.cible)}<div class="mut">${P(c.tp)}</div></td><td class="n">${F(a.dep)} / ${F(a.budget)}<div class="mut">${P(c.tf)}</div></td><td><span class="pill ${s[1]}">${s[0]}</span></td></tr>`; }
+function form(a){ const v = (k, t = 'text', x = '') => `<input id="e_${k}" type="${t}" value="${esc(a[k])}" ${x}>`;
+  return `<div class="card" id="edit"><h3>${a.id ? 'Modifier l\'activité' : 'Nouvelle activité'}</h3><form id="fe"><div class="f">
+    <div><label for="e_axe">Axe</label><input id="e_axe" list="lax" value="${esc(a.axe)}" required><datalist id="lax">${axes().map(x => `<option value="${esc(x)}">`).join('')}</datalist></div>
+    <div class="full"><label for="e_act">Activité</label>${v('act', 'text', 'required')}</div>
+    <div><label for="e_resp">Responsable (fonction ou service)</label>${v('resp')}</div><div><label for="e_deb">Début</label>${v('deb', 'date')}</div><div><label for="e_ech">Échéance</label>${v('ech', 'date')}</div>
+    <div class="full"><label for="e_ind">Indicateur</label>${v('ind')}</div>
+    <div><label for="e_cible">Cible</label>${v('cible', 'number', 'min="0" step="any"')}</div><div><label for="e_real">Réalisé à ce jour</label>${v('real', 'number', 'min="0" step="any"')}</div>
+    <div><label for="e_budget">Budget prévu (F CFA)</label>${v('budget', 'number', 'min="0" step="1"')}</div><div><label for="e_dep">Dépenses exécutées (F CFA)</label>${v('dep', 'number', 'min="0" step="1"')}</div>
+    <div class="full"><label for="e_obs">Observations</label><textarea id="e_obs">${esc(a.obs)}</textarea></div></div>
+    <div class="bar2" style="margin-top:12px"><button class="p" type="submit">Enregistrer</button><button type="button" id="ann">Annuler</button>${a.id ? '<button type="button" id="sup">Supprimer</button>' : ''}</div></form>
+    <p class="note">Dépenses d'exécution seulement : l'outil ne gère aucun encaissement.</p></div>`; }
+function vPTA(){
+  const L = D.acts.filter(a => (!FILTRE.axe || a.axe === FILTRE.axe) && (!FILTRE.st || calc(a).st === FILTRE.st) && (!FILTRE.q || (a.act + ' ' + a.resp).toLowerCase().includes(FILTRE.q.toLowerCase())));
+  return `${EDIT ? form(EDIT) : ''}<div class="bar2"><button class="p" id="nouv">+ Activité</button>
+    <select id="fax" aria-label="Filtrer par axe" style="width:auto"><option value="">Tous les axes</option>${axes().map(x => `<option ${FILTRE.axe === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>
+    <select id="fst" aria-label="Filtrer par statut" style="width:auto"><option value="">Tous les statuts</option>${Object.entries(ST).map(([k, s]) => `<option value="${k}" ${FILTRE.st === k ? 'selected' : ''}>${s[0]}</option>`).join('')}</select>
+    <input id="fq" placeholder="Rechercher" value="${esc(FILTRE.q)}" style="width:min(220px,100%)"></div>
+  <div class="card scroll"><table class="stack"><thead><tr><th>Activité</th><th>Responsable</th><th class="n">Échéance</th><th class="n">Physique</th><th class="n">Financier (F CFA)</th><th>Statut</th></tr></thead><tbody>${L.map(ligne).join('') || '<tr><td colspan="6" class="mut">Aucune activité pour ce filtre.</td></tr>'}</tbody></table>
+  <p class="note">Taux physique = réalisé ÷ cible · taux financier = dépenses ÷ budget prévu · « À surveiller » : réalisé inférieur de plus de 15 points au temps écoulé. Touchez une ligne pour la mettre à jour.</p></div>
+  <div class="card"><h3>Importer un PTA proposé par l'assistant</h3><p class="mut">Collez un tableau (format | colonne | ou copié d'un tableur). Colonnes reconnues : axe, activité, responsable, début, échéance, indicateur, cible, réalisé, budget, dépenses. Vérifiez et validez avant d'importer.</p>
+    <textarea id="imp" placeholder="| Axe | Activité | Responsable | Début | Échéance | Indicateur | Cible | Budget |"></textarea>
+    <div class="bar2" style="margin-top:10px"><button id="bimp">Ajouter au PTA</button><button id="bex">Recharger l'exemple fictif</button></div></div>`;
+}
+function csv(){
+  const q = v => { let s = String(v ?? ''); if (/^[=+\-@]/.test(s)) s = "'" + s; return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const H = ['Axe', 'Activité', 'Responsable', 'Début', 'Échéance', 'Indicateur', 'Cible', 'Réalisé', 'Taux physique (%)', 'Budget prévu', 'Dépenses', 'Taux financier (%)', 'Statut', 'Observations'];
+  return [H, ...D.acts.map(a => { const c = calc(a); return [a.axe, a.act, a.resp, dfr(a.deb), dfr(a.ech), a.ind, a.cible, a.real, Math.round(c.tp * 100), a.budget, a.dep, Math.round(c.tf * 100), ST[c.st][0], a.obs]; })].map(r => r.map(q).join(';')).join('\n');
+}
+function demande(){ return `Tu es analyste en suivi-évaluation pour une collectivité FICTIVE (${D.coll}). Date de suivi : ${dfr(JOUR)}.
+À partir du tableau de suivi ci-dessous (séparateur ;) :
+1. Vérifie les taux physiques (réalisé ÷ cible) et financiers (dépenses ÷ budget prévu) et montre tes calculs.
+2. Identifie les activités en retard et les écarts entre exécution physique et financière.
+3. Propose des actions correctives par responsable, avec une échéance.
+4. Rédige un bilan d'une page : synthèse, résultats par axe, retards, actions proposées.
+Signale les données manquantes. N'invente aucune réalisation, aucun chiffre ni aucun nom. Les décisions restent à valider par l'autorité compétente.
+
+${csv()}`; }
+function bilanTexte(){ const S = synth(D.acts), J = dfr(JOUR);
+  const L = [`BILAN DE SUIVI DU PTA — ${D.coll} — au ${J}`, '', `Activités suivies : ${S.n}. Exécution physique moyenne : ${P(S.tp)}. Exécution financière : ${P(S.tf)} (${F(S.dep)} F CFA sur ${F(S.bud)} F CFA prévus). Terminées : ${S.ok}. En retard : ${S.ret}. À surveiller : ${S.sur}.`, '', 'Par axe :'];
+  axes().forEach(x => { const s = synth(D.acts.filter(a => a.axe === x)); L.push(`- ${x} : ${s.n} activité(s), physique ${P(s.tp)}, financier ${P(s.tf)}, ${s.ret} en retard.`); });
+  const R = D.acts.filter(a => ['ret', 'sur'].includes(calc(a).st));
+  L.push('', 'Activités en retard ou à surveiller :', ...(R.length ? R.map(a => { const c = calc(a); return `- ${a.act} (${a.resp}) : ${P(c.tp)} réalisé, échéance ${dfr(a.ech)}, ${ST[c.st][0].toLowerCase()}.`; }) : ['- aucune']));
+  const FA = D.acts.filter(a => calc(a).alerteF);
+  if (FA.length) L.push('', 'Dépenses en avance sur la réalisation :', ...FA.map(a => { const c = calc(a); return `- ${a.act} : ${P(c.tf)} du budget dépensé pour ${P(c.tp)} réalisé.`; }));
+  L.push('', 'Chiffres calculés à partir des saisies de l\'outil. Actions correctives à arrêter et à valider par l\'autorité compétente.');
+  return L.join('\n'); }
+function vBilan(){
+  return `<div class="grid2"><div class="card"><h3>1. Bilan calculé</h3><p class="mut">Rédigé automatiquement à partir des saisies, sans interprétation.</p><textarea id="bil" style="min-height:300px" readonly>${esc(bilanTexte())}</textarea>
+    <div class="bar2" style="margin-top:10px"><button class="p" id="cbil">Copier le bilan</button><button id="pbil">Imprimer</button></div></div>
+    <div class="card"><h3>2. Analyse des écarts par un assistant autorisé</h3><p class="mut">La demande contient les consignes et l'export du suivi. Collez-la dans l'assistant, puis vérifiez chaque chiffre de sa réponse avec le bilan calculé.</p>
+    <textarea id="dem" style="min-height:300px" readonly>${esc(demande())}</textarea><div class="bar2" style="margin-top:10px"><button class="g" id="cdem">Copier la demande</button></div></div></div>
+  <div class="card"><h3>3. Export CSV</h3><p class="mut">Séparateur point-virgule, lisible par Excel. Les cellules qui commencent par = + - @ sont neutralisées.</p>
+    <div class="bar2"><button id="ccsv">Copier le CSV</button><button id="tcsv">Télécharger le fichier</button></div><p class="note">Ouvrez le fichier avec Excel, ou collez le CSV dans l'assistant. Données fictives : outil de démonstration du séminaire Collectivités 4.0. Si l'impression est bloquée, utilisez « Copier le bilan ».</p></div>`;
+}
+function copier(t, msg){ navigator.clipboard.writeText(t).then(() => toast(msg || 'Copié'), () => toast('Copie refusée : sélectionnez le texte et copiez-le')); }
+function parseNum(s){ const x = String(s ?? '').replace(/[^\d,.\-]/g, '').replace(/\s/g, '').replace(',', '.'); return x === '' ? 0 : +x || 0; }
+function parseDate(s){ s = String(s || '').trim(); let m;
+  if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return m[0];
+  if ((m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})/))) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`; return ''; }
+function importer(txt){
+  const lignes = txt.split('\n').map(l => l.trim()).filter(l => l && !/^\|?[\s:|-]+\|?$/.test(l));
+  if (lignes.length < 2) return toast('Collez un tableau avec une ligne de titres');
+  const sep = lignes[0].includes('|') ? '|' : lignes[0].includes('\t') ? '\t' : ';';
+  const cut = l => { let c = l.split(sep).map(x => x.trim()); if (sep === '|') { if (c[0] === '') c.shift(); if (c[c.length - 1] === '') c.pop(); } return c.map(x => x.replace(/\*\*/g, '')); };
+  const H = cut(lignes[0]).map(h => h.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''));
+  const col = re => H.findIndex(h => re.test(h));
+  const K = { axe: col(/axe|objectif/), act: col(/activit/), resp: col(/respons/), deb: col(/debut|demarr/), ech: col(/echean|fin|delai/), ind: col(/indicat/), cible: col(/cible/), real: col(/realis/), budget: col(/budget|cout|montant/), dep: col(/depens|execut/) };
+  if (K.act < 0) return toast('Colonne « Activité » introuvable');
+  let n = 0;
+  lignes.slice(1).forEach(l => { const c = cut(l), g = k => K[k] >= 0 ? c[K[k]] || '' : '';
+    if (!g('act')) return;
+    D.acts.push({ id: 'a' + Date.now().toString(36) + n, axe: g('axe') || 'Sans axe', act: g('act'), resp: g('resp'), deb: parseDate(g('deb')), ech: parseDate(g('ech')), ind: g('ind'), cible: parseNum(g('cible')), real: parseNum(g('real')), budget: parseNum(g('budget')), dep: parseNum(g('dep')), obs: '' }); n++; });
+  sauver(); toast(n + ' activité(s) ajoutée(s)'); rendre();
+}
+function vue(){ const h = location.hash.slice(1); return ['tableau', 'pta', 'bilan'].includes(h) ? h : 'tableau'; }
+function rendre(){
+  const v = vue(); $('#coll').value = D.coll; $('#jour').value = JOUR; kpis();
+  document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + v));
+  $('#main').innerHTML = v === 'pta' ? vPTA() : v === 'bilan' ? vBilan() : vTableau();
+}
+document.addEventListener('click', e => {
+  const tr = e.target.closest('tr.click'); if (tr){ EDIT = { ...D.acts.find(a => a.id === tr.dataset.id) }; if (vue() !== 'pta') location.hash = 'pta'; else rendre(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  const id = e.target.id;
+  if (id === 'nouv'){ EDIT = { axe: FILTRE.axe || axes()[0] || '', act: '', resp: '', deb: JOUR, ech: '', ind: '', cible: 1, real: 0, budget: 0, dep: 0, obs: '' }; rendre(); }
+  if (id === 'ann'){ EDIT = null; rendre(); }
+  if (id === 'sup'){ if (e.target.dataset.ok){ D.acts = D.acts.filter(a => a.id !== EDIT.id); EDIT = null; sauver(); rendre(); toast('Activité supprimée'); } else { e.target.dataset.ok = 1; e.target.textContent = 'Confirmer la suppression'; } }
+  if (id === 'bimp') importer($('#imp').value);
+  if (id === 'bex'){ if (e.target.dataset.ok){ const c = D.coll; D = EX(); sauver(); rendre(); toast('Exemple fictif rechargé'); } else { e.target.dataset.ok = 1; e.target.textContent = 'Remplacer toutes les activités ?'; } }
+  if (id === 'cbil') copier(bilanTexte(), 'Bilan copié');
+  if (id === 'cdem') copier(demande(), 'Demande copiée');
+  if (id === 'ccsv') copier(csv(), 'CSV copié');
+  if (id === 'tcsv'){ try { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv()], { type: 'text/csv' })); a.download = 'suivi-pta.csv'; a.click(); } catch (x) { toast('Téléchargement bloqué : utilisez « Copier le CSV »'); } }
+  if (id === 'pbil'){ try { const w = window.open('', '_blank'); w.document.write('<pre style="font:14px/1.5 sans-serif;white-space:pre-wrap">' + esc(bilanTexte()) + '</pre>'); w.document.close(); w.print(); } catch (x) { toast('Impression bloquée ici : utilisez « Copier le bilan »'); } }
+});
+document.addEventListener('submit', e => { e.preventDefault();
+  const g = k => $('#e_' + k).value, a = { id: EDIT.id || 'a' + Date.now().toString(36), axe: g('axe').trim() || 'Sans axe', act: g('act').trim(), resp: g('resp').trim(), deb: g('deb'), ech: g('ech'), ind: g('ind').trim(), cible: +g('cible') || 0, real: +g('real') || 0, budget: +g('budget') || 0, dep: +g('dep') || 0, obs: g('obs') };
+  const i = D.acts.findIndex(x => x.id === a.id); if (i >= 0) D.acts[i] = a; else D.acts.push(a);
+  EDIT = null; sauver(); rendre(); toast('Activité enregistrée'); });
+document.addEventListener('change', e => { const id = e.target.id;
+  if (id === 'fax'){ FILTRE.axe = e.target.value; rendre(); } if (id === 'fst'){ FILTRE.st = e.target.value; rendre(); }
+  if (id === 'coll'){ D.coll = e.target.value.trim() || 'Collectivité fictive'; sauver(); kpis(); }
+  if (id === 'jour' && e.target.value){ JOUR = e.target.value; rendre(); } });
+document.addEventListener('input', e => { if (e.target.id === 'fq'){ FILTRE.q = e.target.value; const p = e.target.selectionStart; rendre(); const f = $('#fq'); f.focus(); f.setSelectionRange(p, p); } });
+window.addEventListener('hashchange', () => { if (vue() !== 'pta') EDIT = null; rendre(); });
+rendre();
+}
+</script>
+</body>
+</html>

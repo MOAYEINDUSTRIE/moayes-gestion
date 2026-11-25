@@ -9,7 +9,7 @@ test.afterEach(async ({ page }) => { await sansErreur(page.erreurs); });
 test('chaque prestation du catalogue a sa méthode complète', async ({ page }) => {
   const r = await page.evaluate(() => DATA.catalogue.filter(p => p.cat !== MA).map(p => { const me = methode(p);
     return { code: p.code, type: me.type, etapes: prodEtapes(me).length, champs: me.champs.length, plan: me.plan.length, livrable: me.livrable }; }));
-  expect(r.length).toBe(40);
+  expect(r.length).toBe(41);
   for (const x of r) {
     expect(x.etapes, x.code).toBeGreaterThanOrEqual(8);
     expect(x.champs, x.code).toBeGreaterThanOrEqual(2);
