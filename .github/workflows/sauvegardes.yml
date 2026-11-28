@@ -42,16 +42,64 @@ jobs:
           BASE = 'https://moayes-industrie-default-rtdb.europe-west1.firebasedatabase.app/'
           jour = datetime.datetime.utcnow().strftime('%Y-%m-%d')
           # (préfixe du fichier, chemin Firebase, contrôle minimal : la sauvegarde doit contenir ces clés)
+          # Le script Drive n'accepte que les noms MOAYES_, IGC_ ou END_sauvegarde_AAAA-MM-JJ.json :
+          # la sauvegarde IGC réunit donc l'ancien emplacement (jusqu'à V1.32) et les fiches V1.33 (moayes/igc)
+          # dans un seul fichier IGC_sauvegarde_….json, au format du bouton « ⬆ Restaurer » d'IGC Gestion.
           cibles = [('MOAYES', 'moayes/v2_data', ['ventes', 'clients']),
-                    ('IGC', 'moayes/igc_data', ['societe']),          # ancien emplacement (jusqu'à V1.32)
-                    ('IGC_fiches', 'moayes/igc', ['meta']),           # V1.33 : une fiche par nœud
+                    ('IGC', 'moayes/igc_data', ['societe']),
                     ('END', 'end', [])]
+          COLS = ['clients', 'devis', 'missions', 'factures', 'paiements', 'depenses', 'ordres', 'catalogue', 'dossiers', 'comptesRendus']
+          def nb(x):
+              try: return float(x or 0)
+              except (TypeError, ValueError): return 0.0
+          def liste(v): return list(v.values()) if isinstance(v, dict) else (v if isinstance(v, list) else [])
+          def igc_complet(ancien, fiches):
+              # même fusion que l'application : la fiche la plus récente (champ u) gagne, les suppressions (del) sont appliquées
+              d = dict(ancien or {})
+              if not isinstance(fiches, dict) or not isinstance(fiches.get('meta'), dict): return d
+              m = fiches['meta']
+              if nb(m.get('_lastSaved')) >= nb(d.get('_lastSaved')):
+                  for k in ('societe', 'soldes', '_pins'):
+                      if m.get(k): d[k] = m[k]
+                  d['_lastSaved'] = m.get('_lastSaved')
+              cpt = dict(d.get('compteurs') or {})
+              for k, v in (m.get('compteurs') or {}).items():
+                  if nb(v) > nb(cpt.get(k)): cpt[k] = v
+              d['compteurs'] = cpt
+              nr = dict(d.get('nonRes') or {})
+              for k, v in (m.get('nonRes') or {}).items():
+                  if isinstance(v, dict) and (k not in nr or nb(v.get('u')) > nb((nr[k] or {}).get('u'))): nr[k] = v
+              d['nonRes'] = nr
+              dels = dict(d.get('_del') or {})
+              for k, v in (fiches.get('del') or {}).items():
+                  if nb(v) > nb(dels.get(k)): dels[k] = v
+              d['_del'] = dels
+              total = 0
+              for c in COLS:
+                  par_id = {}
+                  for x in liste(d.get(c)) + liste((fiches.get('c') or {}).get(c)):
+                      if not isinstance(x, dict) or not x.get('id'): continue
+                      if c in ('devis', 'factures') and not isinstance(x.get('lignes'), list): x['lignes'] = liste(x.get('lignes'))
+                      l = par_id.get(x['id'])
+                      if l is None or nb(x.get('u')) > nb(l.get('u')): par_id[x['id']] = x
+                  d[c] = [x for x in par_id.values() if not (x['id'] in dels and dels[x['id']] >= nb(x.get('u')))]
+                  total += len(d[c])
+              vus, aud = set(), []
+              for a in liste(d.get('audit')) + liste(fiches.get('audit')):
+                  if isinstance(a, dict) and (a.get('t'), a.get('a')) not in vus: vus.add((a.get('t'), a.get('a'))); aud.append(a)
+              d['audit'] = sorted(aud, key=lambda a: -nb(a.get('t')))[:300]
+              d['_sauvegarde'] = {'sources': ['moayes/igc_data', 'moayes/igc'], 'fiches': total}
+              return d
           erreurs = 0
           for nom, chemin, cles in cibles:
               try:
                   r = requests.get(BASE + chemin + '.json', headers={'Authorization': 'Bearer ' + cred.token}, timeout=120)
                   r.raise_for_status()
                   data = r.json()
+                  if nom == 'IGC':
+                      f = requests.get(BASE + 'moayes/igc.json', headers={'Authorization': 'Bearer ' + cred.token}, timeout=120)
+                      f.raise_for_status()
+                      data = igc_complet(data, f.json())
                   if not isinstance(data, dict) or any(k not in data for k in cles):
                       raise ValueError('données absentes ou incomplètes')
                   if nom == 'MOAYES':
